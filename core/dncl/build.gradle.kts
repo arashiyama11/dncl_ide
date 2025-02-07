@@ -37,7 +37,5 @@ dependencies {
     implementation(libs.arrow.core)
     implementation(libs.arrow.fx.coroutines)
 
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    testImplementation(libs.kotlin.test)
 }
