@@ -153,7 +153,7 @@ class Lexer(private val input: String) : ILexer {
 
                 '÷' -> {
                     readChar()
-                    Token.Divide
+                    Token.DivideInt
                 }
 
                 '%' -> {
