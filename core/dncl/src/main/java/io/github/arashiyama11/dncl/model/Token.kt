@@ -11,13 +11,14 @@ sealed interface Token {
         override val literal: kotlin.String = "COLON"
     }
 
+    data object Comma : Token {
+        override val literal: kotlin.String = "COMMA"
+    }
+
     data object NewLine : Token {
         override val literal: kotlin.String = "NEW_LINE"
     }
 
-    data object Space : Token {
-        override val literal: kotlin.String = "SPACE"
-    }
 
     data object ParenOpen : Token {
         override val literal: kotlin.String = "("
@@ -27,12 +28,94 @@ sealed interface Token {
         override val literal: kotlin.String = ")"
     }
 
-    data object Assign : Token {
-        override val literal: kotlin.String = "ASSIGN"
+    data object BracketOpen : Token {
+        override val literal: kotlin.String = "["
+    }
+
+    data object BracketClose : Token {
+        override val literal: kotlin.String = "]"
+    }
+
+    data object BraceOpen : Token {
+        override val literal: kotlin.String = "{"
+    }
+
+    data object BraceClose : Token {
+        override val literal: kotlin.String = "}"
+    }
+
+    data object LenticularOpen : Token {
+        override val literal: kotlin.String = "【"
+    }
+
+    data object LenticularClose : Token {
+        override val literal: kotlin.String = "】"
+    }
+
+    data object Plus : Token {
+        override val literal: kotlin.String = "+"
+    }
+
+    data object Minus : Token {
+        override val literal: kotlin.String = "-"
+    }
+
+    data object Times : Token {
+        override val literal: kotlin.String = "*"
     }
 
 
+    data object DivideInt : Token {
+        override val literal: kotlin.String = "//"
+    }
+
+    data object Divide : Token {
+        override val literal: kotlin.String = "÷"
+    }
+
+    data object Modulo : Token {
+        override val literal: kotlin.String = "%"
+    }
+
+    data object Assign : Token {
+        override val literal = "="
+    }
+
+    data object Equal : Token {
+        override val literal: kotlin.String = "=="
+    }
+
+    data object NotEqual : Token {
+        override val literal: kotlin.String = "≠"
+    }
+
+    data object GreaterThan : Token {
+        override val literal: kotlin.String = ">"
+    }
+
+    data object LessThan : Token {
+        override val literal: kotlin.String = "<"
+    }
+
+    data object GreaterThanOrEqual : Token {
+        override val literal: kotlin.String = "≧"
+    }
+
+    data object LessThanOrEqual : Token {
+        override val literal: kotlin.String = "≦"
+    }
+
+    data object Bang : Token {
+        override val literal: kotlin.String = "!"
+    }
+
+    data class Indent(
+        val depth: kotlin.Int,
+        override val literal: kotlin.String = "Indent(${depth})"
+    ) : Token
+
     data class Identifier(override val literal: kotlin.String) : Token
+    data class Japanese(override val literal: kotlin.String) : Token
     data class Int(override val literal: kotlin.String) : Token
     data class Float(override val literal: kotlin.String) : Token
     data class String(override val literal: kotlin.String) : Token
