@@ -10,6 +10,21 @@ sealed class LexerError(override val message: String) : DnclError {
     data object UnExpectedEOF : LexerError("Unexpected EOF")
 }
 
-data class AstError(override val message: String) : DnclError
-data class ParserError(override val message: String) : DnclError
+sealed class ParserError(override val message: String) : DnclError {
+    data class UnExpectedToken(val token: Token, val expectedToken: Token? = null) :
+        ParserError("Unexpected token: $token, ${if (expectedToken != null) "expected: $expectedToken" else ""}")
+
+    data class InvalidIntLiteral(val literal: String) :
+        ParserError("Invalid integer literal: $literal")
+
+    data class InvalidFloatLiteral(val literal: String) :
+        ParserError("Invalid float literal: $literal")
+
+    data class UnknownPrefixOperator(val operator: Token) :
+        ParserError("Unknown prefix operator: $operator")
+
+    data class UnknownInfixOperator(val operator: Token) :
+        ParserError("Unknown infix operator: $operator")
+}
+
 data class InternalError(override val message: String) : DnclError

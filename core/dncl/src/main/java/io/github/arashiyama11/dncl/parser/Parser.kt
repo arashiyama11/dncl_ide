@@ -120,15 +120,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         nextToken()
         if (currentToken != token) {
             Exception("").printStackTrace()
-            raise(ParserError("expectNextToken: expected $token, got $currentToken"))
-        }
-    }
-
-    private inline fun <reified T> expectNextToken(): Either<DnclError, Unit> = either {
-        nextToken()
-        if (currentToken is T) {
-            Exception("").printStackTrace()
-            raise(ParserError("expectNextToken: expected ${T::class.simpleName}, got $currentToken"))
+            raise(ParserError.UnExpectedToken(currentToken, token))
         }
     }
 
@@ -138,7 +130,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         nextToken()
         val startDepth = if (currentToken is Token.Indent) {
             (currentToken as Token.Indent).depth
-        } else raise(ParserError("parseBlockStatement: expected Indent, got $currentToken"))
+        } else raise(ParserError.UnExpectedToken(currentToken))
         nextToken().getOrElse { return it.left() }
         while (currentToken != Token.EOF) {
             if (currentToken is Token.NewLine) { //TODO 汚い
@@ -197,7 +189,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
         val counter = (currentToken as? Token.Identifier)
-            ?: return ParserError("parseForStatement: expected Identifier, got $currentToken").left()
+            ?: return ParserError.UnExpectedToken(currentToken).left()
         expectNextToken(Token.Wo).getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val start = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
@@ -211,7 +203,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val type = when (currentToken) {
             Token.UpTo -> AstNode.ForStatement.Companion.StepType.INCREMENT
             Token.DownTo -> AstNode.ForStatement.Companion.StepType.DECREMENT
-            else -> return ParserError("parseForStatement: expected 増やしながら繰り返す or 減らしながら繰り返す, got $currentToken").left()
+            else -> raise(ParserError.UnExpectedToken(currentToken))
         }
         expectNextToken(Token.Colon).getOrElse { return it.left() }
         val block = parseBlockStatement().getOrElse { return it.left() }
@@ -220,7 +212,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     private fun parseAssignStatement(): Either<DnclError, AstNode.AssignStatement> = either {
         val name = (currentToken as? Token.Identifier)
-            ?: return ParserError("parseAssignStatement: expected Identifier, got $currentToken").left()
+            ?: raise(ParserError.UnExpectedToken(currentToken))
         expectNextToken(Token.Assign).getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val value = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
@@ -230,7 +222,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseIndexAssignStatement(): Either<DnclError, AstNode.IndexAssignStatement> =
         either {
             val name = (currentToken as? Token.Identifier)
-                ?: return ParserError("parseAssignStatement: expected Identifier, got $currentToken").left()
+                ?: raise(ParserError.UnExpectedToken(currentToken))
             expectNextToken(Token.BracketOpen).getOrElse { return it.left() }
             nextToken().getOrElse { return it.left() }
             val index = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
@@ -245,37 +237,37 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         when (token) {
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
-                    ?: return ParserError("parseIdentifier: expected Identifier, got $currentToken").left()
+                    ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.Identifier(identifier.literal)
             }
 
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
-                    ?: return ParserError("parseIdentifier: expected Identifier, got $currentToken").left()
+                    ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.Identifier(identifier.literal)
             }
 
             is Token.Int -> {
                 val int = (currentToken as? Token.Int)
-                    ?: return ParserError("parseIntLiteral: expected IntLiteral, got $currentToken").left()
+                    ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.IntLiteral(
                     int.literal.toIntOrNull()
-                        ?: return ParserError("parseIntLiteral: invalid IntLiteral, got $currentToken").left()
+                        ?: raise(ParserError.InvalidIntLiteral(int.literal))
                 )
             }
 
             is Token.Float -> {
                 val float = (currentToken as? Token.Float)
-                    ?: return ParserError("parseFloatLiteral: expected FloatLiteral, got $currentToken").left()
+                    ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.FloatLiteral(
                     float.literal.toFloatOrNull()
-                        ?: return ParserError("parseFloatLiteral: invalid FloatLiteral, got $currentToken").left()
+                        ?: raise(ParserError.InvalidFloatLiteral(float.literal))
                 )
             }
 
             is Token.String -> {
                 val string = (currentToken as? Token.String)
-                    ?: return ParserError("parseStringLiteral: expected StringLiteral, got $currentToken").left()
+                    ?: return ParserError.UnExpectedToken(currentToken).left()
                 AstNode.StringLiteral(string.literal)
             }
 
@@ -291,7 +283,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
                 expectNextToken(Token.ParenClose).getOrElse { return it.left() }
                 if (currentToken != Token.ParenClose) {
-                    return ParserError("prefixParseFn: aexpected ParenClose, got $currentToken").left()
+                    raise(
+                        ParserError.UnExpectedToken(
+                            currentToken,
+                            expectedToken = Token.ParenClose
+                        )
+                    )
                 }
                 expression
             }
@@ -303,8 +300,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             else -> {
-                Exception("").printStackTrace()
-                raise(ParserError("prefixParseFn: no prefix parse function for $token"))
+                raise(ParserError.UnknownPrefixOperator(token))
             }
         }
     }
@@ -366,7 +362,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.WhileExpression(left, block).right()
             }
 
-            else -> ParserError("infixParseFn: no infix parse function for $currentToken").left()
+            else -> ParserError.UnknownInfixOperator(currentToken).left()
         }
     }
 
@@ -390,9 +386,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.While -> Precedence.WHILE
             is Token.And -> Precedence.AND
             is Token.Or -> Precedence.OR
-            else -> {
-                Precedence.LOWEST
-            }
+            else -> Precedence.LOWEST
+
         }
     }
 }
