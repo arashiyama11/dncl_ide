@@ -8,9 +8,8 @@ import kotlin.test.fail
 
 
 class ParserTest {
-
     @Test
-    fun test() {
+    fun testExpression() {
         val input = """-a+b
 !-a
 a + b + c
@@ -54,5 +53,15 @@ a + b * c + d / e - f
 ((5 < 4) ≠ (3 > 4))
 ((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))""", prog.getOrNull()!!.literal
         )
+    }
+
+    @Test
+    fun testAll() {
+        for ((i, program) in TestCase.all.withIndex()) {
+            val parser = Parser(Lexer(program)).getOrNull()!!
+            val prog = parser.parseProgram()
+            if (prog.isLeft()) fail("fail test case $i ${prog.leftOrNull()?.message}")
+            println(prog.getOrNull()!!.literal)
+        }
     }
 }

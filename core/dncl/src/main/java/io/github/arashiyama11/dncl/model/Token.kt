@@ -1,9 +1,11 @@
 package io.github.arashiyama11.dncl.model
 
+sealed interface ExpressionStopToken
+
 sealed interface Token {
     val literal: kotlin.String
 
-    data object EOF : Token {
+    data object EOF : Token, ExpressionStopToken {
         override val literal: kotlin.String = "EOF"
     }
 
@@ -15,7 +17,7 @@ sealed interface Token {
         override val literal: kotlin.String = "COMMA"
     }
 
-    data object NewLine : Token {
+    data object NewLine : Token, ExpressionStopToken {
         override val literal: kotlin.String = "NEW_LINE"
     }
 
@@ -109,26 +111,58 @@ sealed interface Token {
         override val literal: kotlin.String = "!"
     }
 
+    data object And : Token {
+        override val literal: kotlin.String = "AND"
+    }
+
+    data object Or : Token {
+        override val literal: kotlin.String = "OR"
+    }
+
     data object If : Token {
         override val literal: kotlin.String = "IF"
     }
 
-    data object Then : Token {
+    data object Then : Token, ExpressionStopToken {
         override val literal: kotlin.String = "THEN"
     }
 
-    data object Else : Token {
+    data object Else : Token, ExpressionStopToken {
         override val literal: kotlin.String = "ELSE"
     }
 
-    data object Elif : Token {
+    data object Elif : Token, ExpressionStopToken {
         override val literal: kotlin.String = "ELIF"
+    }
+
+    data object Wo : Token, ExpressionStopToken {
+        override val literal: kotlin.String = "WO"
+    }
+
+    data object Kara : Token, ExpressionStopToken {
+        override val literal: kotlin.String = "KARA"
+    }
+
+    data object Made : Token, ExpressionStopToken {
+        override val literal: kotlin.String = "MADE"
+    }
+
+    data object While : Token {
+        override val literal: kotlin.String = "WHILE"
+    }
+
+    data object UpTo : Token, ExpressionStopToken {
+        override val literal: kotlin.String = "UpTo"
+    }
+
+    data object DownTo : Token, ExpressionStopToken {
+        override val literal: kotlin.String = "DownTo"
     }
 
     data class Indent(
         val depth: kotlin.Int,
         override val literal: kotlin.String = "Indent(${depth})"
-    ) : Token
+    ) : Token, ExpressionStopToken
 
 
     data class Identifier(override val literal: kotlin.String) : Token

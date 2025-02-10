@@ -76,7 +76,10 @@ class Lexer(private val input: String) : ILexer {
 
                 '＞', '>' -> {
                     readChar()
-                    Token.GreaterThan
+                    if (ch == '=') {
+                        readChar()
+                        Token.GreaterThanOrEqual
+                    } else Token.GreaterThan
                 }
 
                 '≧' -> {
@@ -86,7 +89,11 @@ class Lexer(private val input: String) : ILexer {
 
                 '＜', '<' -> {
                     readChar()
-                    Token.LessThan
+                    if (ch == '=') {
+                        readChar()
+                        Token.LessThanOrEqual
+                    } else
+                        Token.LessThan
                 }
 
                 '≦' -> {
@@ -180,7 +187,7 @@ class Lexer(private val input: String) : ILexer {
                 '#' -> {
                     do {
                         readChar()
-                    } while (ch != '\n')
+                    } while (ch != '\n' && ch != END_OF_FILE)
                     nextToken().getOrElse { return it.left() }
                 }
 
@@ -220,8 +227,11 @@ class Lexer(private val input: String) : ILexer {
             readChar()
             if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
         } while (ch.isLetterOrDigit() || ch == '_')
-        val literal = input.substring(pos, position)
-        return Token.Identifier(literal).right()
+        return when (val literal = input.substring(pos, position)) {
+            "and" -> Token.And.right()
+            "or" -> Token.Or.right()
+            else -> Token.Identifier(literal).right()
+        }
     }
 
     private fun readJapanese(): Either<LexerError, Token> {
@@ -235,6 +245,14 @@ class Lexer(private val input: String) : ILexer {
             "ならば" -> Token.Then.right()
             "そうでなくもし" -> Token.Elif.right()
             "そうでなければ" -> Token.Else.right()
+            "を" -> Token.Wo.right()
+            "から" -> Token.Kara.right()
+            "まで" -> Token.Made.right()
+            "の間繰り返す" -> Token.While.right()
+            "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo.right()
+            "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo.right()
+            "かつ" -> Token.And.right()
+            "または" -> Token.Or.right()
             else -> Token.Japanese(literal).right()
         }
     }

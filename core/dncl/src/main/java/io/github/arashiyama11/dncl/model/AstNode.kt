@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl.model
 
+
 sealed interface AstNode {
     val literal: String
     override fun toString(): String
@@ -16,14 +17,35 @@ sealed interface AstNode {
         override fun toString() = literal
     }
 
-    data class InfixExpression(
-        val left: Expression,
-        val operator: Token,
+    sealed interface InfixExpression : Expression {
+        val left: Expression
+        val operator: Token
         val right: Expression
-    ) : Expression {
-
         override val literal: String
             get() = "(${left.literal} ${operator.literal} ${right.literal})"
+
+        companion object {
+            operator fun invoke(
+                left: Expression,
+                operator: Token,
+                right: Expression
+            ): InfixExpression = InfixExpressionImpl(left, operator, right)
+        }
+    }
+
+    private data class InfixExpressionImpl(
+        override val left: Expression,
+        override val operator: Token,
+        override val right: Expression
+    ) : InfixExpression
+
+    data class IndexExpression(
+        override val left: Expression,
+        override val right: Expression,
+        override val operator: Token = Token.BracketOpen
+    ) : InfixExpression {
+        override val literal: String
+            get() = "(${left.literal}[${right.literal}])"
     }
 
     data class Program(val statements: List<Statement>) : AstNode {
@@ -33,7 +55,16 @@ sealed interface AstNode {
 
     data class AssignStatement(val name: Token.Identifier, val value: Expression) : Statement {
         override val literal: String
-            get() = "${name.literal} = ${value.literal};"
+            get() = "${name.literal} = ${value.literal}"
+    }
+
+    data class IndexAssignStatement(
+        val name: Token.Identifier,
+        val index: Expression,
+        val value: Expression
+    ) : Statement {
+        override val literal: String
+            get() = "${name.literal}[${index.literal}] = ${value.literal}"
     }
 
     data class ExpressionStatement(val expression: Expression) : Statement {
@@ -47,7 +78,34 @@ sealed interface AstNode {
         val alternative: BlockStatement?
     ) : Statement {
         override val literal: String
-            get() = "if (${condition.literal}) ${consequence.literal}${alternative?.literal ?: ""}"
+            get() = "if ${condition.literal} ${consequence.literal}${alternative?.literal?.let { " else $it" } ?: ""}"
+    }
+
+    data class ForStatement(
+        val loopCounter: Token.Identifier,
+        val start: Expression,
+        val end: Expression,
+        val step: Expression,
+        val stepType: StepType,
+        val block: BlockStatement
+    ) : Statement {
+        override val literal: String
+            get() = "for ${loopCounter.literal} in $start..$end $stepType by $step ${block.literal}"
+
+        companion object {
+            enum class StepType {
+                INCREMENT,
+                DECREMENT
+            }
+        }
+    }
+
+    data class WhileExpression(
+        val condition: Expression,
+        val block: BlockStatement
+    ) : Expression {
+        override val literal: String
+            get() = "while ${condition.literal} ${block.literal}"
     }
 
     data class BlockStatement(val statements: List<Statement>) : Statement {
@@ -56,6 +114,11 @@ sealed interface AstNode {
     }
 
     data class Identifier(val value: String) : Expression {
+        override val literal: String
+            get() = value
+    }
+
+    data class JapaneseIdentifier(val value: String) : Expression {
         override val literal: String
             get() = value
     }
@@ -75,9 +138,21 @@ sealed interface AstNode {
             get() = value.toString()
     }
 
+    data class StringLiteral(val value: kotlin.String) : Expression {
+        override val literal: String
+            get() = "\"$value\""
+    }
 
     data class ArrayLiteral(val elements: List<Expression>) : Expression {
         override val literal: String
             get() = "[${elements.joinToString(separator = ", ") { it.literal }}]"
+    }
+
+    data class CallExpression(
+        val function: Expression,
+        val arguments: List<Expression>
+    ) : Expression {
+        override val literal: String
+            get() = "${function.literal}(${arguments.joinToString(separator = ", ") { it.literal }})"
     }
 }
