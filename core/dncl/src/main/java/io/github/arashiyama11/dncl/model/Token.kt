@@ -70,7 +70,7 @@ sealed interface Token {
     }
 
     data object Divide : Token {
-        override val literal: kotlin.String = "÷"
+        override val literal: kotlin.String = "/"
     }
 
     data object Modulo : Token {
@@ -109,10 +109,27 @@ sealed interface Token {
         override val literal: kotlin.String = "!"
     }
 
+    data object If : Token {
+        override val literal: kotlin.String = "IF"
+    }
+
+    data object Then : Token {
+        override val literal: kotlin.String = "THEN"
+    }
+
+    data object Else : Token {
+        override val literal: kotlin.String = "ELSE"
+    }
+
+    data object Elif : Token {
+        override val literal: kotlin.String = "ELIF"
+    }
+
     data class Indent(
         val depth: kotlin.Int,
         override val literal: kotlin.String = "Indent(${depth})"
     ) : Token
+
 
     data class Identifier(override val literal: kotlin.String) : Token
     data class Japanese(override val literal: kotlin.String) : Token

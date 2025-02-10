@@ -23,8 +23,10 @@ class Lexer(private val input: String) : ILexer {
         return either {
             val token = when (ch) {
                 '\n' -> {
-                    readChar()
-                    Token.NewLine
+                    do {
+                        readChar()
+                    } while (ch == '\n')
+                    if (ch == END_OF_FILE) Token.EOF else Token.NewLine
                 }
 
                 ' ' -> if (preToken == Token.NewLine) {
@@ -228,21 +230,24 @@ class Lexer(private val input: String) : ILexer {
             readChar()
             if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
         } while (ch.isLetterOrDigit() || ch == '_')
-        val literal = input.substring(pos, position)
-        return Token.Japanese(literal).right()
+        return when (val literal = input.substring(pos, position)) {
+            "もし" -> Token.If.right()
+            "ならば" -> Token.Then.right()
+            "そうでなくもし" -> Token.Elif.right()
+            "そうでなければ" -> Token.Else.right()
+            else -> Token.Japanese(literal).right()
+        }
     }
 
     private fun readNumber(): Either<LexerError, Token> {
         val pos = position
-        while (ch.isDigit()) {
+        while (ch.isDigit() && ch != END_OF_FILE) {
             readChar()
-            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
         }
         return if (ch == '.') {
             readChar()
-            while (ch.isDigit()) {
+            while (ch.isDigit() && ch != END_OF_FILE) {
                 readChar()
-                if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
             }
             Token.Float(input.substring(pos, position)).right()
         } else Token.Int(input.substring(pos, position)).right()
