@@ -18,7 +18,6 @@ class Lexer(private val input: String) : ILexer {
         readChar()
     }
 
-    //andの扱いをどうするか
     override fun nextToken(): Either<LexerError, Token> {
         return either {
             val token = when (ch) {
