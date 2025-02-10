@@ -15,7 +15,6 @@ import io.github.arashiyama11.dncl.model.Precedence
 import io.github.arashiyama11.dncl.model.Token
 
 class Parser private constructor(private val lexer: ILexer) : IParser {
-    private lateinit var preToken: Token
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
 
@@ -112,7 +111,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
 
     private fun nextToken(): Either<LexerError, Token> {
-        preToken = currentToken
         currentToken = nextToken
         nextToken = lexer.nextToken().getOrElse { return it.left() }
         return currentToken.right()
@@ -376,7 +374,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     companion object {
         operator fun invoke(lexer: ILexer): Either<LexerError, Parser> {
             val parser = Parser(lexer)
-            parser.preToken = Token.NewLine
             parser.currentToken = lexer.nextToken().getOrElse { return it.left() }
             parser.nextToken = lexer.nextToken().getOrElse { return it.left() }
             return parser.right()
