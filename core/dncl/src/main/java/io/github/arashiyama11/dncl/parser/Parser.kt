@@ -19,7 +19,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private lateinit var nextToken: Token
 
 
-    fun parseProgram(): Either<DnclError, AstNode.Program> {
+    override fun parseProgram(): Either<DnclError, AstNode.Program> {
         val statements = mutableListOf<AstNode.Statement>()
         while (currentToken != Token.EOF) {
             val statement = parseStatement().getOrElse {
