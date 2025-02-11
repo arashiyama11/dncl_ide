@@ -21,7 +21,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     override fun parseProgram(): Either<DnclError, AstNode.Program> {
         val statements = mutableListOf<AstNode.Statement>()
-        while (currentToken != Token.EOF) {
+        while (currentToken !is Token.EOF) {
             val statement = parseStatement().getOrElse {
                 return it.left()
             }
@@ -38,9 +38,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.Comma -> if (nextToken is Token.Identifier) {
                 nextToken().getOrElse { return it.left() }
                 when (nextToken) {
-                    Token.Assign -> parseAssignStatement()
-                    Token.Wo -> parseForStatement()
-                    Token.BracketOpen -> {
+                    is Token.Assign -> parseAssignStatement()
+                    is Token.Wo -> parseForStatement()
+                    is Token.BracketOpen -> {
                         parseIndexAssignStatement().getOrNull()?.right()
                             ?: parseExpressionStatement()
                     }
@@ -52,9 +52,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             is Token.Identifier -> when (nextToken) {
-                Token.Assign -> parseAssignStatement()
-                Token.Wo -> parseForStatement()
-                Token.BracketOpen -> {
+                is Token.Assign -> parseAssignStatement()
+                is Token.Wo -> parseForStatement()
+                is Token.BracketOpen -> {
                     parseIndexAssignStatement().getOrNull()?.right() ?: parseExpressionStatement()
                 }
 
@@ -67,10 +67,14 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
             is Token.NewLine -> {
                 nextToken().getOrElse { return it.left() }
-                if (currentToken == Token.EOF) { //TODO 汚い
+                if (currentToken is Token.EOF) { //TODO 汚い
                     return AstNode.BlockStatement(emptyList()).right()
                 }
                 parseStatement()
+            }
+
+            is Token.Indent -> {
+                return ParserError.UnexpectedIndent(currentToken).left()
             }
 
 
@@ -83,14 +87,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseExpression(precedence: Precedence): Either<DnclError, AstNode.Expression> {
         var left = prefixParseFn(currentToken).getOrElse { return it.left() }
         while ((nextToken !is ExpressionStopToken && precedence < nextToken.precedence())) {
-            /*if (nextToken == Token.While) {
-                nextToken().getOrElse { return it.left() }
-                expectNextToken(Token.Colon)
-                val block = parseBlockStatement().getOrElse { return it.left() }
-                return AstNode.WhileExpression(
-                    left, block
-                ).right()
-            }*/
             nextToken().getOrElse { return it.left() }
             left = infixParseFn(left).getOrElse { return it.left() }
         }
@@ -104,7 +100,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             /*if (nextToken != Token.EOF && nextToken != Token.NewLine) {
                 expectNextToken(Token.NewLine).getOrElse { return it.left() }
             }*/
-            if (nextToken == Token.NewLine) {
+            if (nextToken is Token.NewLine) {
                 nextToken().getOrElse { return it.left() }
             }
             AstNode.ExpressionStatement(expression)
@@ -116,23 +112,27 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         return currentToken.right()
     }
 
-    private fun expectNextToken(token: Token): Either<DnclError, Unit> = either {
+    private inline fun <reified T> expectNextToken(): Either<DnclError, Unit> = either {
         nextToken()
-        if (currentToken != token) {
-            Exception("").printStackTrace()
-            raise(ParserError.UnExpectedToken(currentToken, token))
+        if (currentToken !is T) {
+            raise(
+                ParserError.UnExpectedToken(
+                    currentToken,
+                    expectedToken = T::class.java.simpleName
+                )
+            )
         }
     }
 
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
         val statements = mutableListOf<AstNode.Statement>()
-        expectNextToken(Token.NewLine).getOrElse { return it.left() }
+        expectNextToken<Token.NewLine>().getOrElse { return it.left() }
         nextToken()
         val startDepth = if (currentToken is Token.Indent) {
             (currentToken as Token.Indent).depth
         } else raise(ParserError.UnExpectedToken(currentToken))
         nextToken().getOrElse { return it.left() }
-        while (currentToken != Token.EOF) {
+        while (currentToken !is Token.EOF) {
             if (currentToken is Token.NewLine) { //TODO 汚い
                 val depth = (nextToken as? Token.Indent)?.depth ?: 0
                 if (depth < startDepth) {
@@ -149,7 +149,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     nextToken().getOrElse { return it.left() }
                 }
             }
-            if (currentToken == Token.EOF) {
+            if (currentToken is Token.EOF) {
                 break
             }
             val statement = parseStatement().getOrElse { return it.left() }
@@ -163,20 +163,20 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         nextToken()
         val condition = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
 
-        expectNextToken(Token.Then).getOrElse { return it.left() }
-        expectNextToken(Token.Colon).getOrElse { return it.left() }
+        expectNextToken<Token.Then>().getOrElse { return it.left() }
+        expectNextToken<Token.Colon>().getOrElse { return it.left() }
 
         val consequence = parseBlockStatement().getOrElse { return it.left() }
 
-        while (nextToken == Token.NewLine || nextToken is Token.Indent) nextToken().getOrElse { return it.left() }
+        while (nextToken is Token.NewLine || nextToken is Token.Indent) nextToken().getOrElse { return it.left() }
 
-        if (nextToken == Token.Else) {
-            expectNextToken(Token.Else).getOrElse { return it.left() }
-            expectNextToken(Token.Colon).getOrElse { return it.left() }
+        if (nextToken is Token.Else) {
+            expectNextToken<Token.Else>().getOrElse { return it.left() }
+            expectNextToken<Token.Colon>().getOrElse { return it.left() }
             val alternative = parseBlockStatement().getOrElse { return it.left() }
             AstNode.IfStatement(condition, consequence, alternative)
-        } else if (nextToken == Token.Elif) {
-            expectNextToken(Token.Elif).getOrElse { return it.left() }
+        } else if (nextToken is Token.Elif) {
+            expectNextToken<Token.Elif>().getOrElse { return it.left() }
             AstNode.IfStatement(
                 condition,
                 consequence,
@@ -190,22 +190,22 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
         val counter = (currentToken as? Token.Identifier)
             ?: return ParserError.UnExpectedToken(currentToken).left()
-        expectNextToken(Token.Wo).getOrElse { return it.left() }
+        expectNextToken<Token.Wo>().getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val start = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-        expectNextToken(Token.Kara).getOrElse { return it.left() }
+        expectNextToken<Token.Kara>().getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val end = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-        expectNextToken(Token.Made).getOrElse { return it.left() }
+        expectNextToken<Token.Made>().getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val step = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val type = when (currentToken) {
-            Token.UpTo -> AstNode.ForStatement.Companion.StepType.INCREMENT
-            Token.DownTo -> AstNode.ForStatement.Companion.StepType.DECREMENT
+            is Token.UpTo -> AstNode.ForStatement.Companion.StepType.INCREMENT
+            is Token.DownTo -> AstNode.ForStatement.Companion.StepType.DECREMENT
             else -> raise(ParserError.UnExpectedToken(currentToken))
         }
-        expectNextToken(Token.Colon).getOrElse { return it.left() }
+        expectNextToken<Token.Colon>().getOrElse { return it.left() }
         val block = parseBlockStatement().getOrElse { return it.left() }
         AstNode.ForStatement(counter, start, end, step, type, block)
     }
@@ -213,7 +213,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseAssignStatement(): Either<DnclError, AstNode.AssignStatement> = either {
         val name = (currentToken as? Token.Identifier)
             ?: raise(ParserError.UnExpectedToken(currentToken))
-        expectNextToken(Token.Assign).getOrElse { return it.left() }
+        expectNextToken<Token.Assign>().getOrElse { return it.left() }
         nextToken().getOrElse { return it.left() }
         val value = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
         AstNode.AssignStatement(name, value)
@@ -223,11 +223,11 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         either {
             val name = (currentToken as? Token.Identifier)
                 ?: raise(ParserError.UnExpectedToken(currentToken))
-            expectNextToken(Token.BracketOpen).getOrElse { return it.left() }
+            expectNextToken<Token.BracketOpen>().getOrElse { return it.left() }
             nextToken().getOrElse { return it.left() }
             val index = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-            expectNextToken(Token.BracketClose).getOrElse { return it.left() }
-            expectNextToken(Token.Assign).getOrElse { return it.left() }
+            expectNextToken<Token.BracketClose>().getOrElse { return it.left() }
+            expectNextToken<Token.Assign>().getOrElse { return it.left() }
             nextToken().getOrElse { return it.left() }
             val value = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
             AstNode.IndexAssignStatement(name, index, value)
@@ -252,7 +252,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.IntLiteral(
                     int.literal.toIntOrNull()
-                        ?: raise(ParserError.InvalidIntLiteral(int.literal))
+                        ?: raise(ParserError.InvalidIntLiteral(int))
                 )
             }
 
@@ -261,7 +261,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.FloatLiteral(
                     float.literal.toFloatOrNull()
-                        ?: raise(ParserError.InvalidFloatLiteral(float.literal))
+                        ?: raise(ParserError.InvalidFloatLiteral(float))
                 )
             }
 
@@ -271,7 +271,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.StringLiteral(string.literal)
             }
 
-            is Token.Bang, Token.Minus, Token.Plus -> {
+            is Token.Bang, is Token.Minus, is Token.Plus -> {
                 val operator = currentToken
                 nextToken().getOrElse { return it.left() }
                 val right = parseExpression(Precedence.PREFIX).getOrElse { return it.left() }
@@ -281,12 +281,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.ParenOpen -> {
                 nextToken().getOrElse { return it.left() }
                 val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-                expectNextToken(Token.ParenClose).getOrElse { return it.left() }
-                if (currentToken != Token.ParenClose) {
+                expectNextToken<Token.ParenClose>().getOrElse { return it.left() }
+                if (currentToken !is Token.ParenClose) {
                     raise(
                         ParserError.UnExpectedToken(
                             currentToken,
-                            expectedToken = Token.ParenClose
+                            expectedToken = Token.ParenClose::class.java.simpleName
                         )
                     )
                 }
@@ -295,7 +295,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
             is Token.BracketOpen -> {
                 nextToken().getOrElse { return it.left() }
-                val exps = parseExpressionList(Token.BracketClose).getOrElse { return it.left() }
+                val exps = parseExpressionList<Token.BracketClose>().getOrElse { return it.left() }
                 AstNode.ArrayLiteral(exps)
             }
 
@@ -305,37 +305,37 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
     }
 
-    private fun parseExpressionList(end: Token): Either<DnclError, List<AstNode.Expression>> =
+    private inline fun <reified T> parseExpressionList(): Either<DnclError, List<AstNode.Expression>> =
         either {
 
-            if (currentToken == end) {
+            if (currentToken is T) {
                 return emptyList<AstNode.Expression>().right()
             }
             val list =
                 mutableListOf(parseExpression(Precedence.LOWEST).getOrElse { return it.left() })
-            while (currentToken is Token.Indent || currentToken == Token.NewLine) nextToken().getOrElse { return it.left() }
+            while (currentToken is Token.Indent || currentToken is Token.NewLine) nextToken().getOrElse { return it.left() }
 
-            while (nextToken == Token.Comma) {
-
-                nextToken().getOrElse { return it.left() }
-                while (currentToken is Token.Indent || currentToken == Token.NewLine) nextToken().getOrElse { return it.left() }
-
+            while (nextToken is Token.Comma) {
 
                 nextToken().getOrElse { return it.left() }
-                while (currentToken is Token.Indent || currentToken == Token.NewLine) nextToken().getOrElse { return it.left() }
+                while (currentToken is Token.Indent || currentToken is Token.NewLine) nextToken().getOrElse { return it.left() }
+
+
+                nextToken().getOrElse { return it.left() }
+                while (currentToken is Token.Indent || currentToken is Token.NewLine) nextToken().getOrElse { return it.left() }
 
 
                 list.add(parseExpression(Precedence.LOWEST).getOrElse { return it.left() })
 
             }
 
-            expectNextToken(end).getOrElse { return it.left() }
+            expectNextToken<T>().getOrElse { return it.left() }
             return list.toList().right()
         }
 
     private fun infixParseFn(left: AstNode.Expression): Either<DnclError, AstNode.Expression> {
         return when (currentToken) {
-            is Token.Plus, Token.Minus, Token.Times, Token.Divide, Token.DivideInt, Token.Modulo, Token.Equal, Token.NotEqual, Token.GreaterThan, Token.LessThan, Token.GreaterThanOrEqual, Token.LessThanOrEqual, Token.And, Token.Or -> {
+            is Token.Plus, is Token.Minus, is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo, is Token.Equal, is Token.NotEqual, is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual, is Token.And, is Token.Or -> {
                 val operator = currentToken
                 val precedence = currentToken.precedence()
                 nextToken().getOrElse { return it.left() }
@@ -346,18 +346,18 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.BracketOpen -> {
                 nextToken().getOrElse { return it.left() }
                 val index = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-                expectNextToken(Token.BracketClose).getOrElse { return it.left() }
-                AstNode.IndexExpression(left, index).right()
+                expectNextToken<Token.BracketClose>().getOrElse { return it.left() }
+                AstNode.IndexExpression(left, index, currentToken).right()
             }
 
             is Token.ParenOpen -> {
                 nextToken().getOrElse { return it.left() }
-                val args = parseExpressionList(Token.ParenClose).getOrElse { return it.left() }
+                val args = parseExpressionList<Token.ParenClose>().getOrElse { return it.left() }
                 AstNode.CallExpression(left, args).right()
             }
 
             is Token.While -> {
-                expectNextToken(Token.Colon).getOrElse { return it.left() }
+                expectNextToken<Token.Colon>().getOrElse { return it.left() }
                 val block = parseBlockStatement().getOrElse { return it.left() }
                 AstNode.WhileExpression(left, block).right()
             }
@@ -376,10 +376,10 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
 
         fun Token.precedence() = when (this) {
-            is Token.Plus, Token.Minus -> Precedence.SUM
-            is Token.Times, Token.Divide, Token.DivideInt, Token.Modulo -> Precedence.PRODUCT
-            is Token.GreaterThan, Token.LessThan, Token.GreaterThanOrEqual, Token.LessThanOrEqual -> Precedence.LESSGREATER
-            is Token.Equal, Token.NotEqual -> Precedence.EQUALS
+            is Token.Plus, is Token.Minus -> Precedence.SUM
+            is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo -> Precedence.PRODUCT
+            is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual -> Precedence.LESSGREATER
+            is Token.Equal, is Token.NotEqual -> Precedence.EQUALS
             is Token.Bang -> Precedence.PREFIX
             is Token.BracketOpen -> Precedence.INDEX
             is Token.ParenOpen -> Precedence.CALL

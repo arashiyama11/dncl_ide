@@ -2,172 +2,98 @@ package io.github.arashiyama11.dncl.model
 
 sealed interface ExpressionStopToken
 
-sealed interface Token {
-    val literal: kotlin.String
-
-    data object EOF : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "EOF"
+sealed class Token(
+    val literal: kotlin.String,
+    val range: IntRange
+) {
+    override fun toString(): kotlin.String {
+        return "${this::class.simpleName}($literal)"
     }
 
-    data object Colon : Token {
-        override val literal: kotlin.String = "COLON"
-    }
+    class EOF(range: IntRange) : Token("EOF", range), ExpressionStopToken
 
-    data object Comma : Token {
-        override val literal: kotlin.String = "COMMA"
-    }
+    class Colon(range: IntRange) : Token("COLON", range)
 
-    data object NewLine : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "NEW_LINE"
-    }
+    class Comma(range: IntRange) : Token("COMMA", range)
 
+    class NewLine(range: IntRange) : Token("NEW_LINE", range), ExpressionStopToken
 
-    data object ParenOpen : Token {
-        override val literal: kotlin.String = "("
-    }
+    class ParenOpen(range: IntRange) : Token("(", range)
 
-    data object ParenClose : Token {
-        override val literal: kotlin.String = ")"
-    }
+    class ParenClose(range: IntRange) : Token(")", range)
 
-    data object BracketOpen : Token {
-        override val literal: kotlin.String = "["
-    }
+    class BracketOpen(range: IntRange) : Token("[", range)
 
-    data object BracketClose : Token {
-        override val literal: kotlin.String = "]"
-    }
+    class BracketClose(range: IntRange) : Token("]", range)
 
-    data object BraceOpen : Token {
-        override val literal: kotlin.String = "{"
-    }
+    class BraceOpen(range: IntRange) : Token("{", range)
 
-    data object BraceClose : Token {
-        override val literal: kotlin.String = "}"
-    }
+    class BraceClose(range: IntRange) : Token("}", range)
 
-    data object LenticularOpen : Token {
-        override val literal: kotlin.String = "【"
-    }
+    class LenticularOpen(range: IntRange) : Token("【", range)
 
-    data object LenticularClose : Token {
-        override val literal: kotlin.String = "】"
-    }
+    class LenticularClose(range: IntRange) : Token("】", range)
 
-    data object Plus : Token {
-        override val literal: kotlin.String = "+"
-    }
+    class Plus(range: IntRange) : Token("+", range)
 
-    data object Minus : Token {
-        override val literal: kotlin.String = "-"
-    }
+    class Minus(range: IntRange) : Token("-", range)
 
-    data object Times : Token {
-        override val literal: kotlin.String = "*"
-    }
+    class Times(range: IntRange) : Token("*", range)
 
+    class DivideInt(range: IntRange) : Token("//", range)
 
-    data object DivideInt : Token {
-        override val literal: kotlin.String = "//"
-    }
+    class Divide(range: IntRange) : Token("/", range)
 
-    data object Divide : Token {
-        override val literal: kotlin.String = "/"
-    }
+    class Modulo(range: IntRange) : Token("%", range)
 
-    data object Modulo : Token {
-        override val literal: kotlin.String = "%"
-    }
+    class Assign(range: IntRange) : Token("=", range)
 
-    data object Assign : Token {
-        override val literal = "="
-    }
+    class Equal(range: IntRange) : Token("==", range)
 
-    data object Equal : Token {
-        override val literal: kotlin.String = "=="
-    }
+    class NotEqual(range: IntRange) : Token("≠", range)
 
-    data object NotEqual : Token {
-        override val literal: kotlin.String = "≠"
-    }
+    class GreaterThan(range: IntRange) : Token(">", range)
 
-    data object GreaterThan : Token {
-        override val literal: kotlin.String = ">"
-    }
+    class LessThan(range: IntRange) : Token("<", range)
 
-    data object LessThan : Token {
-        override val literal: kotlin.String = "<"
-    }
+    class GreaterThanOrEqual(range: IntRange) : Token("≧", range)
 
-    data object GreaterThanOrEqual : Token {
-        override val literal: kotlin.String = "≧"
-    }
+    class LessThanOrEqual(range: IntRange) : Token("≦", range)
 
-    data object LessThanOrEqual : Token {
-        override val literal: kotlin.String = "≦"
-    }
+    class Bang(range: IntRange) : Token("!", range)
 
-    data object Bang : Token {
-        override val literal: kotlin.String = "!"
-    }
+    class And(range: IntRange) : Token("AND", range)
 
-    data object And : Token {
-        override val literal: kotlin.String = "AND"
-    }
+    class Or(range: IntRange) : Token("OR", range)
 
-    data object Or : Token {
-        override val literal: kotlin.String = "OR"
-    }
+    class If(range: IntRange) : Token("IF", range)
 
-    data object If : Token {
-        override val literal: kotlin.String = "IF"
-    }
+    class Then(range: IntRange) : Token("THEN", range), ExpressionStopToken
 
-    data object Then : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "THEN"
-    }
+    class Else(range: IntRange) : Token("ELSE", range), ExpressionStopToken
 
-    data object Else : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "ELSE"
-    }
+    class Elif(range: IntRange) : Token("ELIF", range), ExpressionStopToken
 
-    data object Elif : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "ELIF"
-    }
+    class Wo(range: IntRange) : Token("WO", range), ExpressionStopToken
 
-    data object Wo : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "WO"
-    }
+    class Kara(range: IntRange) : Token("KARA", range), ExpressionStopToken
 
-    data object Kara : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "KARA"
-    }
+    class Made(range: IntRange) : Token("MADE", range), ExpressionStopToken
 
-    data object Made : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "MADE"
-    }
+    class While(range: IntRange) : Token("WHILE", range)
 
-    data object While : Token {
-        override val literal: kotlin.String = "WHILE"
-    }
+    class UpTo(range: IntRange) : Token("UpTo", range), ExpressionStopToken
 
-    data object UpTo : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "UpTo"
-    }
+    class DownTo(range: IntRange) : Token("DownTo", range), ExpressionStopToken
 
-    data object DownTo : Token, ExpressionStopToken {
-        override val literal: kotlin.String = "DownTo"
-    }
-
-    data class Indent(
+    class Indent(
         val depth: kotlin.Int,
-        override val literal: kotlin.String = "Indent(${depth})"
-    ) : Token, ExpressionStopToken
+        range: IntRange
+    ) : Token("Indent(${depth})", range), ExpressionStopToken
 
-
-    data class Identifier(override val literal: kotlin.String) : Token
-    data class Japanese(override val literal: kotlin.String) : Token
-    data class Int(override val literal: kotlin.String) : Token
-    data class Float(override val literal: kotlin.String) : Token
-    data class String(override val literal: kotlin.String) : Token
+    class Identifier(literal: kotlin.String, range: IntRange) : Token(literal, range)
+    class Japanese(literal: kotlin.String, range: IntRange) : Token(literal, range)
+    class Int(literal: kotlin.String, range: IntRange) : Token(literal, range)
+    class Float(literal: kotlin.String, range: IntRange) : Token(literal, range)
+    class String(literal: kotlin.String, range: IntRange) : Token(literal, range)
 }
