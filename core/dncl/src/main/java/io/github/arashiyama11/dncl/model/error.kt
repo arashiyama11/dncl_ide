@@ -50,7 +50,6 @@ ${" ".repeat(spaces)}${"^"}
 sealed class ParserError(override val message: String, open val failToken: Token) : DnclError {
     override fun explain(program: String): String {
         val programLines = program.split("\n")
-        //日本語の字幅を考慮していない
         val (column, line, spaces) = run {
             var index = 0
             for ((l, str) in programLines.withIndex()) {
@@ -69,7 +68,7 @@ sealed class ParserError(override val message: String, open val failToken: Token
         return """line: $line, column: $column
 $message
 ${programLines.subList(max(0, line - 5), line + 1).joinToString("\n")}
-${" ".repeat(spaces)}${"^".repeat(failToken.range.last - failToken.range.first)}"""
+${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.first))}"""
     }
 
     data class UnExpectedToken(override val failToken: Token, val expectedToken: String? = null) :

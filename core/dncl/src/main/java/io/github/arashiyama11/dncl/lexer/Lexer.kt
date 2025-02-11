@@ -20,7 +20,9 @@ class Lexer(private val input: String) : ILexer {
 
     override fun nextToken(): Either<LexerError, Token> {
         return either {
-            val token = when (ch) {
+            val token = if (preToken is Token.NewLine && ch != ' ') {
+                Token.Indent(0, position..position)
+            } else when (ch) {
                 '\n' -> {
                     do {
                         readChar()

@@ -10,6 +10,7 @@ import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl.model.LexerError
 import io.github.arashiyama11.dncl.model.AstNode
 import io.github.arashiyama11.dncl.model.ExpressionStopToken
+import io.github.arashiyama11.dncl.model.InternalError
 import io.github.arashiyama11.dncl.model.ParserError
 import io.github.arashiyama11.dncl.model.Precedence
 import io.github.arashiyama11.dncl.model.Token
@@ -20,15 +21,19 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
     override fun parseProgram(): Either<DnclError, AstNode.Program> {
-        val statements = mutableListOf<AstNode.Statement>()
-        while (currentToken !is Token.EOF) {
-            val statement = parseStatement().getOrElse {
-                return it.left()
+        try {
+            val statements = mutableListOf<AstNode.Statement>()
+            while (currentToken !is Token.EOF) {
+                val statement = parseStatement().getOrElse {
+                    return it.left()
+                }
+                statements.add(statement)
+                nextToken().getOrElse { return it.left() }
             }
-            statements.add(statement)
-            nextToken().getOrElse { return it.left() }
+            return AstNode.Program(statements).right()
+        } catch (e: Throwable) {
+            return InternalError(e.message ?: e.stackTraceToString()).left()
         }
-        return AstNode.Program(statements).right()
     }
 
     private fun parseStatement(): Either<DnclError, AstNode.Statement> {
@@ -61,10 +66,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 else -> parseExpressionStatement()
             }
 
-            is Token.Japanese -> {
-                parseExpressionStatement()
-            }
-
             is Token.NewLine -> {
                 nextToken().getOrElse { return it.left() }
                 if (currentToken is Token.EOF) { //TODO 汚い
@@ -73,8 +74,11 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 parseStatement()
             }
 
-            is Token.Indent -> {
+            is Token.Indent -> if ((currentToken as Token.Indent).depth != 0) {
                 return ParserError.UnexpectedIndent(currentToken).left()
+            } else {
+                nextToken()
+                parseStatement()
             }
 
 
@@ -86,7 +90,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     private fun parseExpression(precedence: Precedence): Either<DnclError, AstNode.Expression> {
         var left = prefixParseFn(currentToken).getOrElse { return it.left() }
-        while ((nextToken !is ExpressionStopToken && precedence < nextToken.precedence())) {
+        while ((nextToken !is ExpressionStopToken && precedence < nextToken.precedence()) && left !is AstNode.WhileExpression) {
             nextToken().getOrElse { return it.left() }
             left = infixParseFn(left).getOrElse { return it.left() }
         }
@@ -97,11 +101,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseExpressionStatement(): Either<DnclError, AstNode.ExpressionStatement> =
         either {
             val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-            /*if (nextToken != Token.EOF && nextToken != Token.NewLine) {
-                expectNextToken(Token.NewLine).getOrElse { return it.left() }
-            }*/
-            if (nextToken is Token.NewLine) {
-                nextToken().getOrElse { return it.left() }
+            if (nextToken !is Token.NewLine && nextToken !is Token.EOF && currentToken !is Token.Indent) {
+                raise(ParserError.UnExpectedToken(nextToken, "NewLine or EOF"))
             }
             AstNode.ExpressionStatement(expression)
         }
@@ -318,7 +319,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     private inline fun <reified T> parseExpressionList(): Either<DnclError, List<AstNode.Expression>> =
         either {
-
             if (currentToken is T) {
                 return emptyList<AstNode.Expression>().right()
             }
