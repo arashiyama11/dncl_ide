@@ -299,6 +299,17 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.ArrayLiteral(exps)
             }
 
+            is Token.LenticularOpen -> {
+                expectNextToken<Token.Japanese>()
+                val string = (currentToken as? Token.Japanese) ?: raise(
+                    ParserError.UnExpectedToken(
+                        currentToken
+                    )
+                )
+                expectNextToken<Token.LenticularClose>().getOrElse { return it.left() }
+                AstNode.SystemLiteral(string.literal)
+            }
+
             else -> {
                 raise(ParserError.UnknownPrefixOperator(token))
             }
@@ -356,6 +367,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.CallExpression(left, args).right()
             }
 
+
             is Token.While -> {
                 expectNextToken<Token.Colon>().getOrElse { return it.left() }
                 val block = parseBlockStatement().getOrElse { return it.left() }
@@ -380,7 +392,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo -> Precedence.PRODUCT
             is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual -> Precedence.LESSGREATER
             is Token.Equal, is Token.NotEqual -> Precedence.EQUALS
-            is Token.Bang -> Precedence.PREFIX
+            is Token.Bang, is Token.LenticularOpen -> Precedence.PREFIX
             is Token.BracketOpen -> Precedence.INDEX
             is Token.ParenOpen -> Precedence.CALL
             is Token.While -> Precedence.WHILE

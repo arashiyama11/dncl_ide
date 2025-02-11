@@ -55,7 +55,7 @@ a + b * c + d / e - f
         )
     }
 
-    @Test
+    @Test//TODO: add more test cases
     fun testAll() {
         for ((i, program) in TestCase.all.withIndex()) {
             val parser = Parser(Lexer(program)).getOrNull()!!

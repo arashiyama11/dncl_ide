@@ -118,27 +118,17 @@ sealed interface AstNode {
             get() = value
     }
 
-    data class JapaneseIdentifier(val value: String) : Expression {
-        override val literal: String
-            get() = value
-    }
-
-    data class Boolean(val value: kotlin.Boolean) : Expression {
+    data class IntLiteral(val value: Int) : Expression {
         override val literal: String
             get() = value.toString()
     }
 
-    data class IntLiteral(val value: kotlin.Int) : Expression {
+    data class FloatLiteral(val value: Float) : Expression {
         override val literal: String
             get() = value.toString()
     }
 
-    data class FloatLiteral(val value: kotlin.Float) : Expression {
-        override val literal: String
-            get() = value.toString()
-    }
-
-    data class StringLiteral(val value: kotlin.String) : Expression {
+    data class StringLiteral(val value: String) : Expression {
         override val literal: String
             get() = "\"$value\""
     }
@@ -146,6 +136,11 @@ sealed interface AstNode {
     data class ArrayLiteral(val elements: List<Expression>) : Expression {
         override val literal: String
             get() = "[${elements.joinToString(separator = ", ") { it.literal }}]"
+    }
+
+    data class SystemLiteral(val value: String) : Expression {
+        override val literal: String
+            get() = value
     }
 
     data class CallExpression(
