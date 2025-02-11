@@ -42,7 +42,7 @@ sealed interface AstNode {
     data class IndexExpression(
         override val left: Expression,
         override val right: Expression,
-        override val operator: Token = Token.BracketOpen
+        override val operator: Token
     ) : InfixExpression {
         override val literal: String
             get() = "(${left.literal}[${right.literal}])"

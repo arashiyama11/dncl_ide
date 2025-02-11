@@ -12,7 +12,7 @@ class Lexer(private val input: String) : ILexer {
     private var position: Int = 0
     private var readPosition: Int = 0
     private var ch: Char = END_OF_FILE
-    private var preToken: Token = Token.NewLine
+    private var preToken: Token = Token.NewLine(0..0)
 
     init {
         readChar()
@@ -25,16 +25,16 @@ class Lexer(private val input: String) : ILexer {
                     do {
                         readChar()
                     } while (ch == '\n')
-                    if (ch == END_OF_FILE) Token.EOF else Token.NewLine
+                    if (ch == END_OF_FILE) Token.EOF(position..position) else Token.NewLine(position..position)
                 }
 
-                ' ' -> if (preToken == Token.NewLine) {
+                ' ' -> if (preToken is Token.NewLine) {
                     var depth = 0
                     do {
                         readChar()
                         depth++
                     } while (ch == ' ')
-                    Token.Indent(depth)
+                    Token.Indent(depth, position - depth..position)
                 } else {
                     do {
                         readChar()
@@ -46,141 +46,141 @@ class Lexer(private val input: String) : ILexer {
                 '"' -> readString('"').getOrElse { return it.left() }
                 '(' -> {
                     readChar()
-                    Token.ParenOpen
+                    Token.ParenOpen(position..position)
                 }
 
                 ')' -> {
                     readChar()
-                    Token.ParenClose
+                    Token.ParenClose(position..position)
                 }
 
                 '←' -> {
                     readChar()
-                    Token.Assign
+                    Token.Assign(position..position)
                 }
 
                 '=' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.Equal
+                    Token.Equal(position..position)
                 } else {
                     readChar()
-                    Token.Assign
+                    Token.Assign(position - 1..position)
                 }
 
                 '≠' -> {
                     readChar()
-                    Token.NotEqual
+                    Token.NotEqual(position..position)
                 }
 
                 '＞', '>' -> {
                     readChar()
                     if (ch == '=') {
                         readChar()
-                        Token.GreaterThanOrEqual
-                    } else Token.GreaterThan
+                        Token.GreaterThanOrEqual(position - 1..position)
+                    } else Token.GreaterThan(position - 1..position)
                 }
 
                 '≧' -> {
                     readChar()
-                    Token.GreaterThanOrEqual
+                    Token.GreaterThanOrEqual(position..position)
                 }
 
                 '＜', '<' -> {
                     readChar()
                     if (ch == '=') {
                         readChar()
-                        Token.LessThanOrEqual
+                        Token.LessThanOrEqual(position - 1..position)
                     } else
-                        Token.LessThan
+                        Token.LessThan(position..position)
                 }
 
                 '≦' -> {
                     readChar()
-                    Token.LessThanOrEqual
+                    Token.LessThanOrEqual(position..position)
                 }
 
                 '[' -> {
                     readChar()
-                    Token.BracketOpen
+                    Token.BracketOpen(position..position)
                 }
 
                 ']' -> {
                     readChar()
-                    Token.BracketClose
+                    Token.BracketClose(position..position)
                 }
 
                 '{' -> {
                     readChar()
-                    Token.BraceOpen
+                    Token.BraceOpen(position..position)
                 }
 
                 '}' -> {
                     readChar()
-                    Token.BraceClose
+                    Token.BraceClose(position..position)
                 }
 
                 '【' -> {
                     readChar()
-                    Token.LenticularOpen
+                    Token.LenticularOpen(position..position)
                 }
 
                 '】' -> {
                     readChar()
-                    Token.LenticularClose
+                    Token.LenticularClose(position..position)
                 }
 
                 ',' -> {
                     readChar()
-                    Token.Comma
+                    Token.Comma(position..position)
                 }
 
                 '+', '＋' -> {
                     readChar()
-                    Token.Plus
+                    Token.Plus(position..position)
                 }
 
                 '-' -> {
                     readChar()
-                    Token.Minus
+                    Token.Minus(position..position)
                 }
 
                 '*', '×' -> {
                     readChar()
-                    Token.Times
+                    Token.Times(position..position)
                 }
 
                 '/' -> if (peekChar() == '/') {
                     readChar()
                     readChar()
-                    Token.DivideInt
+                    Token.DivideInt(position - 1..position)
                 } else {
                     readChar()
-                    Token.Divide
+                    Token.Divide(position..position)
                 }
 
                 '÷' -> {
                     readChar()
-                    Token.DivideInt
+                    Token.DivideInt(position..position)
                 }
 
                 '%' -> {
                     readChar()
-                    Token.Modulo
+                    Token.Modulo(position..position)
                 }
 
                 '!' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.NotEqual
+                    Token.NotEqual(position - 1..position)
                 } else {
                     readChar()
-                    Token.Bang
+                    Token.Bang(position..position)
                 }
 
                 ':', '：' -> {
                     readChar()
-                    Token.Colon
+                    Token.Colon(position..position)
                 }
 
                 '#' -> {
@@ -190,11 +190,11 @@ class Lexer(private val input: String) : ILexer {
                     nextToken().getOrElse { return it.left() }
                 }
 
-                END_OF_FILE -> Token.EOF
+                END_OF_FILE -> Token.EOF(position..position)
                 else -> when {
                     ch.isDigit() -> readNumber().getOrElse { return it.left() }
                     ch.isLetter() -> if (ch.isAlphaBet()) readIdentifier().getOrElse { return it.left() } else readJapanese().getOrElse { return it.left() } //TODO 日本語はべつの処理が必要
-                    else -> raise(LexerError.UnExpectedCharacter(ch))
+                    else -> raise(LexerError.UnExpectedCharacter(ch, position))
                 }
             }
             preToken = token
@@ -224,12 +224,12 @@ class Lexer(private val input: String) : ILexer {
         val pos = position
         do {
             readChar()
-            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
+            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(position).left()
         } while (ch.isLetterOrDigit() || ch == '_')
         return when (val literal = input.substring(pos, position)) {
-            "and" -> Token.And.right()
-            "or" -> Token.Or.right()
-            else -> Token.Identifier(literal).right()
+            "and" -> Token.And(pos until position).right()
+            "or" -> Token.Or(pos until position).right()
+            else -> Token.Identifier(literal, pos until position).right()
         }
     }
 
@@ -237,22 +237,24 @@ class Lexer(private val input: String) : ILexer {
         val pos = position
         do {
             readChar()
-            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
+            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(position).left()
         } while (ch.isLetterOrDigit() || ch == '_')
         return when (val literal = input.substring(pos, position)) {
-            "もし" -> Token.If.right()
-            "ならば" -> Token.Then.right()
-            "そうでなくもし" -> Token.Elif.right()
-            "そうでなければ" -> Token.Else.right()
-            "を" -> Token.Wo.right()
-            "から" -> Token.Kara.right()
-            "まで" -> Token.Made.right()
-            "の間繰り返す" -> Token.While.right()
-            "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo.right()
-            "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo.right()
-            "かつ" -> Token.And.right()
-            "または" -> Token.Or.right()
-            else -> Token.Japanese(literal).right()
+            "もし" -> Token.If(pos until position).right()
+            "ならば" -> Token.Then(pos until position).right()
+            "そうでなくもし" -> Token.Elif(pos until position).right()
+            "そうでなければ" -> Token.Else(pos until position).right()
+            "を" -> Token.Wo(pos until position).right()
+            "から" -> Token.Kara(pos until position).right()
+            "まで" -> Token.Made(pos until position).right()
+            "の間繰り返す" -> Token.While(pos until position).right()
+            "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo(pos until position).right()
+            "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo(pos until position)
+                .right()
+
+            "かつ" -> Token.And(pos until position).right()
+            "または" -> Token.Or(pos until position).right()
+            else -> Token.Japanese(literal, pos until position).right()
         }
     }
 
@@ -266,23 +268,23 @@ class Lexer(private val input: String) : ILexer {
             while (ch.isDigit() && ch != END_OF_FILE) {
                 readChar()
             }
-            Token.Float(input.substring(pos, position)).right()
-        } else Token.Int(input.substring(pos, position)).right()
+            Token.Float(input.substring(pos, position), pos until position).right()
+        } else Token.Int(input.substring(pos, position), pos until position).right()
     }
 
     private fun readString(end: Char): Either<LexerError, Token> {
         val pos = position + 1
         do {
             readChar()
-            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF.left()
+            if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(position).left()
         } while (ch != end)
         readChar()
-        return Token.String(input.substring(pos, position - 1)).right()
+        return Token.String(input.substring(pos, position - 1), pos until position).right()
     }
 
     override fun iterator(): Iterator<Either<LexerError, Token>> =
         object : Iterator<Either<LexerError, Token>> {
-            override fun hasNext(): Boolean = preToken != Token.EOF
+            override fun hasNext(): Boolean = preToken !is Token.EOF
 
             override fun next(): Either<LexerError, Token> = nextToken()
         }

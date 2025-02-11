@@ -70,8 +70,8 @@ hidari <= migi and owari == 0 の間繰り返す:
 もし owari == 0 ならば:
   表示する(atai, "は見つかりませんでした")
 表示する("添字", " ", "要素")
-#i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
-#  表示する(i, " ", Data[i])"""
+i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
+  表示する(i, " ", Data[i])"""
 
     val all = listOf(exam2025_0, exam2025_1, Sisaku2022, Sisaku2022_0, Sisaku2022_1, Sisaku2022_2)
 
