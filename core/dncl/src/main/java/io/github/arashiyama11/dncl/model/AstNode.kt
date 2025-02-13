@@ -94,12 +94,22 @@ sealed interface AstNode {
         }
     }
 
+    data class WhileStatement(
+        val condition: Expression,
+        val block: BlockStatement
+    ) : Statement {
+        override val literal: String
+            get() = "while ${condition.literal} ${block.literal}"
+    }
+
     data class WhileExpression(
         val condition: Expression,
         val block: BlockStatement
     ) : Expression {
         override val literal: String
             get() = "while ${condition.literal} ${block.literal}"
+
+        fun toStatement() = WhileStatement(condition, block)
     }
 
     data class BlockStatement(val statements: List<Statement>) : Statement {

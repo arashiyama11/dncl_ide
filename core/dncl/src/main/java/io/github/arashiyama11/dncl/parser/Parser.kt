@@ -77,11 +77,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
     @EnsuredEndOfLine
-    private fun parseExpressionStatement(): Either<DnclError, AstNode.ExpressionStatement> =
+    private fun parseExpressionStatement(): Either<DnclError, AstNode.Statement> =
         either {
             val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
             requireEndOfLine().getOrElse { return it.left() }
-            AstNode.ExpressionStatement(expression)
+            if (expression is AstNode.WhileExpression) {
+                expression.toStatement()
+            } else AstNode.ExpressionStatement(expression)
         }
 
     private fun nextToken(): Either<LexerError, Token> {
