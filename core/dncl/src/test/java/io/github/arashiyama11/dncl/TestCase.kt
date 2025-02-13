@@ -15,13 +15,13 @@ buinsu = 3
 kougeihin を 1 から kougeihinsu まで 1 ずつ増やしながら繰り返す:
   tantou = 1
   buin を 2 から buinsu まで 1 ずつ増やしながら繰り返す:
-  もし Akibi[buin] < Akibi[tantou] ならば:
-  tantou = buin
-  表示する("工芸品", kougeihin, " … ",
+    もし Akibi[buin] < Akibi[tantou] ならば:
+      tantou = buin
+      表示する("工芸品", kougeihin, " … ",
                 "部員", tantou, "：",
                 Akibi[tantou], "日目～",
                 Akibi[tantou] + Nissu[kougeihin] - 1, "日目")
-  Akibi[tantou] = Akibi[tantou] + Nissu[kougeihin]"""
+      Akibi[tantou] = Akibi[tantou] + Nissu[kougeihin]"""
 
     const val Sisaku2022 =
         """Angoubun = ["p", "y", "e", "b", " ", "c", "m", "y", "b", "o", " ", "k", "x", "n", " ", "c", "o", "f", "o", "x", " ", "i", "o", "k", "b", "c", " ", "k", "q", "y", " "]
