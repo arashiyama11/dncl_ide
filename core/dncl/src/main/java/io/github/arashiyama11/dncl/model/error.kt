@@ -89,8 +89,9 @@ ${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.
     data class UnknownInfixOperator(override val failToken: Token) :
         ParserError("Unexpected token (Unknown infix operator): ${failToken.literal}", failToken)
 
-    data class UnexpectedIndent(override val failToken: Token) :
-        ParserError("Unexpected Indent: ${failToken.literal}", failToken)
+    data class IndentError(override val failToken: Token, val expectedDepth: Int) :
+        ParserError("Unexpected Indent: ${failToken.literal} expected: $expectedDepth", failToken)
+
 }
 
 data class InternalError(override val message: String) : DnclError {

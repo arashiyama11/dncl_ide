@@ -43,9 +43,9 @@ sealed interface AstNode {
         override val left: Expression,
         override val right: Expression,
         override val operator: Token
-    ) : InfixExpression {
+    ) : InfixExpression, Assignable {
         override val literal: String
-            get() = "(${left.literal}[${right.literal}])"
+            get() = "${left.literal}[${right.literal}]"
     }
 
     data class Program(val statements: List<Statement>) : AstNode {
@@ -53,19 +53,13 @@ sealed interface AstNode {
             get() = statements.joinToString(separator = "\n") { it.literal }
     }
 
-    data class AssignStatement(val name: Token.Identifier, val value: Expression) : Statement {
+    data class AssignStatement(val assignments: List<Pair<Assignable, Expression>>) :
+        Statement {
         override val literal: String
-            get() = "${name.literal} = ${value.literal}"
+            get() = assignments.joinToString(separator = ", ") { "${it.first.literal} = ${it.second.literal}" }
     }
 
-    data class IndexAssignStatement(
-        val name: Token.Identifier,
-        val index: Expression,
-        val value: Expression
-    ) : Statement {
-        override val literal: String
-            get() = "${name.literal}[${index.literal}] = ${value.literal}"
-    }
+    sealed interface Assignable : Expression
 
     data class ExpressionStatement(val expression: Expression) : Statement {
         override val literal: String
@@ -113,7 +107,7 @@ sealed interface AstNode {
             get() = "{\n${statements.joinToString(separator = "\n") { it.literal }}\n}"
     }
 
-    data class Identifier(val value: String) : Expression {
+    data class Identifier(val value: String) : Expression, Assignable {
         override val literal: String
             get() = value
     }

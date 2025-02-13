@@ -18,17 +18,24 @@ import io.github.arashiyama11.dncl.model.Token
 class Parser private constructor(private val lexer: ILexer) : IParser {
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
+    private lateinit var aheadToken: Token
 
+    annotation class EnsuredEndOfLine
 
     override fun parseProgram(): Either<DnclError, AstNode.Program> {
         try {
+            while (currentToken is Token.NewLine || (currentToken is Token.Indent && (currentToken as Token.Indent).depth == 0)) {
+                nextToken().getOrElse { return it.left() }
+            }
             val statements = mutableListOf<AstNode.Statement>()
             while (currentToken !is Token.EOF) {
                 val statement = parseStatement().getOrElse {
                     return it.left()
                 }
                 statements.add(statement)
-                nextToken().getOrElse { return it.left() }
+                while (currentToken is Token.NewLine || (currentToken is Token.Indent && (currentToken as Token.Indent).depth == 0)) {
+                    nextToken().getOrElse { return it.left() }
+                }
             }
             return AstNode.Program(statements).right()
         } catch (e: Throwable) {
@@ -36,56 +43,25 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
     }
 
+    @EnsuredEndOfLine
     private fun parseStatement(): Either<DnclError, AstNode.Statement> {
-        return when (currentToken) {
+        val node = when (currentToken) {
             is Token.If -> parseIfStatement()
 
-            is Token.Comma -> if (nextToken is Token.Identifier) {
-                nextToken().getOrElse { return it.left() }
-                when (nextToken) {
-                    is Token.Assign -> parseAssignStatement()
-                    is Token.Wo -> parseForStatement()
-                    is Token.BracketOpen -> {
-                        parseIndexAssignStatement().getOrNull()?.right()
-                            ?: parseExpressionStatement()
-                    }
-
-                    else -> parseExpressionStatement()
-                }
-            } else {
-                parseExpressionStatement()
-            }
-
             is Token.Identifier -> when (nextToken) {
-                is Token.Assign -> parseAssignStatement()
+                is Token.Assign, is Token.BracketOpen -> parseAssignStatement()
                 is Token.Wo -> parseForStatement()
-                is Token.BracketOpen -> {
-                    parseIndexAssignStatement().getOrNull()?.right() ?: parseExpressionStatement()
-                }
-
                 else -> parseExpressionStatement()
             }
-
-            is Token.NewLine -> {
-                nextToken().getOrElse { return it.left() }
-                if (currentToken is Token.EOF) { //TODO 汚い
-                    return AstNode.BlockStatement(emptyList()).right()
-                }
-                parseStatement()
-            }
-
-            is Token.Indent -> if ((currentToken as Token.Indent).depth != 0) {
-                return ParserError.UnexpectedIndent(currentToken).left()
-            } else {
-                nextToken()
-                parseStatement()
-            }
-
 
             else -> {
                 parseExpressionStatement()
             }
         }
+
+        requireEndOfLine().getOrElse { return it.left() }
+
+        return node
     }
 
     private fun parseExpression(precedence: Precedence): Either<DnclError, AstNode.Expression> {
@@ -94,23 +70,35 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             nextToken().getOrElse { return it.left() }
             left = infixParseFn(left).getOrElse { return it.left() }
         }
+        if (nextToken is Token.NewLine || nextToken is Token.EOF) nextToken().getOrElse { return it.left() }
         return left.right()
     }
 
 
+    @EnsuredEndOfLine
     private fun parseExpressionStatement(): Either<DnclError, AstNode.ExpressionStatement> =
         either {
             val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-            if (nextToken !is Token.NewLine && nextToken !is Token.EOF && currentToken !is Token.Indent) {
-                raise(ParserError.UnExpectedToken(nextToken, "NewLine or EOF"))
-            }
+            requireEndOfLine().getOrElse { return it.left() }
             AstNode.ExpressionStatement(expression)
         }
 
     private fun nextToken(): Either<LexerError, Token> {
         currentToken = nextToken
-        nextToken = lexer.nextToken().getOrElse { return it.left() }
+        nextToken = aheadToken
+        aheadToken = lexer.nextToken().getOrElse { return it.left() }
         return currentToken.right()
+    }
+
+    private fun requireEndOfLine(): Either<DnclError, Unit> = either {
+        if (currentToken is Token.EOF) return@either
+        if (currentToken is Token.NewLine && nextToken is Token.Indent) return@either
+        raise(
+            ParserError.UnExpectedToken(
+                currentToken,
+                "require NewLine and Indent :${Exception().stackTraceToString()}"
+            )
+        )
     }
 
     private inline fun <reified T> expectNextToken(): Either<DnclError, Unit> = either {
@@ -125,6 +113,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
     }
 
+    @EnsuredEndOfLine
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
         val statements = mutableListOf<AstNode.Statement>()
         expectNextToken<Token.NewLine>().getOrElse { return it.left() }
@@ -134,32 +123,27 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         } else raise(ParserError.UnExpectedToken(currentToken))
         nextToken().getOrElse { return it.left() }
         while (currentToken !is Token.EOF) {
-            if (currentToken is Token.NewLine) { //TODO 汚い
-                val depth = (nextToken as? Token.Indent)?.depth ?: 0
-                if (depth < startDepth) {
+            if (currentToken is Token.NewLine) {
+                val depth = (nextToken as? Token.Indent)?.depth ?: raise(
+                    ParserError.UnExpectedToken(currentToken, "what the ")
+                )
+                if (depth > startDepth) {
+                    raise(ParserError.IndentError(nextToken, startDepth))
+                } else if (depth < startDepth) {
                     break
                 } else {
                     nextToken().getOrElse { return it.left() }
                     nextToken().getOrElse { return it.left() }
                 }
-            } else if (currentToken is Token.Indent) {
-                val depth = (currentToken as Token.Indent).depth
-                if (depth < startDepth) {
-                    break
-                } else {
-                    nextToken().getOrElse { return it.left() }
-                }
-            }
-            if (currentToken is Token.EOF) {
-                break
             }
             val statement = parseStatement().getOrElse { return it.left() }
             statements.add(statement)
-            nextToken().getOrElse { return it.left() }
         }
+        requireEndOfLine().getOrElse { return it.left() }
         return AstNode.BlockStatement(statements).right()
     }
 
+    @EnsuredEndOfLine
     private fun parseIfStatement(): Either<DnclError, AstNode.Statement> = either {
         nextToken()
         val condition = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
@@ -168,15 +152,15 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         expectNextToken<Token.Colon>().getOrElse { return it.left() }
 
         val consequence = parseBlockStatement().getOrElse { return it.left() }
-
-        while (nextToken is Token.NewLine || nextToken is Token.Indent) nextToken().getOrElse { return it.left() }
-
-        if (nextToken is Token.Else) {
+        requireEndOfLine().getOrElse { return it.left() }
+        if (aheadToken is Token.Else) {
+            expectNextToken<Token.Indent>()
             expectNextToken<Token.Else>().getOrElse { return it.left() }
             expectNextToken<Token.Colon>().getOrElse { return it.left() }
             val alternative = parseBlockStatement().getOrElse { return it.left() }
             AstNode.IfStatement(condition, consequence, alternative)
-        } else if (nextToken is Token.Elif) {
+        } else if (aheadToken is Token.Elif) {
+            expectNextToken<Token.Indent>()
             expectNextToken<Token.Elif>().getOrElse { return it.left() }
             AstNode.IfStatement(
                 condition,
@@ -188,6 +172,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
     }
 
+    @EnsuredEndOfLine
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
         val counter = (currentToken as? Token.Identifier)
             ?: return ParserError.UnExpectedToken(currentToken).left()
@@ -211,28 +196,44 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         AstNode.ForStatement(counter, start, end, step, type, block)
     }
 
+    @EnsuredEndOfLine
     private fun parseAssignStatement(): Either<DnclError, AstNode.AssignStatement> = either {
-        val name = (currentToken as? Token.Identifier)
-            ?: raise(ParserError.UnExpectedToken(currentToken))
-        expectNextToken<Token.Assign>().getOrElse { return it.left() }
-        nextToken().getOrElse { return it.left() }
-        val value = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-        AstNode.AssignStatement(name, value)
-    }
+        val assignments: MutableList<Pair<AstNode.Assignable, AstNode.Expression>> = mutableListOf()
+        while (currentToken !is Token.NewLine && currentToken !is Token.EOF) {
+            if (currentToken !is Token.Identifier) raise(
+                ParserError.UnExpectedToken(
+                    currentToken,
+                    expectedToken = "Identifier"
+                )
+            )
+            val identifier = (currentToken as? Token.Identifier)
+            val left = if (nextToken is Token.BracketOpen) {
+                val op = nextToken
+                expectNextToken<Token.BracketOpen>()
+                nextToken().getOrElse { return it.left() }
+                AstNode.IndexExpression(
+                    AstNode.Identifier(identifier!!.literal),
+                    parseExpressionList<Token.BracketClose>().getOrElse { return it.left() }
+                        .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
+                    op
+                )
+            } else {
+                AstNode.Identifier(identifier!!.literal)
+            }
 
-    private fun parseIndexAssignStatement(): Either<DnclError, AstNode.IndexAssignStatement> =
-        either {
-            val name = (currentToken as? Token.Identifier)
-                ?: raise(ParserError.UnExpectedToken(currentToken))
-            expectNextToken<Token.BracketOpen>().getOrElse { return it.left() }
-            nextToken().getOrElse { return it.left() }
-            val index = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-            expectNextToken<Token.BracketClose>().getOrElse { return it.left() }
             expectNextToken<Token.Assign>().getOrElse { return it.left() }
+
             nextToken().getOrElse { return it.left() }
-            val value = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
-            AstNode.IndexAssignStatement(name, index, value)
+            val right = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
+            assignments.add(left to right)
+            if (nextToken is Token.Comma) {
+                nextToken().getOrElse { return it.left() }
+                nextToken().getOrElse { return it.left() }
+            } else break
         }
+        requireEndOfLine().getOrElse { return it.left() }
+        AstNode.AssignStatement(assignments)
+    }
 
     private fun prefixParseFn(token: Token): Either<DnclError, AstNode.Expression> = either {
         when (token) {
@@ -283,20 +284,14 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 nextToken().getOrElse { return it.left() }
                 val expression = parseExpression(Precedence.LOWEST).getOrElse { return it.left() }
                 expectNextToken<Token.ParenClose>().getOrElse { return it.left() }
-                if (currentToken !is Token.ParenClose) {
-                    raise(
-                        ParserError.UnExpectedToken(
-                            currentToken,
-                            expectedToken = Token.ParenClose::class.java.simpleName
-                        )
-                    )
-                }
+                //nextToken().getOrElse { return it.left() }
                 expression
             }
 
             is Token.BracketOpen -> {
                 nextToken().getOrElse { return it.left() }
                 val exps = parseExpressionList<Token.BracketClose>().getOrElse { return it.left() }
+                nextToken().getOrElse { return it.left() }
                 AstNode.ArrayLiteral(exps)
             }
 
@@ -384,6 +379,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             val parser = Parser(lexer)
             parser.currentToken = lexer.nextToken().getOrElse { return it.left() }
             parser.nextToken = lexer.nextToken().getOrElse { return it.left() }
+            parser.aheadToken = lexer.nextToken().getOrElse { return it.left() }
             return parser.right()
         }
 
@@ -399,7 +395,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.And -> Precedence.AND
             is Token.Or -> Precedence.OR
             else -> Precedence.LOWEST
-
         }
     }
 }
