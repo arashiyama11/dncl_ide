@@ -16,6 +16,7 @@ import io.github.arashiyama11.dncl.model.Precedence
 import io.github.arashiyama11.dncl.model.Token
 
 class Parser private constructor(private val lexer: ILexer) : IParser {
+    private var indentStack: MutableList<Int> = mutableListOf(0)
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
     private lateinit var aheadToken: Token
@@ -24,6 +25,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     override fun parseProgram(): Either<DnclError, AstNode.Program> {
         try {
+            indentStack = mutableListOf(0)
             while (currentToken is Token.NewLine || (currentToken is Token.Indent && (currentToken as Token.Indent).depth == 0)) {
                 nextToken().getOrElse { return it.left() }
             }
@@ -54,14 +56,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 else -> parseExpressionStatement()
             }
 
-            else -> {
-                parseExpressionStatement()
-            }
-        }
+            else -> parseExpressionStatement()
+        }.getOrElse { return it.left() }
+
 
         requireEndOfLine().getOrElse { return it.left() }
 
-        return node
+        return node.right()
     }
 
     private fun parseExpression(precedence: Precedence): Either<DnclError, AstNode.Expression> {
@@ -117,24 +118,43 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
         val statements = mutableListOf<AstNode.Statement>()
         expectNextToken<Token.NewLine>().getOrElse { return it.left() }
-        nextToken()
-        val startDepth = if (currentToken is Token.Indent) {
-            (currentToken as Token.Indent).depth
-        } else raise(ParserError.UnExpectedToken(currentToken))
-        nextToken().getOrElse { return it.left() }
-        while (currentToken !is Token.EOF) {
-            if (currentToken is Token.NewLine) {
-                val depth = (nextToken as? Token.Indent)?.depth ?: raise(
-                    ParserError.UnExpectedToken(currentToken, "what the ")
+        val startDepth = if (nextToken is Token.Indent) {
+            (nextToken as Token.Indent).depth
+        } else raise(ParserError.UnExpectedToken(nextToken))
+        if ((indentStack.lastOrNull() ?: raise(
+                ParserError.IndentError(
+                    nextToken,
+                    0
                 )
-                if (depth > startDepth) {
-                    raise(ParserError.IndentError(nextToken, startDepth))
-                } else if (depth < startDepth) {
-                    break
-                } else {
-                    nextToken().getOrElse { return it.left() }
-                    nextToken().getOrElse { return it.left() }
-                }
+            )) >= startDepth
+        ) raise(
+            ParserError.IndentError(
+                nextToken,
+                ">${indentStack.lastOrNull()}"
+            )
+        )
+        indentStack.add(startDepth)
+        while (currentToken !is Token.EOF) {
+            if (currentToken !is Token.NewLine) raise(
+                ParserError.UnExpectedToken(
+                    currentToken
+                )
+            )
+
+            val depth = (nextToken as? Token.Indent)?.depth ?: raise(
+                ParserError.UnExpectedToken(currentToken)
+            )
+
+            if (!indentStack.contains(depth)) {
+                raise(ParserError.IndentError(nextToken, "in $indentStack"))
+            }
+
+            if (depth < startDepth) {
+                indentStack.removeLastOrNull()
+                break
+            } else {
+                nextToken().getOrElse { return it.left() }
+                nextToken().getOrElse { return it.left() }
             }
             val statement = parseStatement().getOrElse { return it.left() }
             statements.add(statement)
