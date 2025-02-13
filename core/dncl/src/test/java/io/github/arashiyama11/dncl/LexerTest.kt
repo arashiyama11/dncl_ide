@@ -151,7 +151,7 @@ kosu ＞12かつkosu＜27でない
             }
         }
         assertEquals(
-            "Indent(Indent(0))Identifier(kakaku)Assign(=)Int(46)NewLine(NEW_LINE)Indent(Indent(0))Identifier(min_maisu)Assign(=)Int(100)NewLine(NEW_LINE)Indent(Indent(0))Identifier(tsuri)Wo(WO)Int(0)Kara(KARA)Int(99)Made(MADE)Int(1)UpTo(UpTo)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(2))Identifier(shiharai)Assign(=)Identifier(kakaku)Plus(+)Identifier(tsuri)NewLine(NEW_LINE)Indent(Indent(2))Identifier(maisu)Assign(=)Japanese(枚数)ParenOpen(()Identifier(shiharai)ParenClose())Plus(+)Japanese(枚数)ParenOpen(()Identifier(tsuri)ParenClose())NewLine(NEW_LINE)Indent(Indent(4))If(IF)Identifier(maisu)LessThan(<)Identifier(min_maisu)Then(THEN)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(6))Identifier(min_maisu)Assign(=)Identifier(maisu)NewLine(NEW_LINE)Indent(Indent(0))Japanese(表示する)ParenOpen(()Identifier(min_maisu)ParenClose())EOF(EOF)",
+            "Indent(Indent(0))Identifier(kakaku)Assign(=)Int(46)NewLine(NEW_LINE)Indent(Indent(0))Identifier(min_maisu)Assign(=)Int(100)NewLine(NEW_LINE)Indent(Indent(0))Identifier(tsuri)Wo(WO)Int(0)Kara(KARA)Int(99)Made(MADE)Int(1)UpTo(UpTo)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(2))Identifier(shiharai)Assign(=)Identifier(kakaku)Plus(+)Identifier(tsuri)NewLine(NEW_LINE)Indent(Indent(2))Identifier(maisu)Assign(=)Japanese(枚数)ParenOpen(()Identifier(shiharai)ParenClose())Plus(+)Japanese(枚数)ParenOpen(()Identifier(tsuri)ParenClose())NewLine(NEW_LINE)Indent(Indent(2))If(IF)Identifier(maisu)LessThan(<)Identifier(min_maisu)Then(THEN)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(4))Identifier(min_maisu)Assign(=)Identifier(maisu)NewLine(NEW_LINE)Indent(Indent(0))Japanese(表示する)ParenOpen(()Identifier(min_maisu)ParenClose())EOF(EOF)",
             result
         )
     }

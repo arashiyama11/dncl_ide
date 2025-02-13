@@ -48,8 +48,8 @@ min_maisu = 100
 tsuri を 0 から 99 まで 1 ずつ増やしながら繰り返す：
   shiharai = kakaku + tsuri
   maisu = 枚数(shiharai) + 枚数(tsuri)
-    もし maisu < min_maisu ならば：
-      min_maisu = maisu
+  もし maisu < min_maisu ならば：
+    min_maisu = maisu
 表示する(min_maisu)"""
 
     const val Sisaku2022_2 = """Data = [3,18,29,33,48,52,62,77,89,97]
