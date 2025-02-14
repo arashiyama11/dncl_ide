@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl.lexer
 
 import arrow.core.Either
-import arrow.core.getOrElse
 import arrow.core.left
 import arrow.core.raise.either
 import arrow.core.right
@@ -41,11 +40,11 @@ class Lexer(private val input: String) : ILexer {
                     do {
                         readChar()
                     } while (ch == ' ')
-                    nextToken().getOrElse { return it.left() }
+                    nextToken().bind()
                 }
 
-                '「' -> readString('」').getOrElse { return it.left() }
-                '"' -> readString('"').getOrElse { return it.left() }
+                '「' -> readString('」').bind()
+                '"' -> readString('"').bind()
                 '(' -> {
                     readChar()
                     Token.ParenOpen(position..position)
@@ -189,13 +188,13 @@ class Lexer(private val input: String) : ILexer {
                     do {
                         readChar()
                     } while (ch != '\n' && ch != END_OF_FILE)
-                    nextToken().getOrElse { return it.left() }
+                    nextToken().bind()
                 }
 
                 END_OF_FILE -> Token.EOF(position..position)
                 else -> when {
-                    ch.isDigit() -> readNumber().getOrElse { return it.left() }
-                    ch.isLetter() -> if (ch.isAlphaBet()) readIdentifier().getOrElse { return it.left() } else readJapanese().getOrElse { return it.left() } //TODO 日本語はべつの処理が必要
+                    ch.isDigit() -> readNumber().bind()
+                    ch.isLetter() -> if (ch.isAlphaBet()) readIdentifier().bind() else readJapanese().bind()
                     else -> raise(LexerError.UnExpectedCharacter(ch, position))
                 }
             }
