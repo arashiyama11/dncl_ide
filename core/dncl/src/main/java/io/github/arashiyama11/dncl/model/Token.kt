@@ -1,99 +1,155 @@
 package io.github.arashiyama11.dncl.model
 
-sealed interface ExpressionStopToken
+sealed interface ExpressionStopToken : Token
 
-sealed class Token(
-    val literal: kotlin.String,
+sealed interface PrefixExpressionToken : Token
+
+sealed interface InfixExpressionToken : Token
+
+sealed interface Token {
+    val literal: kotlin.String
     val range: IntRange
-) {
-    override fun toString(): kotlin.String {
-        return "${this::class.simpleName}($literal)"
-    }
 
-    class EOF(range: IntRange) : Token("EOF", range), ExpressionStopToken
+    data class EOF(override val range: IntRange, override val literal: kotlin.String = "EOF") :
+        Token
 
-    class Colon(range: IntRange) : Token("COLON", range)
+    data class Colon(override val range: IntRange, override val literal: kotlin.String = "COLON") :
+        Token
 
-    class Comma(range: IntRange) : Token("COMMA", range)
+    data class Comma(override val range: IntRange, override val literal: kotlin.String = "COMMA") :
+        Token
 
-    class NewLine(range: IntRange) : Token("NEW_LINE", range), ExpressionStopToken
+    data class NewLine(
+        override val range: IntRange,
+        override val literal: kotlin.String = "NEW_LINE"
+    ) : ExpressionStopToken
 
-    class ParenOpen(range: IntRange) : Token("(", range)
+    data class ParenOpen(override val range: IntRange, override val literal: kotlin.String = "(") :
+        Token
 
-    class ParenClose(range: IntRange) : Token(")", range)
+    data class ParenClose(override val range: IntRange, override val literal: kotlin.String = ")") :
+        Token
 
-    class BracketOpen(range: IntRange) : Token("[", range)
+    data class BracketOpen(
+        override val range: IntRange,
+        override val literal: kotlin.String = "["
+    ) : Token
 
-    class BracketClose(range: IntRange) : Token("]", range)
+    data class BracketClose(
+        override val range: IntRange,
+        override val literal: kotlin.String = "]"
+    ) : Token
 
-    class BraceOpen(range: IntRange) : Token("{", range)
+    data class BraceOpen(override val range: IntRange, override val literal: kotlin.String = "{") :
+        Token
 
-    class BraceClose(range: IntRange) : Token("}", range)
+    data class BraceClose(override val range: IntRange, override val literal: kotlin.String = "}") :
+        Token
 
-    class LenticularOpen(range: IntRange) : Token("【", range)
+    data class LenticularOpen(
+        override val range: IntRange,
+        override val literal: kotlin.String = "【"
+    ) : Token
 
-    class LenticularClose(range: IntRange) : Token("】", range)
+    data class LenticularClose(
+        override val range: IntRange,
+        override val literal: kotlin.String = "】"
+    ) : Token
 
-    class Plus(range: IntRange) : Token("+", range)
+    data class Plus(override val range: IntRange, override val literal: kotlin.String = "+") :
+        InfixExpressionToken, PrefixExpressionToken
 
-    class Minus(range: IntRange) : Token("-", range)
+    data class Minus(override val range: IntRange, override val literal: kotlin.String = "-") :
+        InfixExpressionToken, PrefixExpressionToken
 
-    class Times(range: IntRange) : Token("*", range)
+    data class Times(override val range: IntRange, override val literal: kotlin.String = "*") :
+        InfixExpressionToken
 
-    class DivideInt(range: IntRange) : Token("//", range)
+    data class DivideInt(override val range: IntRange, override val literal: kotlin.String = "//") :
+        InfixExpressionToken
 
-    class Divide(range: IntRange) : Token("/", range)
+    data class Divide(override val range: IntRange, override val literal: kotlin.String = "/") :
+        InfixExpressionToken
 
-    class Modulo(range: IntRange) : Token("%", range)
+    data class Modulo(override val range: IntRange, override val literal: kotlin.String = "%") :
+        InfixExpressionToken
 
-    class Assign(range: IntRange) : Token("=", range)
+    data class Assign(override val range: IntRange, override val literal: kotlin.String = "=") :
+        Token
 
-    class Equal(range: IntRange) : Token("==", range)
+    data class Equal(override val range: IntRange, override val literal: kotlin.String = "==") :
+        InfixExpressionToken
 
-    class NotEqual(range: IntRange) : Token("≠", range)
+    data class NotEqual(override val range: IntRange, override val literal: kotlin.String = "≠") :
+        InfixExpressionToken
 
-    class GreaterThan(range: IntRange) : Token(">", range)
+    data class GreaterThan(
+        override val range: IntRange,
+        override val literal: kotlin.String = ">"
+    ) : InfixExpressionToken
 
-    class LessThan(range: IntRange) : Token("<", range)
+    data class LessThan(override val range: IntRange, override val literal: kotlin.String = "<") :
+        InfixExpressionToken
 
-    class GreaterThanOrEqual(range: IntRange) : Token("≧", range)
+    data class GreaterThanOrEqual(
+        override val range: IntRange,
+        override val literal: kotlin.String = "≧"
+    ) : InfixExpressionToken
 
-    class LessThanOrEqual(range: IntRange) : Token("≦", range)
+    data class LessThanOrEqual(
+        override val range: IntRange,
+        override val literal: kotlin.String = "≦"
+    ) : InfixExpressionToken
 
-    class Bang(range: IntRange) : Token("!", range)
+    data class Bang(override val range: IntRange, override val literal: kotlin.String = "!") :
+        PrefixExpressionToken
 
-    class And(range: IntRange) : Token("AND", range)
+    data class And(override val range: IntRange, override val literal: kotlin.String = "AND") :
+        InfixExpressionToken
 
-    class Or(range: IntRange) : Token("OR", range)
+    data class Or(override val range: IntRange, override val literal: kotlin.String = "OR") : Token,
+        InfixExpressionToken
 
-    class If(range: IntRange) : Token("IF", range)
+    data class If(override val range: IntRange, override val literal: kotlin.String = "IF") : Token
 
-    class Then(range: IntRange) : Token("THEN", range), ExpressionStopToken
+    data class Then(override val range: IntRange, override val literal: kotlin.String = "THEN") :
+        ExpressionStopToken
 
-    class Else(range: IntRange) : Token("ELSE", range), ExpressionStopToken
+    data class Else(override val range: IntRange, override val literal: kotlin.String = "ELSE") :
+        ExpressionStopToken
 
-    class Elif(range: IntRange) : Token("ELIF", range), ExpressionStopToken
+    data class Elif(override val range: IntRange, override val literal: kotlin.String = "ELIF") :
+        ExpressionStopToken
 
-    class Wo(range: IntRange) : Token("WO", range), ExpressionStopToken
+    data class Wo(override val range: IntRange, override val literal: kotlin.String = "WO") : Token,
+        ExpressionStopToken
 
-    class Kara(range: IntRange) : Token("KARA", range), ExpressionStopToken
+    data class Kara(override val range: IntRange, override val literal: kotlin.String = "KARA") :
+        ExpressionStopToken
 
-    class Made(range: IntRange) : Token("MADE", range), ExpressionStopToken
+    data class Made(override val range: IntRange, override val literal: kotlin.String = "MADE") :
+        ExpressionStopToken
 
-    class While(range: IntRange) : Token("WHILE", range)
+    data class While(override val range: IntRange, override val literal: kotlin.String = "WHILE") :
+        Token
 
-    class UpTo(range: IntRange) : Token("UpTo", range), ExpressionStopToken
+    data class UpTo(override val range: IntRange, override val literal: kotlin.String = "UpTo") :
+        ExpressionStopToken
 
-    class DownTo(range: IntRange) : Token("DownTo", range), ExpressionStopToken
+    data class DownTo(
+        override val range: IntRange,
+        override val literal: kotlin.String = "DownTo"
+    ) : ExpressionStopToken
 
-    class Indent(
+    data class Indent(
         val depth: kotlin.Int,
-        range: IntRange
-    ) : Token("Indent(${depth})", range), ExpressionStopToken
+        override val range: IntRange,
+        override val literal: kotlin.String = "Indent(${depth})"
+    ) : Token
 
-    class Identifier(literal: kotlin.String, range: IntRange) : Token(literal, range)
-    class Japanese(literal: kotlin.String, range: IntRange) : Token(literal, range)
-    class Int(literal: kotlin.String, range: IntRange) : Token(literal, range)
-    class Float(literal: kotlin.String, range: IntRange) : Token(literal, range)
-    class String(literal: kotlin.String, range: IntRange) : Token(literal, range)
+    data class Identifier(override val literal: kotlin.String, override val range: IntRange) : Token
+    data class Japanese(override val literal: kotlin.String, override val range: IntRange) : Token
+    data class Int(override val literal: kotlin.String, override val range: IntRange) : Token
+    data class Float(override val literal: kotlin.String, override val range: IntRange) : Token
+    data class String(override val literal: kotlin.String, override val range: IntRange) : Token
 }

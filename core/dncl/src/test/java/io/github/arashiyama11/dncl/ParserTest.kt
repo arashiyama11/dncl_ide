@@ -97,7 +97,7 @@ Akibi[tantou] = (Akibi[tantou] + Nissu[kougeihin])
             TestCase.Sisaku2022,
             """Angoubun = ["p", "y", "e", "b", " ", "c", "m", "y", "b", "o", " ", "k", "x", "n", " ", "c", "o", "f", "o", "x", " ", "i", "o", "k", "b", "c", " ", "k", "q", "y", " "]
 Hindo = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-for i in IntLiteral(value=0)..InfixExpressionImpl(left=CallExpression(function=Identifier(value=要素数), arguments=[Identifier(value=Angoubun)]), operator=Minus(-), right=IntLiteral(value=1)) INCREMENT by IntLiteral(value=1) {
+for i in IntLiteral(value=0)..InfixExpression(left=CallExpression(function=Identifier(value=要素数), arguments=[Identifier(value=Angoubun)]), operator=Minus(range=261..261, literal=-), right=IntLiteral(value=1)) INCREMENT by IntLiteral(value=1) {
 bangou = 差分(Angoubun[i])
 if (bangou ≠ (-1)) {
 Hindo[bangou] = (Hindo[bangou] + 1)
@@ -163,7 +163,7 @@ if (owari == 0) {
 表示する(atai, "は見つかりませんでした")
 }
 表示する("添字", " ", "要素")
-for i in IntLiteral(value=0)..InfixExpressionImpl(left=Identifier(value=kazu), operator=Minus(-), right=IntLiteral(value=1)) INCREMENT by IntLiteral(value=1) {
+for i in IntLiteral(value=0)..InfixExpression(left=Identifier(value=kazu), operator=Minus(range=468..468, literal=-), right=IntLiteral(value=1)) INCREMENT by IntLiteral(value=1) {
 表示する(i, " ", Data[i])
 }"""
         )

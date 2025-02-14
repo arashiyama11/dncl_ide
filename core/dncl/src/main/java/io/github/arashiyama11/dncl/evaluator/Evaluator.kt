@@ -9,6 +9,7 @@ import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.Environment
 import io.github.arashiyama11.dncl.model.InternalError
 import io.github.arashiyama11.dncl.model.SystemCommand
+import io.github.arashiyama11.dncl.model.Token
 
 class Evaluator(
     private val onCallBuildInFunction: (BuiltInFunction, List<DnclObject>) -> DnclObject,
@@ -217,21 +218,19 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = either {
         val right = eval(prefixExpression.right, env).bind()
-        when (prefixExpression.operator.literal) {
-            "!" -> DnclObject.Boolean(!isTruthy(right))
-            "-" -> when (right) {
+        when (prefixExpression.operator) {
+            is Token.Bang -> DnclObject.Boolean(!isTruthy(right))
+            is Token.Minus -> when (right) {
                 is DnclObject.Int -> DnclObject.Int(-right.value)
                 is DnclObject.Float -> DnclObject.Float(-right.value)
                 else -> DnclObject.TypeError("Int or Float", right::class.simpleName ?: "")
             }
 
-            "+" -> when (right) {
+            is Token.Plus -> when (right) {
                 is DnclObject.Int -> DnclObject.Int(+right.value)
                 is DnclObject.Float -> DnclObject.Float(+right.value)
                 else -> DnclObject.TypeError("Int or Float", right::class.simpleName ?: "")
             }
-
-            else -> DnclObject.UndefinedError(prefixExpression.operator.literal)
         }
     }
 
@@ -241,9 +240,8 @@ class Evaluator(
     ): Either<DnclError, DnclObject> = either {
         val left = eval(infixExpression.left, env).bind()
         val right = eval(infixExpression.right, env).bind()
-        //肩安全にしたい
-        when (infixExpression.operator.literal) {
-            "+" -> when {
+        when (infixExpression.operator) {
+            is Token.Plus -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value + right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value + right.value)
                 left is DnclObject.String && right is DnclObject.String -> DnclObject.String(left.value + right.value)
@@ -253,7 +251,7 @@ class Evaluator(
                 )
             }
 
-            "-" -> when {
+            is Token.Minus -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value - right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value - right.value)
                 else -> DnclObject.TypeError(
@@ -262,7 +260,7 @@ class Evaluator(
                 )
             }
 
-            "*" -> when {
+            is Token.Times -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value * right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value * right.value)
                 else -> DnclObject.TypeError(
@@ -271,7 +269,7 @@ class Evaluator(
                 )
             }
 
-            "/" -> when {
+            is Token.Divide -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Float(left.value.toFloat() / right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value / right.value)
                 else -> DnclObject.TypeError(
@@ -280,7 +278,7 @@ class Evaluator(
                 )
             }
 
-            "//" -> when {
+            is Token.DivideInt -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value / right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Int((left.value / right.value).toInt())
                 else -> DnclObject.TypeError(
@@ -290,7 +288,7 @@ class Evaluator(
 
             }
 
-            "%" -> when {
+            is Token.Modulo -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value % right.value)
                 else -> DnclObject.TypeError(
                     "Int",
@@ -298,11 +296,11 @@ class Evaluator(
                 )
             }
 
-            "==" -> DnclObject.Boolean(left == right)
+            is Token.Equal -> DnclObject.Boolean(left == right)
 
-            "≠" -> DnclObject.Boolean(left != right)
+            is Token.NotEqual -> DnclObject.Boolean(left != right)
 
-            "<" -> when {
+            is Token.LessThan -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value < right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value < right.value)
                 else -> DnclObject.TypeError(
@@ -311,7 +309,7 @@ class Evaluator(
                 )
             }
 
-            "≦" -> when {
+            is Token.LessThanOrEqual -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value <= right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value <= right.value)
                 else -> DnclObject.TypeError(
@@ -320,7 +318,7 @@ class Evaluator(
                 )
             }
 
-            ">" -> when {
+            is Token.GreaterThan -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value > right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value > right.value)
                 else -> DnclObject.TypeError(
@@ -329,7 +327,7 @@ class Evaluator(
                 )
             }
 
-            "≧" -> when {
+            is Token.GreaterThanOrEqual -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value >= right.value)
                 left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value >= right.value)
                 else -> DnclObject.TypeError(
@@ -338,7 +336,7 @@ class Evaluator(
                 )
             }
 
-            "AND" -> when {
+            is Token.And -> when {
                 left is DnclObject.Boolean && right is DnclObject.Boolean -> DnclObject.Boolean(left.value && right.value)
                 else -> DnclObject.TypeError(
                     "Boolean",
@@ -346,15 +344,13 @@ class Evaluator(
                 )
             }
 
-            "OR" -> when {
+            is Token.Or -> when {
                 left is DnclObject.Boolean && right is DnclObject.Boolean -> DnclObject.Boolean(left.value || right.value)
                 else -> DnclObject.TypeError(
                     "Boolean",
                     "${left::class.simpleName} and ${right::class.simpleName}"
                 )
             }
-
-            else -> DnclObject.UndefinedError(infixExpression.operator.literal)
         }
     }
 

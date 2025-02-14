@@ -8,7 +8,7 @@ sealed interface AstNode {
     sealed interface Statement : AstNode
     sealed interface Expression : AstNode
     data class PrefixExpression(
-        val operator: Token,
+        val operator: PrefixExpressionToken,
         val right: Expression
     ) : Expression {
         override val literal: String
@@ -17,33 +17,19 @@ sealed interface AstNode {
         override fun toString() = literal
     }
 
-    sealed interface InfixExpression : Expression {
-        val left: Expression
-        val operator: Token
+    data class InfixExpression(
+        val left: Expression,
+        val operator: InfixExpressionToken,
         val right: Expression
+    ) : Expression {
         override val literal: String
             get() = "(${left.literal} ${operator.literal} ${right.literal})"
-
-        companion object {
-            operator fun invoke(
-                left: Expression,
-                operator: Token,
-                right: Expression
-            ): InfixExpression = InfixExpressionImpl(left, operator, right)
-        }
     }
 
-    private data class InfixExpressionImpl(
-        override val left: Expression,
-        override val operator: Token,
-        override val right: Expression
-    ) : InfixExpression
-
     data class IndexExpression(
-        override val left: Expression,
-        override val right: Expression,
-        override val operator: Token
-    ) : InfixExpression, Assignable {
+        val left: Expression,
+        val right: Expression,
+    ) : Expression, Assignable {
         override val literal: String
             get() = "${left.literal}[${right.literal}]"
     }

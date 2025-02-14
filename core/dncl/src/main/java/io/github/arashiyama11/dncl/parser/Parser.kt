@@ -10,9 +10,11 @@ import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl.model.LexerError
 import io.github.arashiyama11.dncl.model.AstNode
 import io.github.arashiyama11.dncl.model.ExpressionStopToken
+import io.github.arashiyama11.dncl.model.InfixExpressionToken
 import io.github.arashiyama11.dncl.model.InternalError
 import io.github.arashiyama11.dncl.model.ParserError
 import io.github.arashiyama11.dncl.model.Precedence
+import io.github.arashiyama11.dncl.model.PrefixExpressionToken
 import io.github.arashiyama11.dncl.model.Token
 
 class Parser private constructor(private val lexer: ILexer) : IParser {
@@ -228,14 +230,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             )
             val identifier = (currentToken as? Token.Identifier)
             val left = if (nextToken is Token.BracketOpen) {
-                val op = nextToken
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
                     AstNode.Identifier(identifier!!.literal),
                     parseExpressionList<Token.BracketClose>().bind()
                         .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
-                    op
                 )
             } else {
                 AstNode.Identifier(identifier!!.literal)
@@ -293,8 +293,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.StringLiteral(string.literal)
             }
 
-            is Token.Bang, is Token.Minus, is Token.Plus -> {
-                val operator = currentToken
+            is PrefixExpressionToken -> {
+                val operator = currentToken as PrefixExpressionToken
                 nextToken().bind()
                 val right = parseExpression(Precedence.PREFIX).bind()
                 AstNode.PrefixExpression(operator, right)
@@ -304,7 +304,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 nextToken().bind()
                 val expression = parseExpression(Precedence.LOWEST).bind()
                 expectNextToken<Token.ParenClose>().bind()
-                //nextToken().bind()
                 expression
             }
 
@@ -362,8 +361,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun infixParseFn(left: AstNode.Expression): Either<DnclError, AstNode.Expression> =
         either {
             return when (currentToken) {
-                is Token.Plus, is Token.Minus, is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo, is Token.Equal, is Token.NotEqual, is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual, is Token.And, is Token.Or -> {
-                    val operator = currentToken
+                is InfixExpressionToken -> {
+                    val operator = currentToken as InfixExpressionToken
                     val precedence = currentToken.precedence()
                     nextToken().bind()
                     val right = parseExpression(precedence).bind()
@@ -374,7 +373,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     nextToken().bind()
                     val index = parseExpression(Precedence.LOWEST).bind()
                     expectNextToken<Token.BracketClose>().bind()
-                    AstNode.IndexExpression(left, index, currentToken).right()
+                    AstNode.IndexExpression(left, index).right()
                 }
 
                 is Token.ParenOpen -> {

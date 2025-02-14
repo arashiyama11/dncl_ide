@@ -1,11 +1,14 @@
 package io.github.arashiyama11.dncl
 
 import io.github.arashiyama11.dncl.lexer.Lexer
+import io.github.arashiyama11.dncl.model.Token
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class LexerTest {
+
+    private fun tokenToString(token: Token): String = "${token::class.simpleName}(${token.literal})"
 
     @Test
     fun test1() {
@@ -58,7 +61,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.toString())
             }
@@ -77,7 +80,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
@@ -94,7 +97,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
@@ -111,7 +114,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
@@ -128,7 +131,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
@@ -145,7 +148,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
@@ -162,7 +165,7 @@ kosu ＞12かつkosu＜27でない
         var result = ""
         for (token in Lexer(input)) {
             if (token.isRight()) {
-                result += token.getOrNull()!!
+                result += tokenToString(token.getOrNull()!!)
             } else {
                 fail(token.leftOrNull()?.message)
             }
