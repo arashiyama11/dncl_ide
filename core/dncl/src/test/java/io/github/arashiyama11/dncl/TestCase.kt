@@ -17,16 +17,16 @@ kougeihin を 1 から kougeihinsu まで 1 ずつ増やしながら繰り返す
   buin を 2 から buinsu まで 1 ずつ増やしながら繰り返す:
     もし Akibi[buin] < Akibi[tantou] ならば:
       tantou = buin
-      表示する("工芸品", kougeihin, " … ",
+  表示する("工芸品", kougeihin, " … ",
                 "部員", tantou, "：",
                 Akibi[tantou], "日目～",
                 Akibi[tantou] + Nissu[kougeihin] - 1, "日目")
-      Akibi[tantou] = Akibi[tantou] + Nissu[kougeihin]"""
+  Akibi[tantou] = Akibi[tantou] + Nissu[kougeihin]"""
 
     const val Sisaku2022 =
         """Angoubun = ["p", "y", "e", "b", " ", "c", "m", "y", "b", "o", " ", "k", "x", "n", " ", "c", "o", "f", "o", "x", " ", "i", "o", "k", "b", "c", " ", "k", "q", "y", " "]
-# 配 列 Hindo のすべての要素に 0 を代入する
-i を 0 から 1 まで 1 ずつ増やしながら:
+Hindo = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+i を 0 から 要素数(Angoubun)-1 まで 1 ずつ増やしながら:
   bangou = 差分( Angoubun[i] )
   もし bangou != -1 ならば:
     Hindo[bangou] = Hindo[bangou] + 1

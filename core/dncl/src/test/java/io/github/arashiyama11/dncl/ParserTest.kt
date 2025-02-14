@@ -83,10 +83,10 @@ tantou = 1
 for buin in IntLiteral(value=2)..Identifier(value=buinsu) INCREMENT by IntLiteral(value=1) {
 if (Akibi[buin] < Akibi[tantou]) {
 tantou = buin
+}
+}
 表示する("工芸品", kougeihin, " … ", "部員", tantou, "：", Akibi[tantou], "日目～", ((Akibi[tantou] + Nissu[kougeihin]) - 1), "日目")
 Akibi[tantou] = (Akibi[tantou] + Nissu[kougeihin])
-}
-}
 }"""
         )
     }
@@ -96,7 +96,8 @@ Akibi[tantou] = (Akibi[tantou] + Nissu[kougeihin])
         testParser(
             TestCase.Sisaku2022,
             """Angoubun = ["p", "y", "e", "b", " ", "c", "m", "y", "b", "o", " ", "k", "x", "n", " ", "c", "o", "f", "o", "x", " ", "i", "o", "k", "b", "c", " ", "k", "q", "y", " "]
-for i in IntLiteral(value=0)..IntLiteral(value=1) INCREMENT by IntLiteral(value=1) {
+Hindo = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+for i in IntLiteral(value=0)..InfixExpressionImpl(left=CallExpression(function=Identifier(value=要素数), arguments=[Identifier(value=Angoubun)]), operator=Minus(-), right=IntLiteral(value=1)) INCREMENT by IntLiteral(value=1) {
 bangou = 差分(Angoubun[i])
 if (bangou ≠ (-1)) {
 Hindo[bangou] = (Hindo[bangou] + 1)
