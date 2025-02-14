@@ -1,0 +1,386 @@
+package io.github.arashiyama11.dncl.evaluator
+
+import arrow.core.Either
+import arrow.core.raise.either
+import io.github.arashiyama11.dncl.model.AstNode
+import io.github.arashiyama11.dncl.model.BuiltInFunction
+import io.github.arashiyama11.dncl.model.DnclError
+import io.github.arashiyama11.dncl.model.DnclObject
+import io.github.arashiyama11.dncl.model.Environment
+import io.github.arashiyama11.dncl.model.InternalError
+import io.github.arashiyama11.dncl.model.SystemCommand
+
+class Evaluator(
+    private val onCallBuildInFunction: (BuiltInFunction, List<DnclObject>) -> DnclObject,
+    private val onCallSystemCommand: (SystemCommand) -> DnclObject,
+    private val arrayOrigin: Int = 0
+) : IEvaluator {
+    override fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> = either {
+        Either.catch {
+            when (node) {
+                is AstNode.Program -> evalProgram(node, env).bind()
+                is AstNode.BlockStatement -> evalBlockStatement(node, env).bind()
+                is AstNode.WhileStatement -> evalWhileStatement(node, env).bind()
+                is AstNode.IfStatement -> evalIfStatement(node, env).bind()
+                is AstNode.ForStatement -> evalForStatement(node, env).bind()
+                is AstNode.AssignStatement -> evalAssignStatement(node, env).bind()
+                is AstNode.ExpressionStatement -> evalExpressionStatement(node, env).bind()
+
+                is AstNode.IndexExpression -> evalIndexExpression(node, env).bind()
+                is AstNode.CallExpression -> evalCallExpression(node, env).bind()
+                is AstNode.InfixExpression -> evalInfixExpression(node, env).bind()
+                is AstNode.PrefixExpression -> evalPrefixExpression(node, env).bind()
+
+                is AstNode.ArrayLiteral -> evalArrayLiteral(node, env).bind()
+                is AstNode.Identifier -> evalIdentifier(node, env).bind()
+                is AstNode.FloatLiteral -> DnclObject.Float(node.value)
+                is AstNode.IntLiteral -> DnclObject.Int(node.value)
+                is AstNode.StringLiteral -> DnclObject.String(node.value)
+                is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node.value))
+
+                is AstNode.WhileExpression -> raise(InternalError("while expression is not supported"))
+            }
+        }.mapLeft { InternalError(it.message ?: "") }.bind()
+    }
+
+    override fun evalProgram(
+        program: AstNode.Program, env: Environment
+    ): Either<DnclError, DnclObject> =
+        either {
+            Either.catch {
+                var result: DnclObject = DnclObject.Null
+                for (stmt in program.statements) {
+                    result = eval(stmt, env).bind()
+                    if (result is DnclObject.Error || result is DnclObject.ReturnValue) break
+                }
+                result
+            }.mapLeft { InternalError(it.message ?: "") }.bind()
+        }
+
+    private fun evalBlockStatement(
+        block: AstNode.BlockStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> =
+        either {
+            var result: DnclObject = DnclObject.Null
+            for (stmt in block.statements) {
+                result = eval(stmt, env).bind()
+                if (result is DnclObject.Error || result is DnclObject.ReturnValue) break
+            }
+            result
+        }
+
+    private fun evalIfStatement(
+        ifStmt: AstNode.IfStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val condition = eval(ifStmt.condition, env).bind()
+        if (isTruthy(condition)) {
+            eval(ifStmt.consequence, env).bind()
+        } else if (ifStmt.alternative != null) {
+            eval(ifStmt.alternative, env).bind()
+        } else {
+            DnclObject.Null
+        }
+    }
+
+    private fun evalWhileStatement(
+        whileStmt: AstNode.WhileStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        var condition = eval(whileStmt.condition, env).bind()
+        while (isTruthy(condition)) {
+            eval(whileStmt.block, env).bind()
+            condition = eval(whileStmt.condition, env).bind()
+        }
+        DnclObject.Null
+    }
+
+    private fun evalForStatement(
+        forStmt: AstNode.ForStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val loopCounter = forStmt.loopCounter.literal
+        val start = eval(forStmt.start, env).bind()
+        val end = eval(forStmt.end, env).bind()
+        val step = eval(forStmt.step, env).bind()
+        val stepType = forStmt.stepType
+        val block = forStmt.block
+        env.set(loopCounter, start)
+        if (start !is DnclObject.Int) return@either DnclObject.TypeError(
+            "Int",
+            start::class.simpleName ?: ""
+        )
+        if (end !is DnclObject.Int) return@either DnclObject.TypeError(
+            "Int",
+            end::class.simpleName ?: ""
+        )
+        if (step !is DnclObject.Int) return@either DnclObject.TypeError(
+            "Int",
+            step::class.simpleName ?: ""
+        )
+        while (true) {
+            val loopCounterValue =
+                env.get(loopCounter) ?: raise(InternalError("loop counter not found"))
+            if (stepType == AstNode.ForStatement.Companion.StepType.INCREMENT) {
+                if (loopCounterValue !is DnclObject.Int) return@either DnclObject.TypeError(
+                    "Int",
+                    loopCounterValue::class.simpleName ?: ""
+                )
+                if (loopCounterValue.value > end.value) break
+                eval(block, env).bind()
+                env.set(loopCounter, DnclObject.Int(loopCounterValue.value + step.value))
+            } else {
+                if (loopCounterValue !is DnclObject.Int) break
+                if (loopCounterValue.value < end.value) break
+                eval(block, env).bind()
+                env.set(loopCounter, DnclObject.Int(loopCounterValue.value - step.value))
+            }
+        }
+        DnclObject.Null
+    }
+
+    private fun evalAssignStatement(
+        assignStmt: AstNode.AssignStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        for ((id, value) in assignStmt.assignments) {
+            when (id) {
+                is AstNode.Identifier -> env.set(id.value, eval(value, env).bind())
+                is AstNode.IndexExpression -> {
+                    val array = eval(id.left, env).bind()
+                    if (array !is DnclObject.Array) return@either DnclObject.TypeError(
+                        "Array",
+                        array::class.simpleName ?: ""
+                    )
+                    val index = eval(id.right, env).bind()
+                    if (index !is DnclObject.Int) return@either DnclObject.TypeError(
+                        "Int",
+                        index::class.simpleName ?: ""
+                    )
+                    array.value[index.value - arrayOrigin] = eval(value, env).bind()
+                }
+            }
+        }
+        DnclObject.Null
+    }
+
+    private fun evalExpressionStatement(
+        exprStmt: AstNode.ExpressionStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = eval(exprStmt.expression, env)
+
+    private fun evalIndexExpression(
+        indexExpression: AstNode.IndexExpression,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val array = eval(indexExpression.left, env).bind()
+        if (array !is DnclObject.Array) return@either DnclObject.TypeError(
+            "Array",
+            array::class.simpleName ?: ""
+        )
+        val index = eval(indexExpression.right, env).bind()
+        if (index !is DnclObject.Int) return@either DnclObject.TypeError(
+            "Int",
+            index::class.simpleName ?: ""
+        )
+        array.value[index.value - arrayOrigin]
+    }
+
+    private fun evalCallExpression(
+        callExpression: AstNode.CallExpression,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val func = eval(callExpression.function, env).bind()
+        if (func is DnclObject.BuiltInFunction) {
+            return@either onCallBuildInFunction(
+                func.identifier,
+                callExpression.arguments.map { eval(it, env).bind() })
+        }
+
+        if (func !is DnclObject.Function) {
+            return@either DnclObject.TypeError(
+                "Function",
+                func::class.simpleName ?: ""
+            )
+        }
+        val args = callExpression.arguments.map { eval(it, env).bind() }
+        val newEnv = env.createChildEnvironment()
+        for ((param, arg) in func.parameters.zip(args)) {
+            newEnv.set(param.value, arg)
+        }
+        eval(func.body, newEnv).bind()
+    }
+
+    private fun evalPrefixExpression(
+        prefixExpression: AstNode.PrefixExpression,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val right = eval(prefixExpression.right, env).bind()
+        when (prefixExpression.operator.literal) {
+            "!" -> DnclObject.Boolean(!isTruthy(right))
+            "-" -> when (right) {
+                is DnclObject.Int -> DnclObject.Int(-right.value)
+                is DnclObject.Float -> DnclObject.Float(-right.value)
+                else -> DnclObject.TypeError("Int or Float", right::class.simpleName ?: "")
+            }
+
+            "+" -> when (right) {
+                is DnclObject.Int -> DnclObject.Int(+right.value)
+                is DnclObject.Float -> DnclObject.Float(+right.value)
+                else -> DnclObject.TypeError("Int or Float", right::class.simpleName ?: "")
+            }
+
+            else -> DnclObject.UndefinedError(prefixExpression.operator.literal)
+        }
+    }
+
+    private fun evalInfixExpression(
+        infixExpression: AstNode.InfixExpression,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val left = eval(infixExpression.left, env).bind()
+        val right = eval(infixExpression.right, env).bind()
+        //肩安全にしたい
+        when (infixExpression.operator.literal) {
+            "+" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value + right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value + right.value)
+                left is DnclObject.String && right is DnclObject.String -> DnclObject.String(left.value + right.value)
+                else -> DnclObject.TypeError(
+                    "Int, Float or String",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "-" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value - right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value - right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "*" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value * right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value * right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "/" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Float(left.value.toFloat() / right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Float(left.value / right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "//" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value / right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Int((left.value / right.value).toInt())
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+
+            }
+
+            "%" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(left.value % right.value)
+                else -> DnclObject.TypeError(
+                    "Int",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "==" -> DnclObject.Boolean(left == right)
+
+            "≠" -> DnclObject.Boolean(left != right)
+
+            "<" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value < right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value < right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "≦" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value <= right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value <= right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            ">" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value > right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value > right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "≧" -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(left.value >= right.value)
+                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(left.value >= right.value)
+                else -> DnclObject.TypeError(
+                    "Int or Float",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "AND" -> when {
+                left is DnclObject.Boolean && right is DnclObject.Boolean -> DnclObject.Boolean(left.value && right.value)
+                else -> DnclObject.TypeError(
+                    "Boolean",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            "OR" -> when {
+                left is DnclObject.Boolean && right is DnclObject.Boolean -> DnclObject.Boolean(left.value || right.value)
+                else -> DnclObject.TypeError(
+                    "Boolean",
+                    "${left::class.simpleName} and ${right::class.simpleName}"
+                )
+            }
+
+            else -> DnclObject.UndefinedError(infixExpression.operator.literal)
+        }
+    }
+
+    private fun evalArrayLiteral(
+        arrayLiteral: AstNode.ArrayLiteral,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val elements = arrayLiteral.elements.map { eval(it, env).bind() }
+        DnclObject.Array(elements.toMutableList())
+    }
+
+    private fun evalIdentifier(
+        identifier: AstNode.Identifier,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        env.get(identifier.value) ?: BuiltInFunction.from(identifier.value)
+            ?.let { DnclObject.BuiltInFunction(it) }
+        ?: DnclObject.UndefinedError("identifier not found: ${identifier.value}")
+    }
+
+    private fun isTruthy(obj: DnclObject): Boolean = when (obj) {
+        is DnclObject.Boolean -> obj.value
+        is DnclObject.Int -> obj.value != 0
+        is DnclObject.Float -> obj.value != 0.0f
+        is DnclObject.String -> obj.value.isNotEmpty()
+        is DnclObject.Array -> obj.value.isNotEmpty()
+        else -> false
+    }
+}
