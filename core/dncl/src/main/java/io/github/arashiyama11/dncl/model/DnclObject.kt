@@ -82,4 +82,10 @@ sealed interface DnclObject {
 
     data class UndefinedError(override val message: kotlin.String, override val astNode: AstNode) :
         Error(message, astNode)
+
+    data class IndexOutOfRangeError(
+        val index: kotlin.Int,
+        val length: kotlin.Int,
+        override val astNode: AstNode
+    ) : Error("index: $index, length: $length", astNode)
 }

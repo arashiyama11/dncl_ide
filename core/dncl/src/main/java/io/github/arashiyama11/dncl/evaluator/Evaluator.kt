@@ -16,6 +16,11 @@ class Evaluator(
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0
 ) : IEvaluator {
+    private inline fun DnclObject.onReturnValueOrError(action: (DnclObject) -> Unit): DnclObject {
+        if (this is DnclObject.ReturnValue || this is DnclObject.Error) action(this)
+        return this
+    }
+
     override fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> = either {
         Either.catch {
             when (node) {
@@ -52,8 +57,7 @@ class Evaluator(
             Either.catch {
                 var result: DnclObject = DnclObject.Null(program)
                 for (stmt in program.statements) {
-                    result = eval(stmt, env).bind()
-                    if (result is DnclObject.Error || result is DnclObject.ReturnValue) break
+                    result = eval(stmt, env).bind().onReturnValueOrError { return@either it }
                 }
                 result
             }.mapLeft { InternalError(it.message ?: "") }.bind()
@@ -66,8 +70,7 @@ class Evaluator(
         either {
             var result: DnclObject = DnclObject.Null(block)
             for (stmt in block.statements) {
-                result = eval(stmt, env).bind()
-                if (result is DnclObject.Error || result is DnclObject.ReturnValue) break
+                result = eval(stmt, env).bind().onReturnValueOrError { return@either it }
             }
             result
         }
@@ -76,7 +79,7 @@ class Evaluator(
         ifStmt: AstNode.IfStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val condition = eval(ifStmt.condition, env).bind()
+        val condition = eval(ifStmt.condition, env).bind().onReturnValueOrError { return@either it }
         if (isTruthy(condition)) {
             eval(ifStmt.consequence, env).bind()
         } else if (ifStmt.alternative != null) {
@@ -90,10 +93,12 @@ class Evaluator(
         whileStmt: AstNode.WhileStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        var condition = eval(whileStmt.condition, env).bind()
+        var condition =
+            eval(whileStmt.condition, env).bind().onReturnValueOrError { return@either it }
         while (isTruthy(condition)) {
-            eval(whileStmt.block, env).bind()
-            condition = eval(whileStmt.condition, env).bind()
+            eval(whileStmt.block, env).bind().onReturnValueOrError { return@either it }
+            condition =
+                eval(whileStmt.condition, env).bind().onReturnValueOrError { return@either it }
         }
         DnclObject.Null(whileStmt)
     }
@@ -103,9 +108,9 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = either {
         val loopCounter = forStmt.loopCounter.literal
-        val start = eval(forStmt.start, env).bind()
-        val end = eval(forStmt.end, env).bind()
-        val step = eval(forStmt.step, env).bind()
+        val start = eval(forStmt.start, env).bind().onReturnValueOrError { return@either it }
+        val end = eval(forStmt.end, env).bind().onReturnValueOrError { return@either it }
+        val step = eval(forStmt.step, env).bind().onReturnValueOrError { return@either it }
         val stepType = forStmt.stepType
         val block = forStmt.block
         env.set(loopCounter, start)
@@ -130,7 +135,7 @@ class Evaluator(
                     loopCounterValue::class.simpleName ?: "", loopCounterValue.astNode
                 )
                 if (loopCounterValue.value > end.value) break
-                eval(block, env).bind()
+                eval(block, env).bind().onReturnValueOrError { return@either it }
                 env.set(
                     loopCounter,
                     DnclObject.Int(loopCounterValue.value + step.value, loopCounterValue.astNode)
@@ -138,7 +143,7 @@ class Evaluator(
             } else {
                 if (loopCounterValue !is DnclObject.Int) break
                 if (loopCounterValue.value < end.value) break
-                eval(block, env).bind()
+                eval(block, env).bind().onReturnValueOrError { return@either it }
                 env.set(
                     loopCounter,
                     DnclObject.Int(loopCounterValue.value - step.value, loopCounterValue.astNode)
@@ -154,19 +159,29 @@ class Evaluator(
     ): Either<DnclError, DnclObject> = either {
         for ((id, value) in assignStmt.assignments) {
             when (id) {
-                is AstNode.Identifier -> env.set(id.value, eval(value, env).bind())
+                is AstNode.Identifier -> env.set(
+                    id.value,
+                    eval(value, env).bind().onReturnValueOrError { return@either it })
+
                 is AstNode.IndexExpression -> {
-                    val array = eval(id.left, env).bind()
+                    val array = eval(id.left, env).bind().onReturnValueOrError { return@either it }
                     if (array !is DnclObject.Array) return@either DnclObject.TypeError(
                         "Array",
                         array::class.simpleName ?: "", array.astNode
                     )
-                    val index = eval(id.right, env).bind()
+                    val index = eval(id.right, env).bind().onReturnValueOrError { return@either it }
                     if (index !is DnclObject.Int) return@either DnclObject.TypeError(
                         "Int",
                         index::class.simpleName ?: "", index.astNode
                     )
-                    array.value[index.value - arrayOrigin] = eval(value, env).bind()
+                    if (index.value - arrayOrigin in array.value.indices)
+                        array.value[index.value - arrayOrigin] =
+                            eval(value, env).bind().onReturnValueOrError { return@either it }
+                    else return@either DnclObject.IndexOutOfRangeError(
+                        index.value - arrayOrigin,
+                        array.value.size,
+                        index.astNode
+                    )
                 }
             }
         }
@@ -196,28 +211,38 @@ class Evaluator(
         indexExpression: AstNode.IndexExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val array = eval(indexExpression.left, env).bind()
+        val array = eval(indexExpression.left, env).bind().onReturnValueOrError { return@either it }
         if (array !is DnclObject.Array) return@either DnclObject.TypeError(
             "Array",
             array::class.simpleName ?: "", array.astNode
         )
-        val index = eval(indexExpression.right, env).bind()
+        val index =
+            eval(indexExpression.right, env).bind().onReturnValueOrError { return@either it }
         if (index !is DnclObject.Int) return@either DnclObject.TypeError(
             "Int",
             index::class.simpleName ?: "", index.astNode
         )
-        array.value[index.value - arrayOrigin]
+        if (index.value - arrayOrigin in array.value.indices)
+            array.value[index.value - arrayOrigin]
+        else DnclObject.IndexOutOfRangeError(
+            index.value - arrayOrigin,
+            array.value.size,
+            index.astNode
+        )
     }
 
     private fun evalCallExpression(
         callExpression: AstNode.CallExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val func = eval(callExpression.function, env).bind()
+        val func =
+            eval(callExpression.function, env).bind().onReturnValueOrError { return@either it }
         if (func is DnclObject.BuiltInFunction) {
             return@either onCallBuildInFunction(
                 func.identifier,
-                callExpression.arguments.map { eval(it, env).bind() })
+                callExpression.arguments.map {
+                    eval(it, env).bind().onReturnValueOrError { return@either it }
+                })
         }
 
         if (func !is DnclObject.Function) {
@@ -226,7 +251,9 @@ class Evaluator(
                 func::class.simpleName ?: "", func.astNode
             )
         }
-        val args = callExpression.arguments.map { eval(it, env).bind() }
+        val args = callExpression.arguments.map {
+            eval(it, env).bind().onReturnValueOrError { return@either it }
+        }
         for ((param, arg) in func.parameters.zip(args)) {
             func.env.set(param, arg)
         }
@@ -238,7 +265,8 @@ class Evaluator(
         prefixExpression: AstNode.PrefixExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val right = eval(prefixExpression.right, env).bind()
+        val right =
+            eval(prefixExpression.right, env).bind().onReturnValueOrError { return@either it }
         when (prefixExpression.operator) {
             is Token.Bang -> DnclObject.Boolean(!isTruthy(right), prefixExpression)
             is Token.Minus -> when (right) {
@@ -267,8 +295,9 @@ class Evaluator(
         infixExpression: AstNode.InfixExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val left = eval(infixExpression.left, env).bind()
-        val right = eval(infixExpression.right, env).bind()
+        val left = eval(infixExpression.left, env).bind().onReturnValueOrError { return@either it }
+        val right =
+            eval(infixExpression.right, env).bind().onReturnValueOrError { return@either it }
         when (infixExpression.operator) {
             is Token.Plus -> when {
                 left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
@@ -481,7 +510,9 @@ class Evaluator(
         arrayLiteral: AstNode.ArrayLiteral,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        val elements = arrayLiteral.elements.map { eval(it, env).bind() }
+        val elements = arrayLiteral.elements.map {
+            eval(it, env).bind().onReturnValueOrError { return@either it }
+        }
         DnclObject.Array(elements.toMutableList(), arrayLiteral)
     }
 

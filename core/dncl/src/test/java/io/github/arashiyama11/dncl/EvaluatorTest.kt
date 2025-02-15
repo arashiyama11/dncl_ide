@@ -2,18 +2,22 @@ package io.github.arashiyama11.dncl
 
 import io.github.arashiyama11.dncl.evaluator.Evaluator
 import io.github.arashiyama11.dncl.lexer.Lexer
+import io.github.arashiyama11.dncl.model.AstNode
 import io.github.arashiyama11.dncl.model.BuiltInFunction
 import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.Environment
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
+import kotlin.math.max
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
 class EvaluatorTest {
-    private var stdin: DnclObject = DnclObject.Null
+
+    private val nullObj = DnclObject.Null(AstNode.SystemLiteral("", 0..0))
+    private var stdin: DnclObject = nullObj
     private var stdout = ""
     private var evaluator: Evaluator = Evaluator(
         { fn, arg ->
@@ -21,14 +25,19 @@ class EvaluatorTest {
                 BuiltInFunction.PRINT -> {
                     arg.joinToString(" ") { it.toString() }.also { stdout += it }
                     stdout += "\n"
-                    DnclObject.Null
+                    DnclObject.Null(arg[0].astNode)
+                    nullObj
                 }
 
                 BuiltInFunction.LENGTH -> {
                     require(arg.size == 1)
                     when (arg[0]) {
-                        is DnclObject.Array -> DnclObject.Int((arg[0] as DnclObject.Array).value.size)
-                        else -> DnclObject.TypeError("")
+                        is DnclObject.Array -> DnclObject.Int(
+                            (arg[0] as DnclObject.Array).value.size,
+                            arg[0].astNode
+                        )
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
                     }
                 }
 
@@ -38,27 +47,30 @@ class EvaluatorTest {
                         is DnclObject.String -> {
                             val str = (arg[0] as DnclObject.String).value
                             require(str.length == 1)
-                            if (str == " ") DnclObject.Int(-1) else DnclObject.Int(str[0].code - 'a'.code)
+                            if (str == " ") DnclObject.Int(-1, arg[0].astNode) else DnclObject.Int(
+                                str[0].code - 'a'.code,
+                                arg[0].astNode
+                            )
                         }
 
-                        else -> DnclObject.TypeError("")
+                        else -> DnclObject.TypeError("", arg[0].astNode)
                     }
                 }
 
                 BuiltInFunction.RETURN -> {
                     require(arg.size == 1)
-                    DnclObject.ReturnValue(arg[0])
+                    DnclObject.ReturnValue(arg[0], arg[0].astNode)
                 }
             }
         },
         {
             when (it) {
-                SystemCommand.Input -> {
+                is SystemCommand.Input -> {
                     stdin
                 }
 
                 is SystemCommand.Unknown -> {
-                    DnclObject.Null
+                    DnclObject.Null(it.astNode)
                 }
             }
         }, 1
@@ -70,14 +82,18 @@ class EvaluatorTest {
                 BuiltInFunction.PRINT -> {
                     arg.joinToString(", ") { it.toString() }.also { stdout += it }
                     stdout += "\n"
-                    DnclObject.Null
+                    DnclObject.Null(arg[0].astNode)
                 }
 
                 BuiltInFunction.LENGTH -> {
                     require(arg.size == 1)
                     when (arg[0]) {
-                        is DnclObject.Array -> DnclObject.Int((arg[0] as DnclObject.Array).value.size)
-                        else -> DnclObject.TypeError("")
+                        is DnclObject.Array -> DnclObject.Int(
+                            (arg[0] as DnclObject.Array).value.size,
+                            arg[0].astNode
+                        )
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
                     }
                 }
 
@@ -87,27 +103,31 @@ class EvaluatorTest {
                         is DnclObject.String -> {
                             val str = (arg[0] as DnclObject.String).value
                             require(str.length == 1)
-                            if (str == " ") DnclObject.Int(-1) else DnclObject.Int(str[0].code - 'a'.code)
+                            if (str == " ") DnclObject.Int(-1, arg[0].astNode) else DnclObject.Int(
+                                str[0].code - 'a'.code,
+                                arg[0].astNode
+                            )
                         }
 
-                        else -> DnclObject.TypeError("")
+                        else -> DnclObject.TypeError("", arg[0].astNode)
                     }
                 }
 
                 BuiltInFunction.RETURN -> {
                     require(arg.size == 1)
-                    DnclObject.ReturnValue(arg[0])
+                    DnclObject.ReturnValue(arg[0], arg[0].astNode)
                 }
             }
         },
         {
             when (it) {
-                SystemCommand.Input -> {
+                is SystemCommand.Input -> {
                     stdin
                 }
 
                 is SystemCommand.Unknown -> {
-                    DnclObject.Null
+                    println("input: ${it.command}")
+                    DnclObject.Null(it.astNode)
                 }
             }
         }, 0
@@ -127,13 +147,18 @@ class EvaluatorTest {
 と定義する
 表示する(add(1)(2)(3)(4)(""))
 """
-        evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        val a =
+            evaluator.evalProgram(program.toProgram())//.leftOrNull()?.let { fail(it.toString()) }
+        a.getOrNull()!!.let {
+            if (it is DnclObject.Error) println(explain(program, it))
+        }
+        println(a)
         assertEquals("10\n", stdout)
     }
 
     @BeforeTest
     fun setUp() {
-        stdin = DnclObject.Null
+        stdin = nullObj
         stdout = ""
     }
 
@@ -192,7 +217,7 @@ class EvaluatorTest {
 
     @Test
     fun testSisaku2022_2() {
-        stdin = DnclObject.Int(62)
+        stdin = DnclObject.Int(62, nullObj.astNode)
         testEval(
             evaluator0Origin, TestCase.Sisaku2022_2, """0～99の数字を入力してください
 62, は, 6, 番目にありました
@@ -212,4 +237,34 @@ class EvaluatorTest {
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!
+
+    fun explain(program: String, error: DnclObject.Error): String {
+        val programLines = program.split("\n")
+        error.astNode.range
+        val (column, line, spaces) = run {
+            var index = 0
+            for ((l, str) in programLines.withIndex()) {
+                if (index + str.length < error.astNode.range.first) {
+                    index += str.length + 1
+                } else {
+                    val col = error.astNode.range.first - index
+                    val sp = str.substring(0, col)
+                        .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
+                    return@run Triple(col, l, sp)
+                }
+            }
+            return@run Triple(0, 0, 0)
+        }
+
+        return """line: $line, column: $column
+${error.message}
+${programLines.subList(max(0, line - 5), line + 1).joinToString("\n")}
+${" ".repeat(spaces)}${"^".repeat(max(1, error.astNode.range.last - error.astNode.range.first))}"""
+    }
+
+
+    private fun isHalfWidth(char: Char): Boolean {
+        val code = char.code
+        return (code in 0x0020..0x007E) || (code in 0xFF61..0xFF9F)
+    }
 }
