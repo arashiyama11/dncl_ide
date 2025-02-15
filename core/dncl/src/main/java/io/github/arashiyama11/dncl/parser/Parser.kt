@@ -278,12 +278,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
-                    AstNode.Identifier(identifier!!.literal),
+                    AstNode.Identifier(identifier!!.literal, identifier.range),
                     parseExpressionList<Token.BracketClose>().bind()
                         .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
                 )
             } else {
-                AstNode.Identifier(identifier!!.literal)
+                AstNode.Identifier(identifier!!.literal, identifier.range)
             }
 
             expectNextToken<Token.Assign>().bind()
@@ -305,13 +305,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal)
+                AstNode.Identifier(identifier.literal, identifier.range)
             }
 
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal)
+                AstNode.Identifier(identifier.literal, identifier.range)
             }
 
             is Token.Int -> {
@@ -319,7 +319,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.IntLiteral(
                     int.literal.toIntOrNull()
-                        ?: raise(ParserError.InvalidIntLiteral(int))
+                        ?: raise(ParserError.InvalidIntLiteral(int)), int.range
                 )
             }
 
@@ -328,21 +328,21 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.FloatLiteral(
                     float.literal.toFloatOrNull()
-                        ?: raise(ParserError.InvalidFloatLiteral(float))
+                        ?: raise(ParserError.InvalidFloatLiteral(float)), float.range
                 )
             }
 
             is Token.String -> {
                 val string = (currentToken as? Token.String)
                     ?: return ParserError.UnExpectedToken(currentToken).left()
-                AstNode.StringLiteral(string.literal)
+                AstNode.StringLiteral(string.literal, string.range)
             }
 
             is PrefixExpressionToken -> {
                 val operator = currentToken as PrefixExpressionToken
                 nextToken().bind()
                 val right = parseExpression(Precedence.PREFIX).bind()
-                AstNode.PrefixExpression(operator, right)
+                AstNode.PrefixExpression(operator, right, operator.range.first..right.range.last)
             }
 
             is Token.ParenOpen -> {
@@ -355,8 +355,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.BracketOpen -> {
                 nextToken().bind()
                 val exps = parseExpressionList<Token.BracketClose>().bind()
+                val close = currentToken as Token.BracketClose
                 nextToken().bind()
-                AstNode.ArrayLiteral(exps)
+                AstNode.ArrayLiteral(exps, token.range.first..close.range.last)
             }
 
             is Token.LenticularOpen -> {
@@ -367,7 +368,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     )
                 )
                 expectNextToken<Token.LenticularClose>().bind()
-                AstNode.SystemLiteral(string.literal)
+                AstNode.SystemLiteral(string.literal, token.range.first..currentToken.range.last)
             }
 
             else -> {
