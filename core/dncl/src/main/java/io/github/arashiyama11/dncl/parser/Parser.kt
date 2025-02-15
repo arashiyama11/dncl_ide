@@ -18,15 +18,17 @@ import io.github.arashiyama11.dncl.model.PrefixExpressionToken
 import io.github.arashiyama11.dncl.model.Token
 
 class Parser private constructor(private val lexer: ILexer) : IParser {
-    private var indentStack: MutableList<Int> = mutableListOf(0)
+    private val indentStack: MutableList<Int> = mutableListOf(0)
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
     private lateinit var aheadToken: Token
 
+
     annotation class EnsuredEndOfLine
 
     override fun parseProgram(): Either<DnclError, AstNode.Program> = Either.catch {
-        indentStack = mutableListOf(0)
+        indentStack.clear()
+        indentStack.add(0)
         while (currentToken is Token.NewLine || (currentToken is Token.Indent && (currentToken as Token.Indent).depth == 0)) {
             nextToken().getOrElse { return it.left() }
         }
@@ -36,6 +38,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 return it.left()
             }
             statements.add(statement)
+
+            while (aheadToken is Token.NewLine) {
+                expectNextToken<Token.Indent>().getOrElse { return it.left() }
+                expectNextToken<Token.NewLine>().getOrElse { return it.left() }
+            }
+
             while (currentToken is Token.NewLine || (currentToken is Token.Indent && (currentToken as Token.Indent).depth == 0)) {
                 nextToken().getOrElse { return it.left() }
             }
@@ -54,6 +62,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 is Token.Wo -> parseForStatement()
                 else -> parseExpressionStatement()
             }
+
+            is Token.Indent -> raise(ParserError.IndentError(currentToken, "in $indentStack"))
 
             else -> parseExpressionStatement()
         }.bind()
@@ -143,9 +153,17 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 )
             )
 
+            println("$currentToken $nextToken $aheadToken")
+
+            while (aheadToken is Token.NewLine) {
+                expectNextToken<Token.Indent>().bind()
+                expectNextToken<Token.NewLine>().bind()
+            }
+
             val depth = (nextToken as? Token.Indent)?.depth ?: raise(
                 ParserError.UnExpectedToken(currentToken)
             )
+
 
             if (!indentStack.contains(depth)) {
                 raise(ParserError.IndentError(nextToken, "in $indentStack"))
