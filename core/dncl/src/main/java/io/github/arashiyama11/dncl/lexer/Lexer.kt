@@ -255,6 +255,8 @@ class Lexer(private val input: String) : ILexer {
 
             "かつ" -> Token.And(pos until position).right()
             "または" -> Token.Or(pos until position).right()
+            "関数" -> Token.Function(pos until position).right()
+            "と定義する" -> Token.Define(pos until position).right()
             else -> Token.Japanese(literal, pos until position).right()
         }
     }

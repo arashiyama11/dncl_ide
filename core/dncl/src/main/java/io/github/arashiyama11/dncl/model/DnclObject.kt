@@ -22,8 +22,8 @@ sealed interface DnclObject {
     }
 
     data class Function(
-        val parameters: List<String>,
-        val body: AstNode.Program,
+        val parameters: List<kotlin.String>,
+        val body: AstNode.BlockStatement,
         val env: Environment
     ) : DnclObject {
         override fun toString() = "<fn $parameters>"

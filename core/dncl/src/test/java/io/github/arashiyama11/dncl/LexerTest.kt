@@ -75,6 +75,24 @@ kosu ＞12かつkosu＜27でない
     }
 
     @Test
+    fun testFunction() {
+        val input = TestCase.MaisuFunction
+        var result = ""
+        for (token in Lexer(input)) {
+            if (token.isRight()) {
+                println(tokenToString(token.getOrNull()!!))
+                result += tokenToString(token.getOrNull()!!)
+            } else {
+                fail(token.leftOrNull()?.message)
+            }
+        }
+        assertEquals(
+            "Indent(Indent(0))NewLine(NEW_LINE)Indent(Indent(0))Function(FUNCTION)Japanese(枚数)ParenOpen(()Identifier(kingaku)ParenClose())Wo(WO)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(2))Identifier(Kouka)Assign(=)BracketOpen([)Int(1)Comma(COMMA)Int(5)Comma(COMMA)Int(10)Comma(COMMA)Int(50)Comma(COMMA)Int(100)BracketClose(])NewLine(NEW_LINE)Indent(Indent(2))Identifier(maisu)Assign(=)Int(0)Comma(COMMA)Identifier(nokori)Assign(=)Identifier(kingaku)NewLine(NEW_LINE)Indent(Indent(2))Identifier(i)Wo(WO)Int(4)Kara(KARA)Int(0)Made(MADE)Int(1)DownTo(DownTo)Colon(COLON)NewLine(NEW_LINE)Indent(Indent(4))Identifier(maisu)Assign(=)Identifier(maisu)Plus(+)Identifier(nokori)DivideInt(//)Identifier(Kouka)BracketOpen([)Identifier(i)BracketClose(])NewLine(NEW_LINE)Indent(Indent(4))Identifier(nokori)Assign(=)Identifier(nokori)Modulo(%)Identifier(Kouka)BracketOpen([)Identifier(i)BracketClose(])NewLine(NEW_LINE)Indent(Indent(2))Japanese(戻り値)ParenOpen(()Identifier(maisu)ParenClose())NewLine(NEW_LINE)Indent(Indent(0))Define(DEFINE)EOF(EOF)",
+            result
+        )
+    }
+
+    @Test
     fun test2025_1() {
         val input = TestCase.exam2025_0
         var result = ""

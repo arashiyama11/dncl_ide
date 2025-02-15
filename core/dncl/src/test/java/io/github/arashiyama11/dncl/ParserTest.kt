@@ -57,6 +57,25 @@ a + b * c + d / e - f
     }
 
     @Test
+    fun testFunction() {
+        val input = TestCase.MaisuFunction
+        val parser = Parser(Lexer(input)).getOrNull()!!
+        val prog = parser.parseProgram()
+        if (prog.isLeft()) fail(prog.leftOrNull()?.explain(input))
+        assertEquals(
+            """function 枚数(kingaku) {
+Kouka = [1, 5, 10, 50, 100]
+maisu = 0, nokori = kingaku
+for i in IntLiteral(value=4)..IntLiteral(value=0) DECREMENT by IntLiteral(value=1) {
+maisu = (maisu + (nokori // Kouka[i]))
+nokori = (nokori % Kouka[i])
+}
+戻り値(maisu)
+}""", prog.getOrNull()!!.literal
+        )
+    }
+
+    @Test
     fun testexam2025_0() {
         testParser(
             TestCase.exam2025_0, """Akibi = [5, 3, 4]

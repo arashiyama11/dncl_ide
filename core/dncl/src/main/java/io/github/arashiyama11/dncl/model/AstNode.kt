@@ -98,6 +98,15 @@ sealed interface AstNode {
         fun toStatement() = WhileStatement(condition, block)
     }
 
+    data class FunctionStatement(
+        val name: String,
+        val parameters: List<String>,
+        val block: BlockStatement
+    ) : Statement {
+        override val literal: String
+            get() = "function ${name}(${parameters.joinToString(separator = ", ") { it }}) ${block.literal}"
+    }
+
     data class BlockStatement(val statements: List<Statement>) : Statement {
         override val literal: String
             get() = "{\n${statements.joinToString(separator = "\n") { it.literal }}\n}"

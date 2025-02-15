@@ -26,6 +26,7 @@ class Evaluator(
                 is AstNode.ForStatement -> evalForStatement(node, env).bind()
                 is AstNode.AssignStatement -> evalAssignStatement(node, env).bind()
                 is AstNode.ExpressionStatement -> evalExpressionStatement(node, env).bind()
+                is AstNode.FunctionStatement -> evalFunctionStatement(node, env).bind()
 
                 is AstNode.IndexExpression -> evalIndexExpression(node, env).bind()
                 is AstNode.CallExpression -> evalCallExpression(node, env).bind()
@@ -171,6 +172,20 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = eval(exprStmt.expression, env)
 
+    private fun evalFunctionStatement(
+        functionStmt: AstNode.FunctionStatement,
+        env: Environment
+    ): Either<DnclError, DnclObject> = either {
+        val fn = DnclObject.Function(
+            functionStmt.parameters,
+            functionStmt.block,
+            env.createChildEnvironment()
+        )
+        env.set(functionStmt.name, fn)
+        fn.env.set(functionStmt.name, fn)
+        DnclObject.Null
+    }
+
     private fun evalIndexExpression(
         indexExpression: AstNode.IndexExpression,
         env: Environment
@@ -206,11 +221,11 @@ class Evaluator(
             )
         }
         val args = callExpression.arguments.map { eval(it, env).bind() }
-        val newEnv = env.createChildEnvironment()
         for ((param, arg) in func.parameters.zip(args)) {
-            newEnv.set(param.value, arg)
+            func.env.set(param, arg)
         }
-        eval(func.body, newEnv).bind()
+        val res = eval(func.body, func.env).bind()
+        if (res is DnclObject.ReturnValue) res.value else res
     }
 
     private fun evalPrefixExpression(

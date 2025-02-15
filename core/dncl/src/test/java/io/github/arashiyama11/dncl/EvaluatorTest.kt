@@ -4,11 +4,13 @@ import io.github.arashiyama11.dncl.evaluator.Evaluator
 import io.github.arashiyama11.dncl.lexer.Lexer
 import io.github.arashiyama11.dncl.model.BuiltInFunction
 import io.github.arashiyama11.dncl.model.DnclObject
+import io.github.arashiyama11.dncl.model.Environment
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class EvaluatorTest {
     private var stdin: DnclObject = DnclObject.Null
@@ -41,6 +43,11 @@ class EvaluatorTest {
 
                         else -> DnclObject.TypeError("")
                     }
+                }
+
+                BuiltInFunction.RETURN -> {
+                    require(arg.size == 1)
+                    DnclObject.ReturnValue(arg[0])
                 }
             }
         },
@@ -86,6 +93,11 @@ class EvaluatorTest {
                         else -> DnclObject.TypeError("")
                     }
                 }
+
+                BuiltInFunction.RETURN -> {
+                    require(arg.size == 1)
+                    DnclObject.ReturnValue(arg[0])
+                }
             }
         },
         {
@@ -101,6 +113,24 @@ class EvaluatorTest {
         }, 0
     )
 
+    @Test
+    fun test() {
+        val program = """
+関数 add(n) を:
+    関数 f(x) を:
+      もし x == "" ならば:
+        戻り値(n)
+      そうでなければ:
+        戻り値( add(x + n) )
+    と定義する
+    戻り値(f)
+と定義する
+表示する(add(1)(2)(3)(4)(""))
+"""
+        evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        assertEquals("10\n", stdout)
+    }
+
     @BeforeTest
     fun setUp() {
         stdin = DnclObject.Null
@@ -108,7 +138,7 @@ class EvaluatorTest {
     }
 
     fun testEval(evaluator: Evaluator, program: String, expected: String) {
-        evaluator.evalProgram(program.toProgram())
+        evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
         assertEquals(expected, stdout)
     }
 
@@ -144,13 +174,20 @@ class EvaluatorTest {
 
     @Test
     fun testSisaku2022_0() {
+
         testEval(evaluator0Origin, TestCase.Sisaku2022_0, "6\n")
     }
 
-    //TODO
     @Test
     fun testSisaku2022_1() {
-        //testEval(evaluator0Origin, TestCase.Sisaku2022_1, "2\n")
+        val env = Environment()
+        evaluator0Origin.evalProgram(TestCase.MaisuFunction.toProgram(), env).leftOrNull()
+            ?.let { fail(it.toString()) }
+
+        evaluator0Origin.evalProgram(TestCase.Sisaku2022_1.toProgram(), env).leftOrNull()
+            ?.let { fail(it.toString()) }
+
+        assertEquals("3\n", stdout)
     }
 
     @Test

@@ -56,6 +56,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseStatement(): Either<DnclError, AstNode.Statement> = either {
         val node = when (currentToken) {
             is Token.If -> parseIfStatement()
+            is Token.Function -> parseFunctionStatement()
 
             is Token.Identifier -> when (nextToken) {
                 is Token.Assign, is Token.BracketOpen -> parseAssignStatement()
@@ -153,8 +154,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 )
             )
 
-            println("$currentToken $nextToken $aheadToken")
-
             while (aheadToken is Token.NewLine) {
                 expectNextToken<Token.Indent>().bind()
                 expectNextToken<Token.NewLine>().bind()
@@ -234,6 +233,34 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         expectNextToken<Token.Colon>().bind()
         val block = parseBlockStatement().bind()
         AstNode.ForStatement(counter, start, end, step, type, block)
+    }
+
+    @EnsuredEndOfLine
+    private fun parseFunctionStatement(): Either<DnclError, AstNode.FunctionStatement> = either {
+        nextToken().bind()
+        val name = (currentToken as? Token.Identifier)
+            ?: currentToken as? Token.Japanese ?: raise(ParserError.UnExpectedToken(currentToken))
+        expectNextToken<Token.ParenOpen>().bind()
+        nextToken().bind()
+        val params = parseExpressionList<Token.ParenClose>().bind()
+        params.any { it !is AstNode.Identifier }.let {
+            if (it) raise(ParserError.UnExpectedToken(currentToken))
+        }
+        expectNextToken<Token.Wo>().bind()
+        expectNextToken<Token.Colon>().bind()
+        val block = parseBlockStatement().bind()
+        expectNextToken<Token.Indent>().bind()
+        if ((currentToken as Token.Indent).depth != indentStack.lastOrNull()) {
+            raise(ParserError.IndentError(currentToken, indentStack.lastOrNull().toString()))
+        }
+        expectNextToken<Token.Define>().bind()
+        nextToken().bind()
+        requireEndOfLine().bind()
+        AstNode.FunctionStatement(
+            name.literal,
+            params.map { (it as AstNode.Identifier).value },
+            block
+        )
     }
 
     @EnsuredEndOfLine

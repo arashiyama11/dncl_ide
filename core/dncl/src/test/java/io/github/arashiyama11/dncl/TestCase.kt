@@ -75,4 +75,14 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 
     val all = listOf(exam2025_0, exam2025_1, Sisaku2022, Sisaku2022_0, Sisaku2022_1, Sisaku2022_2)
 
+    const val MaisuFunction = """
+関数 枚数(kingaku) を:
+  Kouka = [1,5,10,50,100]
+  maisu = 0, nokori = kingaku
+  i を 4 から 0 まで 1 ずつ減らしながら繰り返す：
+    maisu = maisu + nokori ÷ Kouka[i]
+    nokori = nokori % Kouka[i]
+  戻り値(maisu)
+と定義する
+"""
 }

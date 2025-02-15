@@ -136,6 +136,16 @@ sealed interface Token {
     data class UpTo(override val range: IntRange, override val literal: kotlin.String = "UpTo") :
         ExpressionStopToken
 
+    data class Function(
+        override val range: IntRange,
+        override val literal: kotlin.String = "FUNCTION"
+    ) : Token
+
+    data class Define(
+        override val range: IntRange,
+        override val literal: kotlin.String = "DEFINE"
+    ) : Token
+
     data class DownTo(
         override val range: IntRange,
         override val literal: kotlin.String = "DownTo"
