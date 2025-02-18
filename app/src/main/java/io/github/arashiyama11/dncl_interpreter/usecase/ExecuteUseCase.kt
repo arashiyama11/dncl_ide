@@ -9,43 +9,48 @@ import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
 import io.github.arashiyama11.dncl_interpreter.model.DnclOutput
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 class ExecuteUseCase {
     fun execute(program: String): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
-                DnclOutput.Stderr(
+                DnclOutput.Error(
                     err.explain(program)
                 )
             )
         }
+
         val ast = parser.parseProgram().getOrElse { err ->
             return flowOf(
-                DnclOutput.Stderr(
+                DnclOutput.Error(
                     err.explain(program)
                 )
             )
         }
-
         return channelFlow {
-            val evaluator = getEvaluator {
-                send(DnclOutput.Stdout(it))
-            }
+            withContext(Dispatchers.Default) {
+                val evaluator = getEvaluator {
+                    send(DnclOutput.Stdout(it))
+                }
 
-            evaluator.evalProgram(ast).let { err ->
-                if (err.isLeft()) {
-                    send(DnclOutput.Stderr(err.leftOrNull()!!.message.orEmpty()))
-                } else if (err.getOrNull() is DnclObject.Error) {
-                    send(DnclOutput.Stderr(err.getOrNull()!!.toString()))
+                evaluator.evalProgram(ast).let { err ->
+                    if (err.isLeft()) {
+                        send(DnclOutput.Error(err.leftOrNull()!!.message.orEmpty()))
+                    } else if (err.getOrNull() is DnclObject.Error) {
+                        val e = err.getOrNull()!! as DnclObject.Error
+                        send(DnclOutput.RuntimeError(e))
+                    }
+                    close()
                 }
             }
-
             awaitClose()
         }
     }

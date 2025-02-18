@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_interpreter.ui
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,113 +30,106 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 
 @Composable
-fun DnclIDE(modifier: Modifier = Modifier, viewModel: EditorViewModel = viewModel()) {
+fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = viewModel()) {
     var openSyntaxTemplate by remember { mutableStateOf(false) }
-    val uiState = viewModel.uiState.collectAsState()
-    val textSizeDp = with(LocalDensity.current) {
-        MaterialTheme.typography.bodyMedium.lineHeight.toDp()
+    val isDarkTheme = isSystemInDarkTheme()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.onStart(isDarkTheme)
     }
-    Row(
-        modifier
+
+
+    Column(
+        modifier = modifier
             .fillMaxSize()
-            .imePadding(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.Start
+            .imePadding()
     ) {
-        Column(
+        CodeEditor(
+            codeText = uiState.textFieldValue,
+            annotatedCodeText = uiState.annotatedString,
+            onCodeChange = { viewModel.onTextChanged(it, isDarkTheme) },
+            modifier = Modifier.weight(2f)
+        )
+
+        Row(
             Modifier
-                .fillMaxHeight()
-                .width(textSizeDp * 3)
-                .padding(top = 16.dp, end = 8.dp),
-            horizontalAlignment = Alignment.End
+                .fillMaxWidth()
+                .weight(1f), //horizontalArrangement = Arrangement.End
         ) {
-            for (i in 0 until uiState.value.text.lines().size) {
-                Text(
-                    text = (i + 1).toString(),
-                    modifier = Modifier,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = uiState.value.text,
-                onValueChange = { viewModel.onTextChanged(it) },
-                modifier = Modifier.weight(2f),
-                textStyle = MaterialTheme.typography.bodyMedium,
-            )
-
-            val isError = uiState.value.stderr.isNotEmpty()
 
             OutlinedTextField(
-                value = uiState.value.stdout + if (isError) "\n" + uiState.value.stderr else "",
+                value = uiState.output,
                 onValueChange = {},
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f),
                 textStyle = MaterialTheme.typography.bodyMedium,
                 readOnly = true,
-                isError = isError
+                isError = uiState.isError
             )
-        }
 
-
-        Column(
-            modifier = Modifier
-                .width(96.dp)
-                .padding(horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            IconButton(
-                onClick = viewModel::onRunButtonClicked,
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(96.dp)
+                    .padding(horizontal = 8.dp)
+                    .alpha(0.7f),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
-            }
-
-            IconButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Outlined.Warning, contentDescription = "Stop")
-            }
-
-            IconButton(
-                onClick = {
-                    openSyntaxTemplate = !openSyntaxTemplate
-                }, modifier = Modifier
-                    .fillMaxWidth()
-                    .rotate(if (openSyntaxTemplate) 180f else 0f)
-            ) {
-                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Syntax Template")
-            }
-
-            if (openSyntaxTemplate) {
-                OutlinedButton(
-                    onClick = {},
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(0.dp)
+                IconButton(
+                    onClick = viewModel::onRunButtonClicked,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("If", color = Color.Gray)
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
                 }
 
-                OutlinedButton(
-                    onClick = {},
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("For", color = Color.Gray)
+                IconButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Warning, contentDescription = "Stop")
                 }
 
-                OutlinedButton(
-                    onClick = {},
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(0.dp)
+                IconButton(
+                    onClick = {
+                        openSyntaxTemplate = !openSyntaxTemplate
+                    }, modifier = Modifier
+                        .fillMaxWidth()
+                        .rotate(if (openSyntaxTemplate) 180f else 0f)
                 ) {
-                    Text("While", color = Color.Gray)
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Syntax Template")
+                }
+
+                if (openSyntaxTemplate) {
+                    OutlinedButton(
+                        onClick = {},
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("If", color = Color.Gray)
+                    }
+
+                    OutlinedButton(
+                        onClick = {},
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("For", color = Color.Gray)
+                    }
+
+                    OutlinedButton(
+                        onClick = {},
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("While", color = Color.Gray)
+                    }
                 }
             }
         }
