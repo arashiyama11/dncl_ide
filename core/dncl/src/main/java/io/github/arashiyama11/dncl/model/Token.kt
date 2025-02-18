@@ -157,6 +157,8 @@ sealed interface Token {
         override val literal: kotlin.String = "Indent(${depth})"
     ) : Token
 
+    data class Comment(override val literal: kotlin.String, override val range: IntRange) : Token
+
     data class Identifier(override val literal: kotlin.String, override val range: IntRange) : Token
     data class Japanese(override val literal: kotlin.String, override val range: IntRange) : Token
     data class Int(override val literal: kotlin.String, override val range: IntRange) : Token

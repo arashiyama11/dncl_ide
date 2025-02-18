@@ -100,7 +100,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun nextToken(): Either<LexerError, Token> = either {
         currentToken = nextToken
         nextToken = aheadToken
-        aheadToken = lexer.nextToken().bind()
+        aheadToken = run {
+            var tok = lexer.nextToken().bind()
+            while (tok is Token.Comment) {
+                tok = lexer.nextToken().bind()
+            }
+            tok
+        }
         return currentToken.right()
     }
 
