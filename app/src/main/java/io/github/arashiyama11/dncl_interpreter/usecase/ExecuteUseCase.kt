@@ -17,9 +17,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.koin.core.annotation.Single
 
-class ExecuteUseCase {
-    fun execute(program: String): Flow<DnclOutput> {
+@Single(binds = [IExecuteUseCase::class])
+class ExecuteUseCase : IExecuteUseCase {
+    override operator fun invoke(program: String): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(

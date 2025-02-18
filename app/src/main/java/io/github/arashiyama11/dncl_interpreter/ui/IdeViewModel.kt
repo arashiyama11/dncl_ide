@@ -6,14 +6,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl_interpreter.model.DnclOutput
-import io.github.arashiyama11.dncl_interpreter.usecase.ExecuteUseCase
-import io.github.arashiyama11.dncl_interpreter.usecase.SyntaxHighLightUseCase
+import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
+import io.github.arashiyama11.dncl_interpreter.usecase.ISyntaxHighLightUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.android.annotation.KoinViewModel
 
 
 data class IdeUiState(
@@ -47,9 +48,10 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
     val errorRange: IntRange? = null
 )
 
+@KoinViewModel
 class IdeViewModel(
-    private val syntaxHighLightUseCase: SyntaxHighLightUseCase = SyntaxHighLightUseCase(),
-    private val executeUseCase: ExecuteUseCase = ExecuteUseCase()
+    private val syntaxHighLightUseCase: ISyntaxHighLightUseCase,
+    private val executeUseCase: IExecuteUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
@@ -92,7 +94,7 @@ class IdeViewModel(
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
 
-            executeUseCase.execute(uiState.value.textFieldValue.text).collect { output ->
+            executeUseCase(uiState.value.textFieldValue.text).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
                         _uiState.update {

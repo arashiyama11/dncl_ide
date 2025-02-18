@@ -14,9 +14,11 @@ import io.github.arashiyama11.dncl.model.InternalError
 import io.github.arashiyama11.dncl.model.ParserError
 import io.github.arashiyama11.dncl.model.Token
 import io.github.arashiyama11.dncl.parser.Parser
+import org.koin.core.annotation.Single
 
-class SyntaxHighLightUseCase {
-    operator fun invoke(
+@Single(binds = [ISyntaxHighLightUseCase::class])
+class SyntaxHighLightUseCase : ISyntaxHighLightUseCase {
+    override operator fun invoke(
         text: String,
         isDarkTheme: Boolean,
         errorRange: IntRange?
