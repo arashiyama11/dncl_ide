@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.annotations)
+    implementation(libs.material.icons.extended)
     ksp(libs.koin.ksp)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
