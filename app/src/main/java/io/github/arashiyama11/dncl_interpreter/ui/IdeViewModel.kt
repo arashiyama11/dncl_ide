@@ -16,6 +16,7 @@ import io.github.arashiyama11.dncl_interpreter.model.DnclOutput
 import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
 import io.github.arashiyama11.dncl_interpreter.usecase.ISyntaxHighLightUseCase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +64,7 @@ class IdeViewModel(
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
     private var isDarkThemeCache = false
+    private var executeJob: Job? = null
 
     fun onStart(isDarkTheme: Boolean) {
         onTextChanged(uiState.value.textFieldValue, isDarkTheme)
@@ -99,7 +101,7 @@ class IdeViewModel(
     }
 
     fun onRunButtonClicked() {
-        viewModelScope.launch {
+        executeJob = viewModelScope.launch {
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
 
@@ -135,7 +137,13 @@ class IdeViewModel(
             }
             delay(50)
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
+            executeJob = null
         }
+    }
+
+    fun onCancelButtonClicked() {
+        executeJob?.cancel()
+        executeJob = null
     }
 
     fun insertText(text: String) {
@@ -171,6 +179,7 @@ class IdeViewModel(
                 ), isDarkThemeCache
             )
         }
+
         return true
     }
 }

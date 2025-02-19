@@ -16,9 +16,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun IdeSideButtons(
     onRunButtonClicked: () -> Unit,
+    onCancelButtonClicked: () -> Unit,
     insertText: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -205,8 +206,8 @@ fun IdeSideButtons(
                 Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
             }
 
-            IconButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Outlined.Warning, contentDescription = "Stop")
+            IconButton(onClick = { onCancelButtonClicked() }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Cancel, contentDescription = "Stop")
             }
 
             IconButton(
