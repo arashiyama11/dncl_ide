@@ -1,6 +1,13 @@
 package io.github.arashiyama11.dncl_interpreter.ui
 
+import android.util.Log
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -63,6 +70,10 @@ class IdeViewModel(
 
     fun onTextChanged(text: TextFieldValue, isDarkTheme: Boolean) {
         isDarkThemeCache = isDarkTheme
+        Log.d("IdeViewModel", "onTextChanged")
+        _uiState.update {
+            it.copy(textFieldValue = text)
+        }
         viewModelScope.launch(Dispatchers.Default) {
             val (annotatedString, error) = syntaxHighLightUseCase(
                 text.text, isDarkTheme, uiState.value.errorRange
@@ -80,13 +91,11 @@ class IdeViewModel(
 
             _uiState.update {
                 it.copy(
-                    textFieldValue = text,
                     annotatedString = annotatedString,
                     isError = error != null
                 )
             }
         }
-
     }
 
     fun onRunButtonClicked() {
@@ -129,6 +138,39 @@ class IdeViewModel(
         }
     }
 
-    fun onCancelButtonClicked() {
+    fun insertText(text: String) {
+        val newText = uiState.value.textFieldValue.text.substring(
+            0,
+            uiState.value.textFieldValue.selection.start
+        ) + text + uiState.value.textFieldValue.text.substring(uiState.value.textFieldValue.selection.end)
+        val newRange = TextRange(uiState.value.textFieldValue.selection.start + text.length)
+        onTextChanged(TextFieldValue(newText, newRange), isDarkThemeCache)
+    }
+
+
+    fun onEditorKeyEvent(keyEvent: KeyEvent): Boolean {
+        Log.d("IdeViewModel", "onKeyEvent")
+        if (keyEvent.type != KeyEventType.KeyUp || keyEvent.key != Key.Enter) return false
+        viewModelScope.launch {
+            val codeText = uiState.value.textFieldValue
+            val cursorPos = codeText.selection.start
+            val textBeforeCursor = codeText.text.substring(0, cursorPos - 1)
+            val currentLine = textBeforeCursor.substringAfterLast("\n", textBeforeCursor)
+            val indent = currentLine.takeWhile { it == ' ' || it == '\t' || it == '　' }
+            val insertion = if (currentLine.lastOrNull() == ':') "$indent  " else indent
+            val newText =
+                codeText.text.substring(0, cursorPos) + insertion + codeText.text.substring(
+                    cursorPos
+                )
+            val newCursorPos = cursorPos + insertion.length
+
+            onTextChanged(
+                TextFieldValue(
+                    text = newText,
+                    selection = TextRange(newCursorPos)
+                ), isDarkThemeCache
+            )
+        }
+        return true
     }
 }

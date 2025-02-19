@@ -130,7 +130,23 @@ class SyntaxHighLightUseCase : ISyntaxHighLightUseCase {
                             }
                         }
 
-                        is Token.EOF, is Token.Indent, is Token.NewLine -> {}
+                        is Token.Indent -> {
+                            withStyle(
+                                SpanStyle(
+                                    color = Color.Gray,
+                                    textDecoration = TextDecoration.LineThrough
+                                )
+                            ) {
+                                if (t.depth > 0)
+                                    append(
+                                        text.substring(
+                                            t.range
+                                        )
+                                    )
+                            }
+                        }
+
+                        is Token.EOF, is Token.NewLine -> {}
                         is Token.Comment -> withStyle(styles.commentStyle) {
                             append(
                                 text.substring(

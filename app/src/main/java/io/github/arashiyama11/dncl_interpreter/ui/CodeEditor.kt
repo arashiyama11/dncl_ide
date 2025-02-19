@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -33,14 +35,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.arashiyama11.dncl_interpreter.usecase.SyntaxHighLightUseCase
 
 
 @Composable
 fun CodeEditor(
     codeText: TextFieldValue,
     annotatedCodeText: AnnotatedString?,
+    modifier: Modifier = Modifier,
     onCodeChange: (TextFieldValue) -> Unit,
-    modifier: Modifier = Modifier
+    onKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
     val lineHeight = with(LocalDensity.current) {
         MaterialTheme.typography.bodyMedium.lineHeight.toDp()
@@ -97,7 +101,8 @@ fun CodeEditor(
             modifier = Modifier
                 .weight(1f)
                 .padding(vertical = 8.dp)
-                .horizontalScroll(rememberScrollState()),
+                .horizontalScroll(rememberScrollState())
+                .onKeyEvent { onKeyEvent(it) },
             cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
             decorationBox = { innerTextField ->
                 innerTextField()
@@ -146,8 +151,18 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
         ))
     }
 
+    val annotatedCodeText by remember {
+        mutableStateOf(
+            SyntaxHighLightUseCase()(
+                code.text,
+                true,
+                null
+            )
+        )
+    }
+
 
     CodeEditor(
-        code, null, { code = it }
+        code, annotatedCodeText.first, onCodeChange = { code = it }
     )
 }
