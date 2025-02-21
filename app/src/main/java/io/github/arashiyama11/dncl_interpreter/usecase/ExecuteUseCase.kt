@@ -8,7 +8,7 @@ import io.github.arashiyama11.dncl.model.BuiltInFunction
 import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
-import io.github.arashiyama11.dncl_interpreter.model.DnclOutput
+import io.github.arashiyama11.model.DnclOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
