@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_interpreter.model
+package io.github.arashiyama11.model
 
 import io.github.arashiyama11.dncl.model.DnclObject
 
