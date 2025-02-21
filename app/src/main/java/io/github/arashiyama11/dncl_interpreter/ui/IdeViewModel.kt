@@ -12,9 +12,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
-import io.github.arashiyama11.dncl_interpreter.model.DnclOutput
 import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
+import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
 import io.github.arashiyama11.dncl_interpreter.usecase.ISyntaxHighLightUseCase
+import io.github.arashiyama11.model.DnclOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -59,7 +60,8 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 @KoinViewModel
 class IdeViewModel(
     private val syntaxHighLightUseCase: ISyntaxHighLightUseCase,
-    private val executeUseCase: IExecuteUseCase
+    private val executeUseCase: IExecuteUseCase,
+    private val fileUseCase: IFileUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
@@ -67,12 +69,25 @@ class IdeViewModel(
     private var executeJob: Job? = null
 
     fun onStart(isDarkTheme: Boolean) {
-        onTextChanged(uiState.value.textFieldValue, isDarkTheme)
+        viewModelScope.launch {
+            fileUseCase.selectedFileName.collect { fileName ->
+                Log.d("IdeViewModel", "selectedFileName: ${fileName?.value}")
+                if (fileName != null) {
+                    val programFile = fileUseCase.getFileByName(fileName) ?: return@collect
+                    onTextChanged(
+                        TextFieldValue(
+                            programFile.content.value,
+                            TextRange(programFile.cursorPosition.value)
+                        ),
+                        isDarkTheme
+                    )
+                }
+            }
+        }
     }
 
     fun onTextChanged(text: TextFieldValue, isDarkTheme: Boolean) {
         isDarkThemeCache = isDarkTheme
-        Log.d("IdeViewModel", "onTextChanged")
         _uiState.update {
             it.copy(textFieldValue = text)
         }
@@ -101,6 +116,18 @@ class IdeViewModel(
     }
 
     fun onRunButtonClicked() {
+        viewModelScope.launch {
+            fileUseCase.selectedFileName.value?.let {
+                fileUseCase.saveFile(
+                    io.github.arashiyama11.model.ProgramFile(
+                        it,
+                        io.github.arashiyama11.model.FileContent(uiState.value.textFieldValue.text),
+                        io.github.arashiyama11.model.CursorPosition(uiState.value.textFieldValue.selection.start)
+                    ),
+                )
+            }
+        }
+
         executeJob = viewModelScope.launch {
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
