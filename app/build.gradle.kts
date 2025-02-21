@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room.gradle.plugin)
 }
 
 android {
@@ -38,6 +39,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    room {
+        schemaDirectory("$projectDir/schemas")
+    }
 }
 
 ksp {
@@ -58,6 +63,8 @@ dependencies {
     implementation(libs.arrow.core)
     implementation(libs.arrow.fx.coroutines)
     implementation(project(":core:dncl"))
+    implementation(project(":core:data"))
+    implementation(project(":core:model"))
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.andriod)
@@ -65,6 +72,10 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.annotations)
     implementation(libs.material.icons.extended)
+    implementation(libs.room.ktx)
+    implementation(libs.room.runtime)
+    ksp(libs.room.compiler)
+    annotationProcessor(libs.room.compiler)
     ksp(libs.koin.ksp)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
