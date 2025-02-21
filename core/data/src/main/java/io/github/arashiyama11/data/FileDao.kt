@@ -4,24 +4,25 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import io.github.arashiyama11.data.entity.FileEntity
 
 @Dao
 interface FileDao {
-    @Query("SELECT * FROM file")
-    fun getAllFiles(): List<io.github.arashiyama11.data.entity.FileEntity>
-
     @Query("SELECT * FROM file WHERE id = :id")
-    fun getFileById(id: Int): io.github.arashiyama11.data.entity.FileEntity?
+    suspend fun getFileById(id: Int): FileEntity?
 
     @Query("SELECT * FROM file WHERE name = :name")
-    fun getFileByName(name: String): io.github.arashiyama11.data.entity.FileEntity?
+    suspend fun getFileByName(name: String): FileEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertFile(file: io.github.arashiyama11.data.entity.FileEntity)
+    suspend fun insertFile(file: FileEntity)
 
     @Query("SELECT * FROM selected_file")
-    fun getSelectedFile(): io.github.arashiyama11.data.entity.SelectedFileEntity?
+    suspend fun getSelectedFile(): List<io.github.arashiyama11.data.entity.SelectedFileEntity>?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertSelectedFile(selectedFile: io.github.arashiyama11.data.entity.SelectedFileEntity)
+    suspend fun insertSelectedFile(selectedFile: io.github.arashiyama11.data.entity.SelectedFileEntity)
+
+    @Query("DELETE FROM selected_file")
+    suspend fun clearSelectedFile()
 }

@@ -13,14 +13,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.core.annotation.Single
 import java.io.File
 
-@Single(binds = [IFileRepository::class])
 class FileRepository(
-    context: Context, private val fileDao:
-    FileDao
+    context: Context,
+    private val fileDao: FileDao
 ) : IFileRepository {
     override val selectedFileName: MutableStateFlow<FileName?> = MutableStateFlow(null)
     private val programFilesDir: File = File(context.filesDir, PROGRAM_FILES_DIR).apply {
@@ -44,68 +41,55 @@ class FileRepository(
         }
 
         CoroutineScope(Dispatchers.IO).launch {
-            fileDao.getSelectedFile()?.let {
-                selectedFileName.value =
-                    FileName(fileDao.getFileById(it.fileId)?.name ?: DEFAULT_FILE_NAME)
-            }
+            selectedFileName.value = fileDao.getSelectedFile()?.singleOrNull()?.let {
+                FileName(fileDao.getFileById(it.fileId)?.name ?: DEFAULT_FILE_NAME)
+            } ?: FileName(DEFAULT_FILE_NAME)
         }
     }
 
 
     override suspend fun getAllFileNames(): List<FileName>? {
-        return withContext(Dispatchers.IO) {
-            programFilesDir.listFiles()?.map {
-                FileName(it.name)
-            }
+        return programFilesDir.listFiles()?.map {
+            FileName(it.name)
         }
     }
 
     override suspend fun getFileByName(fileName: FileName): ProgramFile? {
-        return withContext(Dispatchers.IO) {
-            val file = File(programFilesDir, fileName.value)
-            if (!file.exists()) {
-                return@withContext null
-            }
-            fileDao.getFileByName(fileName.value)?.let {
-                ProgramFile(
-                    fileName,
-                    FileContent(file.readText()),
-                    CursorPosition(it.cursorPosition)
-                )
-            }
+        val file = File(programFilesDir, fileName.value)
+        if (!file.exists()) {
+            return null
+        }
+        return fileDao.getFileByName(fileName.value)?.let {
+            ProgramFile(
+                fileName,
+                FileContent(file.readText()),
+                CursorPosition(it.cursorPosition)
+            )
         }
     }
 
     override suspend fun saveFile(programFile: ProgramFile) {
-        withContext(Dispatchers.IO) {
-            fileDao.getFileByName(programFile.name.value)?.let {
-                fileDao.insertFile(
-                    it.copy(cursorPosition = programFile.cursorPosition.value)
-                )
-            } ?: fileDao.insertFile(
-                FileEntity(
-                    name = programFile.name.value,
-                    cursorPosition = programFile.cursorPosition.value
-                )
+        fileDao.getFileByName(programFile.name.value)?.let {
+            fileDao.insertFile(
+                it.copy(cursorPosition = programFile.cursorPosition.value)
             )
+        } ?: fileDao.insertFile(
+            FileEntity(
+                name = programFile.name.value,
+                cursorPosition = programFile.cursorPosition.value
+            )
+        )
 
-            fileDao.getFileByName(programFile.name.value)?.let {
-                fileDao.insertSelectedFile(SelectedFileEntity(it.id))
-            }
-
-
-            val file = File(programFilesDir, programFile.name.value)
-            file.writeText(programFile.content.value)
-        }
+        val file = File(programFilesDir, programFile.name.value)
+        file.writeText(programFile.content.value)
     }
 
     override suspend fun selectFile(fileName: FileName) {
         selectedFileName.value = fileName
-        withContext(Dispatchers.IO) {
-            fileDao.getFileByName(fileName.value)?.let {
-                fileDao.insertSelectedFile(SelectedFileEntity(it.id))
-            } ?: Log.e("FileRepository", "selectFile: file not found")
-        }
+        fileDao.getFileByName(fileName.value)?.let {
+            fileDao.clearSelectedFile()
+            fileDao.insertSelectedFile(SelectedFileEntity(it.id))
+        } ?: Log.e("FileRepository", "selectFile: file not found")
     }
 
     companion object {
