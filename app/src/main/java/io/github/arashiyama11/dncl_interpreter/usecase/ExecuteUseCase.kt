@@ -21,7 +21,7 @@ import org.koin.core.annotation.Single
 
 @Single(binds = [IExecuteUseCase::class])
 class ExecuteUseCase : IExecuteUseCase {
-    override operator fun invoke(program: String): Flow<DnclOutput> {
+    override operator fun invoke(program: String, input: String): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(
@@ -39,7 +39,7 @@ class ExecuteUseCase : IExecuteUseCase {
         }
         return channelFlow {
             withContext(Dispatchers.Default) {
-                val evaluator = getEvaluator {
+                val evaluator = getEvaluator(input) {
                     send(DnclOutput.Stdout(it))
                 }
 
@@ -57,7 +57,7 @@ class ExecuteUseCase : IExecuteUseCase {
         }
     }
 
-    private fun getEvaluator(onStdout: suspend (String) -> Unit): Evaluator {
+    private fun getEvaluator(input: String, onStdout: suspend (String) -> Unit): Evaluator {
         return Evaluator(
             { fn, arg ->
                 when (fn) {
@@ -110,11 +110,10 @@ class ExecuteUseCase : IExecuteUseCase {
             {
                 when (it) {
                     is SystemCommand.Input -> {
-                        DnclObject.Null(it.astNode)
+                        DnclObject.String(input, it.astNode)
                     }
 
                     is SystemCommand.Unknown -> {
-                        println("input: ${it.command}")
                         DnclObject.Null(it.astNode)
                     }
                 }

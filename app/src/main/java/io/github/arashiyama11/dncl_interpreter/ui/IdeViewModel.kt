@@ -53,8 +53,10 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
     val dnclError: DnclError? = null,
     val annotatedString: AnnotatedString? = null,
     val output: String = "",
+    val input: String = "",
     val isError: Boolean = false,
-    val errorRange: IntRange? = null
+    val errorRange: IntRange? = null,
+    val isInputMode: Boolean = false
 )
 
 @KoinViewModel
@@ -132,7 +134,10 @@ class IdeViewModel(
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
 
-            executeUseCase(uiState.value.textFieldValue.text).collect { output ->
+            executeUseCase(
+                uiState.value.textFieldValue.text,
+                uiState.value.input
+            ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
                         _uiState.update {
@@ -208,5 +213,17 @@ class IdeViewModel(
         }
 
         return true
+    }
+
+    fun onChangeIOButtonClicked() {
+        _uiState.update {
+            it.copy(isInputMode = !it.isInputMode)
+        }
+    }
+
+    fun onInputTextChanged(input: String) {
+        _uiState.update {
+            it.copy(input = input)
+        }
     }
 }

@@ -48,22 +48,35 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                 .weight(1f),
             horizontalArrangement = Arrangement.End
         ) {
-            OutlinedTextField(
-                value = uiState.output,
-                onValueChange = {},
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(1f),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                readOnly = true,
-                isError = uiState.isError,
-                label = { Text("出力") }
-            )
+            if (uiState.isInputMode)
+                OutlinedTextField(
+                    value = uiState.input,
+                    onValueChange = { viewModel.onInputTextChanged(it) },
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(1f),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    label = { Text("入力") }
+                )
+            else
+                OutlinedTextField(
+                    value = uiState.output,
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(1f),
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    readOnly = true,
+                    isError = uiState.isError,
+                    label = { Text("出力") }
+                )
 
             IdeSideButtons(
                 onRunButtonClicked = { viewModel.onRunButtonClicked() },
                 onCancelButtonClicked = { viewModel.onCancelButtonClicked() },
                 insertText = { viewModel.insertText(it) },
+                onChangeIOButtonClicked = { viewModel.onChangeIOButtonClicked() },
+                isInputMode = uiState.isInputMode,
                 modifier = Modifier
                     .fillMaxHeight()
             )

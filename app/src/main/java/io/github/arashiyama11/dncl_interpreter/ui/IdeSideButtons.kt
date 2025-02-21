@@ -17,8 +17,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +44,8 @@ fun IdeSideButtons(
     onRunButtonClicked: () -> Unit,
     onCancelButtonClicked: () -> Unit,
     insertText: (String) -> Unit,
+    onChangeIOButtonClicked: () -> Unit,
+    isInputMode: Boolean,
     modifier: Modifier = Modifier
 ) {
     //TODO アニメーションをつける
@@ -188,6 +192,23 @@ fun IdeSideButtons(
                         )
                     }
                 }
+
+                item {
+                    OutlinedButton(
+                        onClick = { insertText("【外部からの入力】") },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        border = BorderStroke(4.dp, Color.Gray),
+                        modifier = Modifier
+                            .width(52.dp)
+                            .height(36.dp)
+                    ) {
+                        Text(
+                            "INPUT",
+                            color = Color.Gray, fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
             }
         }
 
@@ -208,6 +229,16 @@ fun IdeSideButtons(
 
             IconButton(onClick = { onCancelButtonClicked() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.Cancel, contentDescription = "Stop")
+            }
+
+            IconButton(
+                onClick = { onChangeIOButtonClicked() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    if (isInputMode) Icons.Outlined.Upload else Icons.Outlined.Download,
+                    contentDescription = "Change IO"
+                )
             }
 
             IconButton(
