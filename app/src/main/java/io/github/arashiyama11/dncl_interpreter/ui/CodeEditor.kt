@@ -1,9 +1,11 @@
 package io.github.arashiyama11.dncl_interpreter.ui
 
 import android.content.res.Configuration
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,15 +20,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -36,7 +42,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.arashiyama11.dncl_interpreter.usecase.SyntaxHighLightUseCase
-
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 @Composable
 fun CodeEditor(
@@ -49,71 +56,140 @@ fun CodeEditor(
     val lineHeight = with(LocalDensity.current) {
         MaterialTheme.typography.bodyMedium.lineHeight.toDp()
     }
+    val lineHeightPx = with(LocalDensity.current) { lineHeight.toPx() }
 
     val scrollState = rememberScrollState()
 
+    var editorHeightPx by remember { mutableIntStateOf(0) }
+    var textFieldHeightPx by remember { mutableIntStateOf(0) }
 
-    Row(
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .background(MaterialTheme.colorScheme.background)
-            .padding(8.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .width(40.dp)
-                .padding(vertical = 8.dp)
-        ) {
-            val lines = codeText.text.split("\n")
-            val selectLine = run {
-                var idx = 0
-                for ((i, line) in lines.withIndex()) {
-                    if (idx + line.length < codeText.selection.start) {
-                        idx += line.length + 1
-                    } else {
-                        return@run i
-                    }
-                }
-                return@run null
+            .onGloballyPositioned { coordinates ->
+                editorHeightPx = coordinates.size.height
             }
-            lines.forEachIndexed { index, _ ->
-                Text(
-                    text = "${index + 1}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(lineHeight)
-                        .padding(horizontal = 4.dp),
-                    color = if (selectLine == index) if (isSystemInDarkTheme()) Color.LightGray else Color.Black else Color.DarkGray,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.End,
-                    fontWeight = if (selectLine == index) FontWeight.Bold else FontWeight.Normal
-                )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(8.dp)
+        ) {
+            // 行番号部分
+            Column(
+                modifier = Modifier
+                    .width(40.dp)
+            ) {
+                val lines = codeText.text.split("\n")
+                val selectLine = run {
+                    var idx = 0
+                    for ((i, line) in lines.withIndex()) {
+                        if (idx + line.length < codeText.selection.start) {
+                            idx += line.length + 1
+                        } else {
+                            return@run i
+                        }
+                    }
+                    lines.lastIndex
+                }
+                lines.forEachIndexed { index, _ ->
+                    Text(
+                        text = "${index + 1}",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(lineHeight)
+                            .padding(horizontal = 4.dp),
+                        color = if (selectLine == index)
+                            if (isSystemInDarkTheme()) Color.LightGray else Color.Black
+                        else Color.DarkGray,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.End,
+                        fontWeight = if (selectLine == index) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // コード入力部分
+            BasicTextField(
+                value = codeText,
+                onValueChange = { onCodeChange(it) },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    if (annotatedCodeText == null) MaterialTheme.colorScheme.onBackground else Color.Gray
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(bottom = 32.dp)
+                    .horizontalScroll(rememberScrollState())
+                    .onGloballyPositioned { coordinates ->
+                        textFieldHeightPx = coordinates.size.height
+                    }
+                    .onKeyEvent { onKeyEvent(it) },
+                cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
+                onTextLayout = { textLayoutResult ->
+                    val cursorOffset = codeText.selection.start
+                    val cursorRect = textLayoutResult.getCursorRect(cursorOffset)
+                    val margin = 32f
+                    if (cursorRect.top < margin) {
+                        coroutineScope.launch {
+                            val delta = (margin - cursorRect.top).toInt()
+                            scrollState.animateScrollTo((scrollState.value - delta).coerceAtLeast(0))
+                        }
+                    } else if (cursorRect.bottom > textFieldHeightPx - margin) {
+                        coroutineScope.launch {
+                            val delta = (cursorRect.bottom - (textFieldHeightPx - margin)).toInt()
+                            scrollState.animateScrollTo(scrollState.value + delta)
+                        }
+                    }
+                },
+                decorationBox = { innerTextField ->
+                    innerTextField()
+                    if (annotatedCodeText != null)
+                        Text(
+                            text = annotatedCodeText,
+                            modifier = Modifier.fillMaxSize(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            softWrap = false
+                        )
+                }
+            )
+        }
+    }
+
+    var scrollJob: Job? by remember { mutableStateOf(null) }
+
+    LaunchedEffect(codeText.selection, editorHeightPx) {
+        scrollJob?.cancel()
+        scrollJob = launch {
+            val lines = codeText.text.split("\n")
+            var idx = 0
+            var cursorLine = 0
+            for ((i, line) in lines.withIndex()) {
+                if (idx + line.length < codeText.selection.start) {
+                    idx += line.length + 1
+                } else {
+                    cursorLine = i
+                    break
+                }
+            }
+            Log.d("CodeEditor", "cursorLine: $cursorLine")
+            val targetOffset = (cursorLine * lineHeightPx).toInt()
+
+            // 表示領域からカーソルがはみ出している場合にスクロール調整
+            if (targetOffset - lineHeightPx.toInt() < scrollState.value) {
+                scrollState.animateScrollTo(targetOffset - lineHeightPx.toInt())
+            } else if (targetOffset + lineHeightPx.toInt() * 4 > scrollState.value + editorHeightPx) {
+                if (targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx > scrollState.maxValue)
+                    scrollState.animateScrollTo(scrollState.maxValue)
+                else
+                    scrollState.animateScrollTo(targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx)
             }
         }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        BasicTextField(
-            value = codeText,
-            onValueChange = { onCodeChange(it) },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(if (annotatedCodeText == null) MaterialTheme.colorScheme.onBackground else Color.Gray),
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 8.dp)
-                .horizontalScroll(rememberScrollState())
-                .onKeyEvent { onKeyEvent(it) },
-            cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
-            decorationBox = { innerTextField ->
-                innerTextField()
-                if (annotatedCodeText != null) Text(
-                    text = annotatedCodeText,
-                    modifier = Modifier.fillMaxSize(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    softWrap = false
-                )
-            }
-        )
     }
 }
 
