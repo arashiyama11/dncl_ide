@@ -23,3 +23,5 @@ rootProject.name = "dncl_interpreter"
 include(":app")
 include(":core")
 include(":core:dncl")
+include(":core:data")
+include(":core:model")

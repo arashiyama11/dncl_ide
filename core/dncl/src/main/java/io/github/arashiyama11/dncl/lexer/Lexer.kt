@@ -12,6 +12,7 @@ class Lexer(private val input: String) : ILexer {
     private var readPosition: Int = 0
     private var ch: Char = END_OF_FILE
     private var preToken: Token = Token.NewLine(0..0)
+    private val whiteSpace = setOf(' ', '\t', '\r', '　')
 
     init {
         readChar()
@@ -19,7 +20,7 @@ class Lexer(private val input: String) : ILexer {
 
     override fun nextToken(): Either<LexerError, Token> {
         return either {
-            val token = if (preToken is Token.NewLine && ch != ' ') {
+            val token = if (preToken is Token.NewLine && ch !in whiteSpace) {
                 Token.Indent(0, position..position)
             } else when (ch) {
                 '\n' -> {
@@ -29,17 +30,17 @@ class Lexer(private val input: String) : ILexer {
                     if (ch == END_OF_FILE) Token.EOF(position..position) else Token.NewLine(position..position)
                 }
 
-                ' ' -> if (preToken is Token.NewLine) {
+                in whiteSpace -> if (preToken is Token.NewLine) {
                     var depth = 0
                     do {
                         readChar()
                         depth++
-                    } while (ch == ' ')
-                    Token.Indent(depth, position - depth..position)
+                    } while (ch in whiteSpace)
+                    Token.Indent(depth, position - depth..<position)
                 } else {
                     do {
                         readChar()
-                    } while (ch == ' ')
+                    } while (ch in whiteSpace)
                     nextToken().bind()
                 }
 
@@ -47,148 +48,149 @@ class Lexer(private val input: String) : ILexer {
                 '"' -> readString('"').bind()
                 '(' -> {
                     readChar()
-                    Token.ParenOpen(position..position)
+                    Token.ParenOpen(position - 1..<position)
                 }
 
                 ')' -> {
                     readChar()
-                    Token.ParenClose(position..position)
+                    Token.ParenClose(position - 1..<position)
                 }
 
                 '←' -> {
                     readChar()
-                    Token.Assign(position..position)
+                    Token.Assign(position - 1..<position)
                 }
 
                 '=' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.Equal(position..position)
+                    Token.Equal(position - 2..<position)
                 } else {
                     readChar()
-                    Token.Assign(position - 1..position)
+                    Token.Assign(position - 1..<position)
                 }
 
                 '≠' -> {
                     readChar()
-                    Token.NotEqual(position..position)
+                    Token.NotEqual(position - 1..<position)
                 }
 
                 '＞', '>' -> {
                     readChar()
                     if (ch == '=') {
                         readChar()
-                        Token.GreaterThanOrEqual(position - 1..position)
-                    } else Token.GreaterThan(position - 1..position)
+                        Token.GreaterThanOrEqual(position - 2..<position)
+                    } else Token.GreaterThan(position - 1..<position)
                 }
 
                 '≧' -> {
                     readChar()
-                    Token.GreaterThanOrEqual(position..position)
+                    Token.GreaterThanOrEqual(position - 1..<position)
                 }
 
                 '＜', '<' -> {
                     readChar()
                     if (ch == '=') {
                         readChar()
-                        Token.LessThanOrEqual(position - 1..position)
+                        Token.LessThanOrEqual(position - 2..<position)
                     } else
-                        Token.LessThan(position..position)
+                        Token.LessThan(position - 1..<position)
                 }
 
                 '≦' -> {
                     readChar()
-                    Token.LessThanOrEqual(position..position)
+                    Token.LessThanOrEqual(position - 1..<position)
                 }
 
                 '[' -> {
                     readChar()
-                    Token.BracketOpen(position..position)
+                    Token.BracketOpen(position - 1..<position)
                 }
 
                 ']' -> {
                     readChar()
-                    Token.BracketClose(position..position)
+                    Token.BracketClose(position - 1..<position)
                 }
 
                 '{' -> {
                     readChar()
-                    Token.BraceOpen(position..position)
+                    Token.BraceOpen(position - 1..<position)
                 }
 
                 '}' -> {
                     readChar()
-                    Token.BraceClose(position..position)
+                    Token.BraceClose(position - 1..<position)
                 }
 
                 '【' -> {
                     readChar()
-                    Token.LenticularOpen(position..position)
+                    Token.LenticularOpen(position - 1..<position)
                 }
 
                 '】' -> {
                     readChar()
-                    Token.LenticularClose(position..position)
+                    Token.LenticularClose(position - 1..<position)
                 }
 
                 ',' -> {
                     readChar()
-                    Token.Comma(position..position)
+                    Token.Comma(position - 1..<position)
                 }
 
                 '+', '＋' -> {
                     readChar()
-                    Token.Plus(position..position)
+                    Token.Plus(position - 1..<position)
                 }
 
                 '-' -> {
                     readChar()
-                    Token.Minus(position..position)
+                    Token.Minus(position - 1..<position)
                 }
 
                 '*', '×' -> {
                     readChar()
-                    Token.Times(position..position)
+                    Token.Times(position - 1..<position)
                 }
 
                 '/' -> if (peekChar() == '/') {
                     readChar()
                     readChar()
-                    Token.DivideInt(position - 1..position)
+                    Token.DivideInt(position - 2..<position)
                 } else {
                     readChar()
-                    Token.Divide(position..position)
+                    Token.Divide(position - 1..<position)
                 }
 
                 '÷' -> {
                     readChar()
-                    Token.DivideInt(position..position)
+                    Token.DivideInt(position - 1..<position)
                 }
 
                 '%' -> {
                     readChar()
-                    Token.Modulo(position..position)
+                    Token.Modulo(position - 1..<position)
                 }
 
                 '!' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.NotEqual(position - 1..position)
+                    Token.NotEqual(position - 2..<position)
                 } else {
                     readChar()
-                    Token.Bang(position..position)
+                    Token.Bang(position - 1..<position)
                 }
 
                 ':', '：' -> {
                     readChar()
-                    Token.Colon(position..position)
+                    Token.Colon(position - 1..<position)
                 }
 
                 '#' -> {
+                    val start = position
                     do {
                         readChar()
                     } while (ch != '\n' && ch != END_OF_FILE)
-                    nextToken().bind()
+                    Token.Comment(input.substring(start, position), start until position)
                 }
 
                 END_OF_FILE -> Token.EOF(position..position)
@@ -282,7 +284,7 @@ class Lexer(private val input: String) : ILexer {
             if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(position).left()
         } while (ch != end)
         readChar()
-        return Token.String(input.substring(pos, position - 1), pos until position).right()
+        return Token.String(input.substring(pos, position - 1), pos - 1 until position).right()
     }
 
     override fun iterator(): Iterator<Either<LexerError, Token>> =

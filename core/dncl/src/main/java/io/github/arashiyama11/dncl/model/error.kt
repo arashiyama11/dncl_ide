@@ -4,6 +4,7 @@ import kotlin.math.max
 
 sealed interface DnclError {
     val message: String?
+    val errorRange: IntRange?
     fun explain(program: String): String
 }
 
@@ -41,13 +42,22 @@ ${" ".repeat(spaces)}${"^"}
 """
     }
 
-    data class UnExpectedCharacter(val char: Char, override val index: Int) :
+    data class UnExpectedCharacter(
+        val char: Char, override val index: Int,
+        override val errorRange: IntRange = index..index
+    ) :
         LexerError("Unexpected character: $char", index)
 
-    data class UnExpectedEOF(override val index: Int) : LexerError("Unexpected EOF", index)
+    data class UnExpectedEOF(
+        override val index: Int,
+        override val errorRange: IntRange = index..index
+    ) : LexerError("Unexpected EOF", index)
 }
 
-sealed class ParserError(override val message: String, open val failToken: Token) : DnclError {
+sealed class ParserError(
+    override val message: String, open val failToken: Token,
+    override val errorRange: IntRange? = failToken.range
+) : DnclError {
     override fun explain(program: String): String {
         val programLines = program.split("\n")
         val (column, line, spaces) = run {
@@ -96,7 +106,8 @@ ${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.
 
 }
 
-data class InternalError(override val message: String) : DnclError {
+data class InternalError(override val message: String, override val errorRange: IntRange? = null) :
+    DnclError {
     override fun explain(program: String): String {
         return message
     }
