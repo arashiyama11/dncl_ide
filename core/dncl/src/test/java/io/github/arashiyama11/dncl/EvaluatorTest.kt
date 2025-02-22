@@ -20,7 +20,7 @@ class EvaluatorTest {
     private var stdin: DnclObject = nullObj
     private var stdout = ""
     private var evaluator: Evaluator = Evaluator(
-        { fn, arg ->
+        { fn, arg, env ->
             when (fn) {
                 BuiltInFunction.PRINT -> {
                     arg.joinToString(" ") { it.toString() }.also { stdout += it }
@@ -61,6 +61,151 @@ class EvaluatorTest {
                     require(arg.size == 1)
                     DnclObject.ReturnValue(arg[0], arg[0].astNode)
                 }
+
+                BuiltInFunction.CONCAT -> {
+                    require(arg.size == 2)
+                    when {
+                        arg[0] is DnclObject.Array && arg[1] is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = (arg[1] as DnclObject.Array).value
+                            DnclObject.Array((a + b).toMutableList(), arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.PUSH -> {
+                    require(arg.size == 2)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = arg[1]
+                            a.add(b)
+                            DnclObject.Null(arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.SHIFT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(0)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.UNSHIFT -> {
+                    require(arg.size == 2)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = arg[1]
+                            a.add(0, b)
+                            DnclObject.Null(arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.POP -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(a.size - 1)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.INT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Int(str.toIntOrNull() ?: 0, arg[0].astNode)
+                        }
+
+                        is DnclObject.Float -> {
+                            val flt = (arg[0] as DnclObject.Float).value
+                            DnclObject.Int(flt.toInt(), arg[0].astNode)
+                        }
+
+                        is DnclObject.Int -> arg[0]
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.FLOAT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Float(str.toFloatOrNull() ?: 0f, arg[0].astNode)
+                        }
+
+                        is DnclObject.Int -> {
+                            val int = (arg[0] as DnclObject.Int).value
+                            DnclObject.Float(int.toFloat(), arg[0].astNode)
+                        }
+
+                        is DnclObject.Float -> arg[0]
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.STRING -> {
+                    require(arg.size == 1)
+                    DnclObject.String(arg[0].toString(), arg[0].astNode)
+                }
+
+                BuiltInFunction.IMPORT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            evalProgram(str.toProgram(), env)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                    DnclObject.Null(arg[0].astNode)
+                }
+
+                BuiltInFunction.CHAR_CODE -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Int(str[0].code, arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.FROM_CHAR_CODE -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Int -> {
+                            val int = (arg[0] as DnclObject.Int).value
+                            DnclObject.String(int.toChar().toString(), arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
             }
         },
         {
@@ -77,7 +222,7 @@ class EvaluatorTest {
     )
 
     val evaluator0Origin = Evaluator(
-        { fn, arg ->
+        { fn, arg, env ->
             when (fn) {
                 BuiltInFunction.PRINT -> {
                     arg.joinToString(", ") { it.toString() }.also { stdout += it }
@@ -117,6 +262,151 @@ class EvaluatorTest {
                     require(arg.size == 1)
                     DnclObject.ReturnValue(arg[0], arg[0].astNode)
                 }
+
+                BuiltInFunction.CONCAT -> {
+                    require(arg.size == 2)
+                    when {
+                        arg[0] is DnclObject.Array && arg[1] is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = (arg[1] as DnclObject.Array).value
+                            DnclObject.Array((a + b).toMutableList(), arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.PUSH -> {
+                    require(arg.size == 2)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = arg[1]
+                            a.add(b)
+                            DnclObject.Null(arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.SHIFT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(0)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.UNSHIFT -> {
+                    require(arg.size == 2)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            val b = arg[1]
+                            a.add(0, b)
+                            DnclObject.Null(arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.POP -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Array -> {
+                            val a = (arg[0] as DnclObject.Array).value
+                            if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(a.size - 1)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.INT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Int(str.toIntOrNull() ?: 0, arg[0].astNode)
+                        }
+
+                        is DnclObject.Float -> {
+                            val flt = (arg[0] as DnclObject.Float).value
+                            DnclObject.Int(flt.toInt(), arg[0].astNode)
+                        }
+
+                        is DnclObject.Int -> arg[0]
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.FLOAT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Float(str.toFloatOrNull() ?: 0f, arg[0].astNode)
+                        }
+
+                        is DnclObject.Int -> {
+                            val int = (arg[0] as DnclObject.Int).value
+                            DnclObject.Float(int.toFloat(), arg[0].astNode)
+                        }
+
+                        is DnclObject.Float -> arg[0]
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.STRING -> {
+                    require(arg.size == 1)
+                    DnclObject.String(arg[0].toString(), arg[0].astNode)
+                }
+
+                BuiltInFunction.IMPORT -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            evalProgram(str.toProgram(), env)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                    DnclObject.Null(arg[0].astNode)
+                }
+
+                BuiltInFunction.CHAR_CODE -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.String -> {
+                            val str = (arg[0] as DnclObject.String).value
+                            DnclObject.Int(str[0].code, arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
+
+                BuiltInFunction.FROM_CHAR_CODE -> {
+                    require(arg.size == 1)
+                    when (arg[0]) {
+                        is DnclObject.Int -> {
+                            val int = (arg[0] as DnclObject.Int).value
+                            DnclObject.String(int.toChar().toString(), arg[0].astNode)
+                        }
+
+                        else -> DnclObject.TypeError("", arg[0].astNode)
+                    }
+                }
             }
         },
         {
@@ -135,7 +425,7 @@ class EvaluatorTest {
 
     @Test
     fun test() {
-        val program = """
+        var program = """
 関数 add(n) を:
     関数 f(x) を:
       もし x == "" ならば:
@@ -147,8 +437,33 @@ class EvaluatorTest {
 と定義する
 表示する(add(1)(2)(3)(4)(""))
 """
+
+        program = """
+関数 reduce(array,f) を:
+  もし 要素数(array) == 0 ならば:
+    戻り値(0)
+  a = f(0, array[0])
+  i を 0 から 要素数(array)-2 まで 1 ずつ増やしながら:
+    a = f(a, array[i+1])
+  戻り値(a)
+と定義する
+
+
+関数 sum(array) を:
+  関数 add(a,b) を:
+    戻り値(a+b)
+  と定義する
+  
+  戻り値( reduce(array,add) )
+  
+と定義する
+
+Data = [1,2,3,4]
+表示する(sum(Data))
+"""
+        println(Parser(Lexer(program)).getOrNull()!!.parseProgram())
         val a =
-            evaluator.evalProgram(program.toProgram())//.leftOrNull()?.let { fail(it.toString()) }
+            evaluator0Origin.evalProgram(program.toProgram())//.leftOrNull()?.let { fail(it.toString()) }
         a.getOrNull()!!.let {
             if (it is DnclObject.Error) println(explain(program, it))
         }

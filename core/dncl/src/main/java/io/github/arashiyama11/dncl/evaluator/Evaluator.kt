@@ -12,7 +12,7 @@ import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.model.Token
 
 class Evaluator(
-    private val onCallBuildInFunction: (BuiltInFunction, List<DnclObject>) -> DnclObject,
+    private val onCallBuildInFunction: Evaluator.(BuiltInFunction, List<DnclObject>, Environment) -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0
 ) : IEvaluator {
@@ -242,7 +242,8 @@ class Evaluator(
                 func.identifier,
                 callExpression.arguments.map {
                     eval(it, env).bind().onReturnValueOrError { return@either it }
-                })
+                }, env
+            )
         }
 
         if (func !is DnclObject.Function) {

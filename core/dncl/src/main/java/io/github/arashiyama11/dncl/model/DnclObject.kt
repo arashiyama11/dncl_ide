@@ -70,6 +70,15 @@ sealed interface DnclObject {
         override fun hash() = message.hashCode()
     }
 
+    data class RuntimeError(override val message: kotlin.String, override val astNode: AstNode) :
+        Error(message, astNode)
+
+    data class ArgumentSizeError(
+        override val message: kotlin.String,
+        override val astNode: AstNode
+    ) :
+        Error(message, astNode)
+
     data class TypeError(override val message: kotlin.String, override val astNode: AstNode) :
         Error(message, astNode) {
         constructor(
