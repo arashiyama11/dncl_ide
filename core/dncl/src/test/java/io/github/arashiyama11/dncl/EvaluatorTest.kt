@@ -427,38 +427,19 @@ class EvaluatorTest {
     fun test() {
         var program = """
 関数 add(n) を:
-    関数 f(x) を:
+    戻り値(関数 (x) を:
       もし x == "" ならば:
         戻り値(n)
       そうでなければ:
         戻り値( add(x + n) )
-    と定義する
-    戻り値(f)
+    と定義する)
 と定義する
 表示する(add(1)(2)(3)(4)(""))
 """
-
-        program = """
-関数 reduce(array,f) を:
-  もし 要素数(array) == 0 ならば:
-    戻り値(0)
-  a = f(0, array[0])
-  i を 0 から 要素数(array)-2 まで 1 ずつ増やしながら:
-    a = f(a, array[i+1])
-  戻り値(a)
-と定義する
-
-
-関数 sum(array) を:
-  関数 add(a,b) を:
-    戻り値(a+b)
-  と定義する
-  戻り値(reduce(array,add))
-と定義する
-
-表示する(sum([1,2,3,4]))
-"""
-        println(Parser(Lexer(program)).getOrNull()!!.parseProgram())
+        println(
+            Parser(Lexer(program)).getOrNull()!!.parseProgram()
+                .fold({ it.explain(program) }, { it })
+        )
         val a =
             evaluator0Origin.evalProgram(program.toProgram())//.leftOrNull()?.let { fail(it.toString()) }
         a.getOrNull()!!.let {

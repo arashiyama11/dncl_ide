@@ -376,6 +376,24 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 AstNode.SystemLiteral(string.literal, token.range.first..currentToken.range.last)
             }
 
+            is Token.Function -> {
+                expectNextToken<Token.ParenOpen>().bind()
+                nextToken().bind()
+                val params = parseExpressionList<Token.ParenClose>().bind()
+                params.any { it !is AstNode.Identifier }.let {
+                    if (it) raise(ParserError.UnExpectedToken(currentToken))
+                }
+                expectNextToken<Token.Wo>().bind()
+                expectNextToken<Token.Colon>().bind()
+                val block = parseBlockStatement().bind()
+                val lit = AstNode.FunctionLiteral(
+                    params.map { (it as AstNode.Identifier).value }, block
+                )
+                expectNextToken<Token.Indent>().bind()
+                expectNextToken<Token.Define>().bind()
+                lit
+            }
+
             else -> {
                 raise(ParserError.UnknownPrefixOperator(token))
             }

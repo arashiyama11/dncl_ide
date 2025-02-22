@@ -189,6 +189,17 @@ sealed interface AstNode {
             get() = value
     }
 
+    data class FunctionLiteral(
+        val parameters: List<String>,
+        val body: BlockStatement
+    ) : Expression {
+        override val literal: String
+            get() = "function(${parameters.joinToString(separator = ", ") { it }}) ${body.literal}"
+
+        override val range: IntRange
+            get() = body.range
+    }
+
     data class CallExpression(
         val function: Expression,
         val arguments: List<Expression>
