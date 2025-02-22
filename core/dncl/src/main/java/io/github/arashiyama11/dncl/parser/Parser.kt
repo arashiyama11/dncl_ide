@@ -362,7 +362,6 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 nextToken().bind()
                 val exps = parseExpressionList<Token.BracketClose>().bind()
                 val close = currentToken as Token.BracketClose
-                nextToken().bind()
                 AstNode.ArrayLiteral(exps, token.range.first..close.range.last)
             }
 

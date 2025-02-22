@@ -453,13 +453,10 @@ class EvaluatorTest {
   関数 add(a,b) を:
     戻り値(a+b)
   と定義する
-  
-  戻り値( reduce(array,add) )
-  
+  戻り値(reduce(array,add))
 と定義する
 
-Data = [1,2,3,4]
-表示する(sum(Data))
+表示する(sum([1,2,3,4]))
 """
         println(Parser(Lexer(program)).getOrNull()!!.parseProgram())
         val a =
