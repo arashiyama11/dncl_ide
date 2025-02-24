@@ -258,10 +258,11 @@ class Evaluator(
         val args = callExpression.arguments.map {
             eval(it, env).bind().onReturnValueOrError { return@either it }
         }
+        val funcChild = func.env.createChildEnvironment()
         for ((param, arg) in func.parameters.zip(args)) {
-            func.env.set(param, arg)
+            funcChild.set(param, arg)
         }
-        val res = eval(func.body, func.env).bind()
+        val res = eval(func.body, funcChild).bind()
         if (res is DnclObject.ReturnValue) res.value else res
     }
 
@@ -316,6 +317,11 @@ class Evaluator(
 
                 left is DnclObject.String && right is DnclObject.String -> DnclObject.String(
                     left.value + right.value,
+                    infixExpression
+                )
+
+                left is DnclObject.Array && right is DnclObject.Array -> DnclObject.Array(
+                    (left.value + right.value).toMutableList(),
                     infixExpression
                 )
 
