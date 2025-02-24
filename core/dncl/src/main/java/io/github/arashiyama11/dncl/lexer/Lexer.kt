@@ -21,13 +21,15 @@ class Lexer(private val input: String) : ILexer {
     override fun nextToken(): Either<LexerError, Token> {
         return either {
             val token = if (preToken is Token.NewLine && ch !in whiteSpace) {
-                Token.Indent(0, position..position)
+                Token.Indent(0, position - 1..<position)
             } else when (ch) {
                 '\n' -> {
                     do {
                         readChar()
                     } while (ch == '\n')
-                    if (ch == END_OF_FILE) Token.EOF(position..position) else Token.NewLine(position..position)
+                    if (ch == END_OF_FILE) Token.EOF(position - 1..<position) else Token.NewLine(
+                        position - 1..<position
+                    )
                 }
 
                 in whiteSpace -> if (preToken is Token.NewLine) {
