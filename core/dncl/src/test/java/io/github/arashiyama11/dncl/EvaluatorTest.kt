@@ -426,27 +426,51 @@ class EvaluatorTest {
     @Test
     fun test() {
         var program = """
-関数 add(n) を:
-    戻り値(関数 (x) を:
-      もし x == "" ならば:
-        戻り値(n)
-      そうでなければ:
-        戻り値( add(x + n) )
-    と定義する)
+関数 forEach(array,f) を:
+  i を 0 から 要素数(array)-1 まで 1 ずつ増やしながら繰り返す:
+    f(array[i])
 と定義する
-表示する(add(1)(2)(3)(4)(""))
+
+関数 tail(array) を:
+  Result = []
+  i を 1 から 要素数(array)-1 まで 1 ずつ増やしながら繰り返す:
+    末尾追加(Result,array[i])
+  戻り値(Result)
+と定義する
+
+関数 quick_sort(array) を:
+  もし 要素数(array) <= 1 ならば:
+    戻り値(array)
+  pivot = array[0]
+  Left = []
+  Right = []
+  forEach(tail(array),関数 (x) を:
+    もし x < pivot ならば:
+      末尾追加(Left,x)
+    そうでなければ:
+      末尾追加(Right,x)
+  と定義する)
+  Right2 = quick_sort(Right)
+  Left2 = quick_sort(Left)
+  戻り値(Left2 + [pivot] + Right2)
+と定義する
+
+Data = [65, 18, 29, 48, 52, 3, 62, 77, 89, 9, 7, 33]
+D = quick_sort(Data)
+表示する(D)
 """
-        println(
-            Parser(Lexer(program)).getOrNull()!!.parseProgram()
-                .fold({ it.explain(program) }, { it })
-        )
+        val env = Environment()
         val a =
-            evaluator0Origin.evalProgram(program.toProgram())//.leftOrNull()?.let { fail(it.toString()) }
+            evaluator0Origin.evalProgram(
+                program.toProgram(),
+                env
+            )//.leftOrNull()?.let { fail(it.toString()) }
+
         a.getOrNull()!!.let {
             if (it is DnclObject.Error) println(explain(program, it))
         }
         println(a)
-        assertEquals("10\n", stdout)
+        assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]\n", stdout)
     }
 
     @BeforeTest
