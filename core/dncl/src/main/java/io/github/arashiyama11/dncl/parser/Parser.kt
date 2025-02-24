@@ -190,7 +190,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     @EnsuredEndOfLine
     private fun parseIfStatement(): Either<DnclError, AstNode.Statement> = either {
-        nextToken()
+        nextToken().bind()
         val condition = parseExpression(Precedence.LOWEST).bind()
 
         expectNextToken<Token.Then>().bind()
@@ -199,13 +199,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val consequence = parseBlockStatement().bind()
         requireEndOfLine().bind()
         if (aheadToken is Token.Else) {
-            expectNextToken<Token.Indent>()
+            expectNextToken<Token.Indent>().bind()
             expectNextToken<Token.Else>().bind()
             expectNextToken<Token.Colon>().bind()
             val alternative = parseBlockStatement().bind()
             AstNode.IfStatement(condition, consequence, alternative)
         } else if (aheadToken is Token.Elif) {
-            expectNextToken<Token.Indent>()
+            expectNextToken<Token.Indent>().bind()
             expectNextToken<Token.Elif>().bind()
             AstNode.IfStatement(
                 condition,
@@ -279,17 +279,17 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     expectedToken = "Identifier"
                 )
             )
-            val identifier = (currentToken as? Token.Identifier)
+            val identifier = (currentToken as Token.Identifier)
             val left = if (nextToken is Token.BracketOpen) {
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
-                    AstNode.Identifier(identifier!!.literal, identifier.range),
+                    AstNode.Identifier(identifier.literal, identifier.range),
                     parseExpressionList<Token.BracketClose>().bind()
                         .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
                 )
             } else {
-                AstNode.Identifier(identifier!!.literal, identifier.range)
+                AstNode.Identifier(identifier.literal, identifier.range)
             }
 
             expectNextToken<Token.Assign>().bind()
@@ -366,7 +366,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             is Token.LenticularOpen -> {
-                expectNextToken<Token.Japanese>()
+                expectNextToken<Token.Japanese>().bind()
                 val string = (currentToken as? Token.Japanese) ?: raise(
                     ParserError.UnExpectedToken(
                         currentToken
