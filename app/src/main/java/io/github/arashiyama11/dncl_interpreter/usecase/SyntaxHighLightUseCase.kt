@@ -41,9 +41,10 @@ class SyntaxHighLightUseCase : ISyntaxHighLightUseCase {
     private fun annotateByLex(
         text: String,
         isDarkTheme: Boolean,
-        errorRange: IntRange? = null
+        errorRange: IntRange? = null,
+        err: DnclError? = null
     ): Pair<AnnotatedString, DnclError?> {
-        var error: DnclError? = null
+        var error: DnclError? = err
         val str = buildAnnotatedString {
             for (token in Lexer(text)) {
                 if (token.isLeft()) {
@@ -176,8 +177,8 @@ class SyntaxHighLightUseCase : ISyntaxHighLightUseCase {
     ): Pair<AnnotatedString, DnclError?> {
         val parser = Parser(Lexer(text)).getOrNull() ?: return annotateByLex(text, isDarkTheme)
         val err = parser.parseProgram().leftOrNull() ?: return annotateByLex(text, isDarkTheme)
-        if (err !is ParserError) return annotateByLex(text, isDarkTheme)
-        return annotateByLex(text, isDarkTheme, err.failToken.range)
+        err.errorRange?.let { return annotateByLex(text, isDarkTheme, it, err) }
+        return annotateByLex(text, isDarkTheme)
     }
 
 
