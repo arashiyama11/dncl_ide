@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.arashiyama11.dncl_interpreter.usecase.SyntaxHighLightUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -229,7 +228,7 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 
     val annotatedCodeText by remember {
         mutableStateOf(
-            SyntaxHighLightUseCase()(
+            SyntaxHighLighter()(
                 code.text,
                 true,
                 null

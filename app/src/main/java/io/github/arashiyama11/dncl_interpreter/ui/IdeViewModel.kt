@@ -14,7 +14,6 @@ import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
 import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
-import io.github.arashiyama11.dncl_interpreter.usecase.ISyntaxHighLightUseCase
 import io.github.arashiyama11.model.DnclOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -61,7 +60,7 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 
 @KoinViewModel
 class IdeViewModel(
-    private val syntaxHighLightUseCase: ISyntaxHighLightUseCase,
+    private val syntaxHighLighter: ISyntaxHighLighter,
     private val executeUseCase: IExecuteUseCase,
     private val fileUseCase: IFileUseCase
 ) : ViewModel() {
@@ -94,7 +93,7 @@ class IdeViewModel(
             it.copy(textFieldValue = text)
         }
         viewModelScope.launch(Dispatchers.Default) {
-            val (annotatedString, error) = syntaxHighLightUseCase(
+            val (annotatedString, error) = syntaxHighLighter(
                 text.text, isDarkTheme, uiState.value.errorRange
             )
 

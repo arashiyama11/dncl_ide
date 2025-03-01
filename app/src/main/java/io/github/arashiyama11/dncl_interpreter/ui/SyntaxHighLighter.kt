@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_interpreter.usecase
+package io.github.arashiyama11.dncl_interpreter.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -11,13 +11,12 @@ import io.github.arashiyama11.dncl.lexer.Lexer
 import io.github.arashiyama11.dncl.model.BuiltInFunction
 import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl.model.InternalError
-import io.github.arashiyama11.dncl.model.ParserError
 import io.github.arashiyama11.dncl.model.Token
 import io.github.arashiyama11.dncl.parser.Parser
 import org.koin.core.annotation.Single
 
-@Single(binds = [ISyntaxHighLightUseCase::class])
-class SyntaxHighLightUseCase : ISyntaxHighLightUseCase {
+@Single(binds = [ISyntaxHighLighter::class])
+class SyntaxHighLighter : ISyntaxHighLighter {
     override operator fun invoke(
         text: String,
         isDarkTheme: Boolean,
