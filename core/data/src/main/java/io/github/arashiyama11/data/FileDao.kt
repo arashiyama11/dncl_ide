@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import io.github.arashiyama11.data.entity.FileEntity
+import io.github.arashiyama11.data.entity.SelectedFileEntity
 
 @Dao
 interface FileDao {
@@ -17,11 +18,8 @@ interface FileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFile(file: FileEntity)
 
-    @Query("SELECT * FROM selected_file")
-    suspend fun getSelectedFile(): List<io.github.arashiyama11.data.entity.SelectedFileEntity>?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSelectedFile(selectedFile: io.github.arashiyama11.data.entity.SelectedFileEntity)
+    suspend fun insertSelectedFile(selectedFile: SelectedFileEntity)
 
     @Query("DELETE FROM selected_file")
     suspend fun clearSelectedFile()
