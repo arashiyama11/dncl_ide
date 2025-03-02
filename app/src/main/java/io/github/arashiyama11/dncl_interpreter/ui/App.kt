@@ -9,8 +9,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import io.github.arashiyama11.dncl_interpreter.ui.theme.Dncl_interpreterTheme
 import org.koin.compose.viewmodel.koinViewModel
@@ -20,7 +25,25 @@ fun App() {
     Dncl_interpreterTheme {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val drawerViewModel = koinViewModel<DrawerViewModel>()
-        Scaffold(floatingActionButton = {
+        val ideViewModel = koinViewModel<IdeViewModel>()
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(Unit) {
+            ideViewModel.onStart()
+            for (err in ideViewModel.errorChannel) {
+                snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            for (err in drawerViewModel.errorChannel) {
+                snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
+            }
+        }
+
+        Scaffold(snackbarHost = {
+            SnackbarHost(snackbarHostState)
+        }, floatingActionButton = {
             if (drawerState.isOpen)
                 FloatingActionButton(onClick = { drawerViewModel.onFileAddClicked() }) {
                     Icon(Icons.Outlined.Add, contentDescription = null)
@@ -30,7 +53,7 @@ fun App() {
                 DrawerContent(drawerViewModel)
             }, drawerState = drawerState, modifier = Modifier.padding(contentPadding)) {
                 DnclIDE(
-                    modifier = Modifier
+                    modifier = Modifier, ideViewModel
                 )
             }
         }

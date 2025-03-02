@@ -3,6 +3,8 @@ package io.github.arashiyama11.dncl_interpreter.usecase
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.arashiyama11.data.repository.IFileRepository
+import io.github.arashiyama11.model.FileName
 import org.koin.core.annotation.Single
 
 
@@ -22,10 +24,10 @@ sealed interface ValidationError {
     data class AlreadyExists(override val message: String) : ValidationError
 }
 
-@Single
-class FileValidationUseCase(private val fileRepository: io.github.arashiyama11.data.repository.IFileRepository) {
-    suspend fun validateFileName(fileName: io.github.arashiyama11.model.FileName): Either<ValidationError, Unit> {
-
+@Single(binds = [IFileNameValidationUseCase::class])
+class FileNameValidationUseCase(private val fileRepository: IFileRepository) :
+    IFileNameValidationUseCase {
+    override suspend operator fun invoke(fileName: FileName): Either<ValidationError, Unit> {
         if (fileName.value.isBlank()) {
             return ValidationError.FileNameEmpty.left()
         }

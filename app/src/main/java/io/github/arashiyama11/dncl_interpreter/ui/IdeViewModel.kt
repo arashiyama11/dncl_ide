@@ -1,6 +1,5 @@
 package io.github.arashiyama11.dncl_interpreter.ui
 
-import android.util.Log
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -13,10 +12,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
+import io.github.arashiyama11.dncl_interpreter.usecase.IFileNameValidationUseCase
 import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
 import io.github.arashiyama11.model.DnclOutput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,26 +63,26 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 class IdeViewModel(
     private val syntaxHighLighter: ISyntaxHighLighter,
     private val executeUseCase: IExecuteUseCase,
-    private val fileUseCase: IFileUseCase
+    private val fileUseCase: IFileUseCase,
+    private val fileNameValidationUseCase: IFileNameValidationUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
     private var isDarkThemeCache = false
     private var executeJob: Job? = null
+    val errorChannel = Channel<String>(Channel.BUFFERED)
 
-    fun onStart(isDarkTheme: Boolean) {
+    fun onStart() {
         viewModelScope.launch {
             fileUseCase.selectedFileName.collect { fileName ->
-                Log.d("IdeViewModel", "selectedFileName: ${fileName?.value}")
                 if (fileName != null) {
-                    val programFile = fileUseCase.getFileByName(fileName) ?: return@collect
-                    onTextChanged(
-                        TextFieldValue(
-                            programFile.content.value,
-                            TextRange(programFile.cursorPosition.value)
-                        ),
-                        isDarkTheme
-                    )
+                    _uiState.update {
+                        it.copy(
+                            output = it.output + "\n" + it.dnclError?.message,
+                            isError = true,
+                            errorRange = it.dnclError?.errorRange
+                        )
+                    }
                 }
             }
         }
@@ -117,17 +118,7 @@ class IdeViewModel(
     }
 
     fun onRunButtonClicked() {
-        viewModelScope.launch {
-            fileUseCase.selectedFileName.value?.let {
-                fileUseCase.saveFile(
-                    io.github.arashiyama11.model.ProgramFile(
-                        it,
-                        io.github.arashiyama11.model.FileContent(uiState.value.textFieldValue.text),
-                        io.github.arashiyama11.model.CursorPosition(uiState.value.textFieldValue.selection.start)
-                    ),
-                )
-            }
-        }
+        saveFile()
 
         executeJob = viewModelScope.launch {
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
@@ -188,7 +179,7 @@ class IdeViewModel(
 
 
     fun onEditorKeyEvent(keyEvent: KeyEvent): Boolean {
-        Log.d("IdeViewModel", "onKeyEvent")
+        saveFile()
         if (keyEvent.type != KeyEventType.KeyUp || keyEvent.key != Key.Enter) return false
         viewModelScope.launch {
             val codeText = uiState.value.textFieldValue
@@ -223,6 +214,24 @@ class IdeViewModel(
     fun onInputTextChanged(input: String) {
         _uiState.update {
             it.copy(input = input)
+        }
+    }
+
+    private fun saveFile() {
+        viewModelScope.launch {
+            fileUseCase.selectedFileName.value?.let { fileName ->
+                fileNameValidationUseCase(fileName).fold(
+                    { errorChannel.send(it.message) }, {
+                        _uiState.update {
+                            it.copy(
+                                output = it.output + "\n" + it.dnclError?.message,
+                                isError = true,
+                                errorRange = it.dnclError?.errorRange
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 }

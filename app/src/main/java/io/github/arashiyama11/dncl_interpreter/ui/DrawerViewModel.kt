@@ -3,8 +3,10 @@ package io.github.arashiyama11.dncl_interpreter.ui
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.arashiyama11.dncl_interpreter.usecase.IFileNameValidationUseCase
 import io.github.arashiyama11.model.FileName
 import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,7 +24,10 @@ data class DrawerUiState(
 )
 
 @KoinViewModel
-class DrawerViewModel(private val fileUseCase: IFileUseCase) : ViewModel() {
+class DrawerViewModel(
+    private val fileUseCase: IFileUseCase,
+    private val fileNameValidationUseCase: IFileNameValidationUseCase
+) : ViewModel() {
     private val _uiState = MutableStateFlow(DrawerUiState())
     val uiState = combine(
         _uiState, fileUseCase.selectedFileName
@@ -33,6 +38,7 @@ class DrawerViewModel(private val fileUseCase: IFileUseCase) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
     private var focusRequester: FocusRequester? = null
+    val errorChannel = Channel<String>(Channel.BUFFERED)
 
     fun onStart(focusRequester: FocusRequester) {
         viewModelScope.launch {
@@ -78,8 +84,16 @@ class DrawerViewModel(private val fileUseCase: IFileUseCase) : ViewModel() {
 
     private fun onFileAddConfirmed(newFileName: String) {
         viewModelScope.launch {
-            fileUseCase.createFile(FileName(newFileName))
-            fileUseCase.selectFile(FileName(newFileName))
+            fileNameValidationUseCase(FileName(newFileName)).mapLeft {
+                errorChannel.send(it.message)
+                return@launch
+            }
+            try {
+                fileUseCase.createFile(FileName(newFileName))
+                fileUseCase.selectFile(FileName(newFileName))
+            } catch (e: Exception) {
+                errorChannel.send(e.message ?: "Error")
+            }
             _uiState.update {
                 it.copy(
                     files = fileUseCase.getAllFileNames().orEmpty(),
