@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_interpreter.ui
+package io.github.arashiyama11.dncl_interpreter.adapter
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -11,10 +11,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
-import io.github.arashiyama11.dncl_interpreter.usecase.IExecuteUseCase
-import io.github.arashiyama11.dncl_interpreter.usecase.IFileNameValidationUseCase
-import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
-import io.github.arashiyama11.model.DnclOutput
+import io.github.arashiyama11.domain.model.CursorPosition
+import io.github.arashiyama11.domain.model.DnclOutput
+import io.github.arashiyama11.domain.model.FileContent
+import io.github.arashiyama11.domain.usecase.IExecuteUseCase
+import io.github.arashiyama11.domain.usecase.IFileUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -64,7 +65,6 @@ class IdeViewModel(
     private val syntaxHighLighter: ISyntaxHighLighter,
     private val executeUseCase: IExecuteUseCase,
     private val fileUseCase: IFileUseCase,
-    private val fileNameValidationUseCase: IFileNameValidationUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
@@ -76,13 +76,13 @@ class IdeViewModel(
         viewModelScope.launch {
             fileUseCase.selectedFileName.collect { fileName ->
                 if (fileName != null) {
-                    _uiState.update {
-                        it.copy(
-                            output = it.output + "\n" + it.dnclError?.message,
-                            isError = true,
-                            errorRange = it.dnclError?.errorRange
-                        )
-                    }
+                    val programFile = fileUseCase.getFileByName(fileName) ?: return@collect
+                    onTextChanged(
+                        TextFieldValue(
+                            programFile.content.value,
+                            TextRange(programFile.cursorPosition.value)
+                        ), isDarkThemeCache
+                    )
                 }
             }
         }
@@ -220,16 +220,11 @@ class IdeViewModel(
     private fun saveFile() {
         viewModelScope.launch {
             fileUseCase.selectedFileName.value?.let { fileName ->
-                fileNameValidationUseCase(fileName).fold(
-                    { errorChannel.send(it.message) }, {
-                        _uiState.update {
-                            it.copy(
-                                output = it.output + "\n" + it.dnclError?.message,
-                                isError = true,
-                                errorRange = it.dnclError?.errorRange
-                            )
-                        }
-                    }
+                fileUseCase.saveFile(
+                    fileUseCase.getFileByName(fileName)!!.copy(
+                        content = FileContent(uiState.value.textFieldValue.text),
+                        cursorPosition = CursorPosition(uiState.value.textFieldValue.selection.start)
+                    )
                 )
             }
         }

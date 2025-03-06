@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_interpreter.ui
+package io.github.arashiyama11.dncl_interpreter.adapter
 
 import androidx.compose.ui.text.AnnotatedString
 import io.github.arashiyama11.dncl.model.DnclError

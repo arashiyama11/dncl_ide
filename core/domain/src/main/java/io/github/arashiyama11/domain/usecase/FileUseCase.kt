@@ -1,15 +1,14 @@
-package io.github.arashiyama11.dncl_interpreter.usecase
+package io.github.arashiyama11.domain.usecase
 
-import io.github.arashiyama11.model.CursorPosition
-import io.github.arashiyama11.model.FileContent
-import io.github.arashiyama11.model.FileName
-import io.github.arashiyama11.model.ProgramFile
-import io.github.arashiyama11.data.repository.IFileRepository
+import io.github.arashiyama11.domain.model.CursorPosition
+import io.github.arashiyama11.domain.model.FileContent
+import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.ProgramFile
+import io.github.arashiyama11.domain.repository.IFileRepository
 import org.koin.core.annotation.Single
 
 @Single(binds = [IFileUseCase::class])
-class FileUseCase(private val fileRepository: IFileRepository) :
-    IFileUseCase {
+internal class FileUseCase(private val fileRepository: IFileRepository) : IFileUseCase {
     override val selectedFileName = fileRepository.selectedFileName
 
     override suspend fun getAllFileNames() = fileRepository.getAllFileNames()

@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import io.github.arashiyama11.dncl_interpreter.adapter.DrawerViewModel
+import io.github.arashiyama11.dncl_interpreter.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_interpreter.ui.theme.Dncl_interpreterTheme
 import org.koin.compose.viewmodel.koinViewModel
 

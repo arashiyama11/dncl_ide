@@ -60,23 +60,28 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.navigation.compose)
+    implementation(libs.material.icons.extended)
+
     implementation(libs.arrow.core)
     implementation(libs.arrow.fx.coroutines)
+
     implementation(project(":core:dncl"))
     implementation(project(":core:data"))
-    implementation(project(":core:model"))
+    implementation(project(":core:domain"))
+
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.andriod)
     implementation(libs.koin.compose)
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.annotations)
-    implementation(libs.material.icons.extended)
+    ksp(libs.koin.ksp)
+
     implementation(libs.room.ktx)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     annotationProcessor(libs.room.compiler)
-    ksp(libs.koin.ksp)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -1,7 +1,7 @@
-package io.github.arashiyama11.data.repository
+package io.github.arashiyama11.domain.repository
 
-import io.github.arashiyama11.model.FileName
-import io.github.arashiyama11.model.ProgramFile
+import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.ProgramFile
 import kotlinx.coroutines.flow.StateFlow
 
 interface IFileRepository {

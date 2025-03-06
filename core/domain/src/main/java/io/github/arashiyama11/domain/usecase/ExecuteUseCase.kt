@@ -1,16 +1,16 @@
-package io.github.arashiyama11.dncl_interpreter.usecase
+package io.github.arashiyama11.domain.usecase
 
 import android.util.Log
 import arrow.core.getOrElse
-import io.github.arashiyama11.data.repository.IFileRepository
+import io.github.arashiyama11.domain.repository.IFileRepository
 import io.github.arashiyama11.dncl.evaluator.Evaluator
 import io.github.arashiyama11.dncl.lexer.Lexer
 import io.github.arashiyama11.dncl.model.BuiltInFunction
 import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
-import io.github.arashiyama11.model.DnclOutput
-import io.github.arashiyama11.model.FileName
+import io.github.arashiyama11.domain.model.DnclOutput
+import io.github.arashiyama11.domain.model.FileName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +22,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.Single
 
 @Single(binds = [IExecuteUseCase::class])
-class ExecuteUseCase(private val fileRepository: IFileRepository) : IExecuteUseCase {
+internal class ExecuteUseCase(private val fileRepository: IFileRepository) :
+    IExecuteUseCase {
     override operator fun invoke(program: String, input: String): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(

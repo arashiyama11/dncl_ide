@@ -4,9 +4,10 @@ import android.app.Application
 import io.github.arashiyama11.data.DataModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
+import org.koin.core.annotation.ComponentScan
+import org.koin.core.annotation.Module
 import org.koin.core.context.startKoin
-import org.koin.ksp.generated.defaultModule
-import org.koin.ksp.generated.module
+import org.koin.ksp.generated.*
 
 class MainApplication : Application() {
 
@@ -16,7 +17,12 @@ class MainApplication : Application() {
             androidLogger()
             androidContext(this@MainApplication)
             modules(DataModule().module)
+            modules(AppModule().module)
             defaultModule()
         }
     }
 }
+
+@Module
+@ComponentScan("io.github.arashiyama11.data", "io.github.arashiyama11.domain")
+class AppModule

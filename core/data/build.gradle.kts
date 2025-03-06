@@ -47,14 +47,14 @@ dependencies {
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     annotationProcessor(libs.room.compiler)
+
     implementation(project.dependencies.platform(libs.koin.bom))
     implementation(libs.koin.core)
     implementation(libs.koin.andriod)
-    implementation(libs.koin.compose)
-    implementation(libs.koin.compose.viewmodel)
     implementation(libs.koin.annotations)
     ksp(libs.koin.ksp)
-    implementation(project(":core:model"))
+
+    implementation(project(":core:domain"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.core)
 

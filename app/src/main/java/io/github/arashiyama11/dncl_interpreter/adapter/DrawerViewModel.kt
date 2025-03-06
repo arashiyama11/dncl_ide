@@ -1,11 +1,11 @@
-package io.github.arashiyama11.dncl_interpreter.ui
+package io.github.arashiyama11.dncl_interpreter.adapter
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.arashiyama11.dncl_interpreter.usecase.IFileNameValidationUseCase
-import io.github.arashiyama11.model.FileName
-import io.github.arashiyama11.dncl_interpreter.usecase.IFileUseCase
+import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.usecase.IFileNameValidationUseCase
+import io.github.arashiyama11.domain.usecase.IFileUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,11 +62,11 @@ class DrawerViewModel(
             )
         }
         viewModelScope.launch {
-            for (i in 0..2) {
+            repeat(3) {
                 try {
                     delay(100)
                     focusRequester?.requestFocus()
-                    break
+                    return@launch
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

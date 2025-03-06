@@ -1,31 +1,16 @@
-package io.github.arashiyama11.dncl_interpreter.usecase
+package io.github.arashiyama11.domain.usecase
 
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import io.github.arashiyama11.data.repository.IFileRepository
-import io.github.arashiyama11.model.FileName
+import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.ValidationError
+import io.github.arashiyama11.domain.repository.IFileRepository
 import org.koin.core.annotation.Single
 
 
-sealed interface ValidationError {
-    val message: String
-
-    data object FileNameEmpty : ValidationError {
-        override val message = "ファイル名を入力してください。"
-    }
-
-    data class ForbiddenChar(override val message: String) : ValidationError
-    data object FileNameTooLong : ValidationError {
-        override val message = "ファイル名は255文字以内で入力してください。"
-    }
-
-    data class ReservedName(override val message: String) : ValidationError
-    data class AlreadyExists(override val message: String) : ValidationError
-}
-
 @Single(binds = [IFileNameValidationUseCase::class])
-class FileNameValidationUseCase(private val fileRepository: IFileRepository) :
+internal class FileNameValidationUseCase(private val fileRepository: IFileRepository) :
     IFileNameValidationUseCase {
     override suspend operator fun invoke(fileName: FileName): Either<ValidationError, Unit> {
         if (fileName.value.isBlank()) {

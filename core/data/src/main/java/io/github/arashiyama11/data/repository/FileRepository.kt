@@ -9,17 +9,20 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.arashiyama11.data.FileDao
 import io.github.arashiyama11.data.entity.FileEntity
-import io.github.arashiyama11.model.CursorPosition
-import io.github.arashiyama11.model.FileContent
-import io.github.arashiyama11.model.FileName
-import io.github.arashiyama11.model.ProgramFile
+import io.github.arashiyama11.domain.model.CursorPosition
+import io.github.arashiyama11.domain.model.FileContent
+import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.ProgramFile
+import io.github.arashiyama11.domain.repository.IFileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import org.koin.core.annotation.Single
 import java.io.File
 
+@Single(binds = [IFileRepository::class])
 class FileRepository(
     private val context: Context,
     private val fileDao: FileDao

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import io.github.arashiyama11.dncl_interpreter.adapter.IdeViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 
