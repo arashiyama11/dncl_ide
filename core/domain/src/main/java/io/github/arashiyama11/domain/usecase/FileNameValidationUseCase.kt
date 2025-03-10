@@ -3,7 +3,9 @@ package io.github.arashiyama11.domain.usecase
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.EntryName
+import io.github.arashiyama11.domain.model.EntryPath
+import io.github.arashiyama11.domain.model.Folder
 import io.github.arashiyama11.domain.model.ValidationError
 import io.github.arashiyama11.domain.repository.IFileRepository
 import org.koin.core.annotation.Single
@@ -12,29 +14,32 @@ import org.koin.core.annotation.Single
 @Single(binds = [IFileNameValidationUseCase::class])
 internal class FileNameValidationUseCase(private val fileRepository: IFileRepository) :
     IFileNameValidationUseCase {
-    override suspend operator fun invoke(fileName: FileName): Either<ValidationError, Unit> {
-        if (fileName.value.isBlank()) {
+    override suspend operator fun invoke(entryPath: EntryPath): Either<ValidationError, Unit> {
+        val entryName = entryPath.value.lastOrNull() ?: return Unit.right()
+
+        if (entryName.value.isBlank()) {
             return ValidationError.FileNameEmpty.left()
         }
 
         forbiddenCharacters.forEach { char ->
-            if (fileName.value.contains(char)) {
+            if (entryName.value.contains(char)) {
                 return ValidationError.ForbiddenChar("ファイル名に使用できない文字 '$char' が含まれています。")
                     .left()
             }
         }
 
-        if (fileName.value.length > MAX_FILE_NAME_LENGTH) {
+        if (entryName.value.length > MAX_FILE_NAME_LENGTH) {
             return ValidationError.FileNameTooLong.left()
         }
 
 
-        if (reservedNames.contains(fileName.value.uppercase())) {
+        if (reservedNames.contains(entryName.value.uppercase())) {
             return ValidationError.ReservedName("予約された名前は使用できません。").left()
         }
 
-        val allFileNames = fileRepository.getAllFileNames()
-        if (allFileNames != null && allFileNames.contains(fileName)) {
+        val folder = fileRepository.getEntryByPath(entryPath)
+        if (folder !is Folder) return ValidationError.FolderNotFound.left()
+        if (folder.entities.any { it.name == entryName }) {
             return ValidationError.AlreadyExists("同じ名前のファイルがすでに存在します。").left()
         }
         return Unit.right()

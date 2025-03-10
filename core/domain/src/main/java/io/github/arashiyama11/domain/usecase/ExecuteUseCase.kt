@@ -10,7 +10,11 @@ import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
 import io.github.arashiyama11.domain.model.DnclOutput
+import io.github.arashiyama11.domain.model.EntryName
+import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.FileName
+import io.github.arashiyama11.domain.model.FolderName
+import io.github.arashiyama11.domain.model.ProgramFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.Single
 
-@Single(binds = [IExecuteUseCase::class])
+@Single
 internal class ExecuteUseCase(private val fileRepository: IFileRepository) :
     IExecuteUseCase {
     override operator fun invoke(program: String, input: String): Flow<DnclOutput> {
@@ -266,33 +270,40 @@ internal class ExecuteUseCase(private val fileRepository: IFileRepository) :
                         checkArgSize(arg, 1)?.let { return@Evaluator it }
                         when (arg[0]) {
                             is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value
+                                val str = (arg[0] as DnclObject.String).value.split("/")
                                 val file = runBlocking {
                                     withTimeoutOrNull(100) {
-                                        fileRepository.getFileByName(FileName(str))
+                                        fileRepository.getEntryByPath(
+                                            EntryPath(
+                                                str.dropLast(1).map { FolderName(it) } + FileName(
+                                                    str.last()
+                                                )
+                                            ))
                                     }
                                 }
-                                if (file == null) {
-                                    return@Evaluator DnclObject.RuntimeError(
-                                        "ファイル:$str が見つかりません",
-                                        arg[0].astNode
-                                    )
-                                } else {
+                                if (file is ProgramFile) {
+                                    val content =
+                                        runBlocking { fileRepository.getFileContent(file) }.value
                                     val parser =
-                                        Parser(Lexer(file.content.value)).getOrElse { err ->
+                                        Parser(Lexer(content)).getOrElse { err ->
                                             return@Evaluator DnclObject.RuntimeError(
-                                                err.explain(file.content.value),
+                                                err.explain(content),
                                                 arg[0].astNode
                                             )
                                         }
 
                                     val prog = parser.parseProgram().getOrElse { err ->
                                         return@Evaluator DnclObject.RuntimeError(
-                                            err.explain(file.content.value),
+                                            err.explain(content),
                                             arg[0].astNode
                                         )
                                     }
                                     evalProgram(prog, env)
+                                } else {
+                                    return@Evaluator DnclObject.RuntimeError(
+                                        "ファイル:$str が見つかりません",
+                                        arg[0].astNode
+                                    )
                                 }
                             }
 

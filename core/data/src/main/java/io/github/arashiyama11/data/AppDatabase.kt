@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [io.github.arashiyama11.data.entity.FileEntity::class, io.github.arashiyama11.data.entity.SelectedFileEntity::class],
+    entities = [io.github.arashiyama11.data.entity.FileEntity::class],
     version = 1
 )
 abstract class AppDatabase : RoomDatabase() {
