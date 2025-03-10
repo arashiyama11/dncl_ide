@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_interpreter.adapter
 
+import android.util.Log
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -13,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.DnclOutput
+import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.FileContent
 import io.github.arashiyama11.domain.model.ProgramFile
 import io.github.arashiyama11.domain.usecase.ExecuteUseCase
@@ -21,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -73,12 +76,20 @@ class IdeViewModel(
     private var executeJob: Job? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
+    fun onPause() {
+        viewModelScope.launch {
+            saveFile()
+        }
+    }
+
     fun onStart() {
         viewModelScope.launch {
+            var prePath: EntryPath? = null
             fileUseCase.selectedEntryPath.collect { entryPath ->
                 if (entryPath != null) {
                     val programFile = fileUseCase.getEntryByPath(entryPath)
                     if (programFile is ProgramFile) {
+                        if (prePath != null) saveFile(prePath)
 
                         onTextChanged(
                             TextFieldValue(
@@ -90,6 +101,7 @@ class IdeViewModel(
                         errorChannel.send("ファイルが開けませんでした")
                     }
                 }
+                prePath = entryPath
             }
         }
     }
@@ -124,7 +136,9 @@ class IdeViewModel(
     }
 
     fun onRunButtonClicked() {
-        saveFile()
+        viewModelScope.launch {
+            saveFile()
+        }
 
         executeJob = viewModelScope.launch {
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
@@ -185,7 +199,6 @@ class IdeViewModel(
 
 
     fun onEditorKeyEvent(keyEvent: KeyEvent): Boolean {
-        saveFile()
         if (keyEvent.type != KeyEventType.KeyUp || keyEvent.key != Key.Enter) return false
         viewModelScope.launch {
             val codeText = uiState.value.textFieldValue
@@ -223,20 +236,20 @@ class IdeViewModel(
         }
     }
 
-    private fun saveFile() {
-        viewModelScope.launch {
-            fileUseCase.selectedEntryPath.value?.let { entryPath ->
-                val entry = fileUseCase.getEntryByPath(entryPath)
-                if (entry is ProgramFile) {
-                    fileUseCase.saveFile(
-                        entry,
-                        FileContent(uiState.value.textFieldValue.text),
-                        CursorPosition(uiState.value.textFieldValue.selection.start)
-                    )
-                } else {
-                    errorChannel.send("ファイルを保存できませんでした")
-                }
-            }
+    private suspend fun saveFile(entryPath: EntryPath? = null) {
+        val path = entryPath ?: fileUseCase.selectedEntryPath.value ?: run {
+            errorChannel.send("ファイルが選択されていません")
+            return
+        }
+        val entry = fileUseCase.getEntryByPath(path)
+        if (entry is ProgramFile) {
+            fileUseCase.saveFile(
+                entry,
+                FileContent(uiState.value.textFieldValue.text),
+                CursorPosition(uiState.value.textFieldValue.selection.start)
+            )
+        } else {
+            errorChannel.send("ファイルを保存できませんでした")
         }
     }
 }
