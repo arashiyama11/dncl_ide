@@ -7,5 +7,13 @@ data class EntryPath(
         return value.joinToString("/") { it.value }
     }
 
+    fun parent(): EntryPath? {
+        return if (value.size > 1) {
+            EntryPath(value.dropLast(1))
+        } else {
+            null
+        }
+    }
+
     operator fun plus(entryName: EntryName): EntryPath = EntryPath(value + entryName)
 }

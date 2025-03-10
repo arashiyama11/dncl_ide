@@ -25,9 +25,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.annotation.Single
 
 @Single
-internal class ExecuteUseCase(private val fileRepository: IFileRepository) :
-    IExecuteUseCase {
-    override operator fun invoke(program: String, input: String): Flow<DnclOutput> {
+class ExecuteUseCase(private val fileRepository: IFileRepository) {
+    operator fun invoke(program: String, input: String): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(

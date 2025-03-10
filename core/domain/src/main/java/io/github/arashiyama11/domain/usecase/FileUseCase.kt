@@ -11,26 +11,26 @@ import io.github.arashiyama11.domain.model.ProgramFile
 import io.github.arashiyama11.domain.repository.IFileRepository
 import org.koin.core.annotation.Single
 
-@Single(binds = [IFileUseCase::class])
-internal class FileUseCase(private val fileRepository: IFileRepository) : IFileUseCase {
-    override val selectedEntryPath = fileRepository.selectedEntryPath
+@Single
+class FileUseCase(private val fileRepository: IFileRepository) {
+    val selectedEntryPath = fileRepository.selectedEntryPath
 
-    override suspend fun getEntryByPath(entryPath: EntryPath): Entry? {
+    suspend fun getEntryByPath(entryPath: EntryPath): Entry? {
         return fileRepository.getEntryByPath(entryPath)
     }
 
-    override suspend fun saveFile(
+    suspend fun saveFile(
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
     ) =
         fileRepository.saveFile(programFile, fileContent, cursorPosition)
 
-    override suspend fun selectFile(entryPath: EntryPath) {
+    suspend fun selectFile(entryPath: EntryPath) {
         fileRepository.selectFile(entryPath)
     }
 
-    override suspend fun createFile(
+    suspend fun createFile(
         parentPath: EntryPath,
         fileName: FileName
     ) {
@@ -42,22 +42,22 @@ internal class FileUseCase(private val fileRepository: IFileRepository) : IFileU
         )
     }
 
-    override suspend fun createFolder(
+    suspend fun createFolder(
         parentPath: EntryPath,
         folderName: FolderName
     ) {
         fileRepository.createFolder(parentPath + folderName)
     }
 
-    override suspend fun getRootFolder(): Folder {
+    suspend fun getRootFolder(): Folder {
         return fileRepository.getRootFolder()
     }
 
-    override suspend fun getCursorPosition(programFile: ProgramFile): CursorPosition {
+    suspend fun getCursorPosition(programFile: ProgramFile): CursorPosition {
         return fileRepository.getCursorPosition(programFile)
     }
 
-    override suspend fun getFileContent(programFile: ProgramFile): FileContent {
+    suspend fun getFileContent(programFile: ProgramFile): FileContent {
         return fileRepository.getFileContent(programFile)
     }
 }

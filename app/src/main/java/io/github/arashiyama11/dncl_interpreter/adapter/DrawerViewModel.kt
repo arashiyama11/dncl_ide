@@ -8,8 +8,8 @@ import io.github.arashiyama11.domain.model.FileName
 import io.github.arashiyama11.domain.model.Folder
 import io.github.arashiyama11.domain.model.FolderName
 import io.github.arashiyama11.domain.model.ProgramFile
-import io.github.arashiyama11.domain.usecase.IFileNameValidationUseCase
-import io.github.arashiyama11.domain.usecase.IFileUseCase
+import io.github.arashiyama11.domain.usecase.FileNameValidationUseCase
+import io.github.arashiyama11.domain.usecase.FileUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,8 +36,8 @@ data class DrawerUiState(
 
 @KoinViewModel
 class DrawerViewModel(
-    private val fileUseCase: IFileUseCase,
-    private val fileNameValidationUseCase: IFileNameValidationUseCase
+    private val fileUseCase: FileUseCase,
+    private val fileNameValidationUseCase: FileNameValidationUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DrawerUiState())
     val uiState = combine(

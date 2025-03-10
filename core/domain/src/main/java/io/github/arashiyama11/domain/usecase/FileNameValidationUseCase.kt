@@ -9,11 +9,9 @@ import io.github.arashiyama11.domain.model.ValidationError
 import io.github.arashiyama11.domain.repository.IFileRepository
 import org.koin.core.annotation.Single
 
-
-@Single(binds = [IFileNameValidationUseCase::class])
-internal class FileNameValidationUseCase(private val fileRepository: IFileRepository) :
-    IFileNameValidationUseCase {
-    override suspend operator fun invoke(entryPath: EntryPath): Either<ValidationError, Unit> {
+@Single
+class FileNameValidationUseCase(private val fileRepository: IFileRepository) {
+    suspend operator fun invoke(entryPath: EntryPath): Either<ValidationError, Unit> {
         val entryName = entryPath.value.lastOrNull() ?: return Unit.right()
 
         if (entryName.value.isBlank()) {
@@ -36,7 +34,7 @@ internal class FileNameValidationUseCase(private val fileRepository: IFileReposi
             return ValidationError.ReservedName("予約された名前は使用できません。").left()
         }
 
-        val folder = fileRepository.getEntryByPath(entryPath)
+        val folder = entryPath.parent()?.let { fileRepository.getEntryByPath(it) }
         if (folder !is Folder) return ValidationError.FolderNotFound.left()
         if (folder.entities.any { it.name == entryName }) {
             return ValidationError.AlreadyExists("同じ名前のファイルがすでに存在します。").left()

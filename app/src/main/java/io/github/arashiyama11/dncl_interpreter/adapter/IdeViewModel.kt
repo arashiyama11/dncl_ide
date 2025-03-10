@@ -15,8 +15,8 @@ import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.DnclOutput
 import io.github.arashiyama11.domain.model.FileContent
 import io.github.arashiyama11.domain.model.ProgramFile
-import io.github.arashiyama11.domain.usecase.IExecuteUseCase
-import io.github.arashiyama11.domain.usecase.IFileUseCase
+import io.github.arashiyama11.domain.usecase.ExecuteUseCase
+import io.github.arashiyama11.domain.usecase.FileUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -63,9 +63,9 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 
 @KoinViewModel
 class IdeViewModel(
-    private val syntaxHighLighter: ISyntaxHighLighter,
-    private val executeUseCase: IExecuteUseCase,
-    private val fileUseCase: IFileUseCase,
+    private val syntaxHighLighter: SyntaxHighLighter,
+    private val executeUseCase: ExecuteUseCase,
+    private val fileUseCase: FileUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
