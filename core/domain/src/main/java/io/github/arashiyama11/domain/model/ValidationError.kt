@@ -12,6 +12,10 @@ sealed interface ValidationError {
         override val message = "ファイル名は255文字以内で入力してください。"
     }
 
+    data object FolderNotFound : ValidationError {
+        override val message = "フォルダが見つかりません。"
+    }
+
     data class ReservedName(override val message: String) : ValidationError
     data class AlreadyExists(override val message: String) : ValidationError
 }

@@ -9,8 +9,8 @@ data class FileEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
 
-    @ColumnInfo(name = "name")
-    val name: String = "",
+    @ColumnInfo(name = "path")
+    val path: String = "",
 
     @ColumnInfo(name = "cursor_position")
     val cursorPosition: Int = 0

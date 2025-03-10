@@ -15,9 +15,9 @@ import io.github.arashiyama11.dncl.model.Token
 import io.github.arashiyama11.dncl.parser.Parser
 import org.koin.core.annotation.Single
 
-@Single(binds = [ISyntaxHighLighter::class])
-class SyntaxHighLighter : ISyntaxHighLighter {
-    override operator fun invoke(
+@Single
+class SyntaxHighLighter {
+    operator fun invoke(
         text: String,
         isDarkTheme: Boolean,
         errorRange: IntRange?

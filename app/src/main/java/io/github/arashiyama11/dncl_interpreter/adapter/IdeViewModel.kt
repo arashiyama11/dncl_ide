@@ -14,8 +14,9 @@ import io.github.arashiyama11.dncl.model.DnclError
 import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.DnclOutput
 import io.github.arashiyama11.domain.model.FileContent
-import io.github.arashiyama11.domain.usecase.IExecuteUseCase
-import io.github.arashiyama11.domain.usecase.IFileUseCase
+import io.github.arashiyama11.domain.model.ProgramFile
+import io.github.arashiyama11.domain.usecase.ExecuteUseCase
+import io.github.arashiyama11.domain.usecase.FileUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -62,9 +63,9 @@ i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
 
 @KoinViewModel
 class IdeViewModel(
-    private val syntaxHighLighter: ISyntaxHighLighter,
-    private val executeUseCase: IExecuteUseCase,
-    private val fileUseCase: IFileUseCase,
+    private val syntaxHighLighter: SyntaxHighLighter,
+    private val executeUseCase: ExecuteUseCase,
+    private val fileUseCase: FileUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
@@ -74,15 +75,20 @@ class IdeViewModel(
 
     fun onStart() {
         viewModelScope.launch {
-            fileUseCase.selectedFileName.collect { fileName ->
-                if (fileName != null) {
-                    val programFile = fileUseCase.getFileByName(fileName) ?: return@collect
-                    onTextChanged(
-                        TextFieldValue(
-                            programFile.content.value,
-                            TextRange(programFile.cursorPosition.value)
-                        ), isDarkThemeCache
-                    )
+            fileUseCase.selectedEntryPath.collect { entryPath ->
+                if (entryPath != null) {
+                    val programFile = fileUseCase.getEntryByPath(entryPath)
+                    if (programFile is ProgramFile) {
+
+                        onTextChanged(
+                            TextFieldValue(
+                                fileUseCase.getFileContent(programFile).value,
+                                TextRange(fileUseCase.getCursorPosition(programFile).value)
+                            ), isDarkThemeCache
+                        )
+                    } else {
+                        errorChannel.send("ファイルが開けませんでした")
+                    }
                 }
             }
         }
@@ -219,13 +225,17 @@ class IdeViewModel(
 
     private fun saveFile() {
         viewModelScope.launch {
-            fileUseCase.selectedFileName.value?.let { fileName ->
-                fileUseCase.saveFile(
-                    fileUseCase.getFileByName(fileName)!!.copy(
-                        content = FileContent(uiState.value.textFieldValue.text),
-                        cursorPosition = CursorPosition(uiState.value.textFieldValue.selection.start)
+            fileUseCase.selectedEntryPath.value?.let { entryPath ->
+                val entry = fileUseCase.getEntryByPath(entryPath)
+                if (entry is ProgramFile) {
+                    fileUseCase.saveFile(
+                        entry,
+                        FileContent(uiState.value.textFieldValue.text),
+                        CursorPosition(uiState.value.textFieldValue.selection.start)
                     )
-                )
+                } else {
+                    errorChannel.send("ファイルを保存できませんでした")
+                }
             }
         }
     }
