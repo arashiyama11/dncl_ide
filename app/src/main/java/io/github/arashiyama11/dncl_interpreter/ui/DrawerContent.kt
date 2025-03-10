@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -14,7 +15,6 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_interpreter.adapter.CreatingType
 import io.github.arashiyama11.dncl_interpreter.adapter.DrawerViewModel
@@ -94,7 +95,7 @@ fun DrawerContent(drawerViewModel: DrawerViewModel) {
                         selected = false,
                         icon = {
                             Icon(
-                                if (uiState.creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Outlined.Folder,
+                                if (uiState.creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Filled.Folder,
                                 contentDescription = null
                             )
                         },
@@ -152,7 +153,7 @@ fun FolderItem(
                 selected = false,
                 icon = {
                     Icon(
-                        Icons.Outlined.Folder,
+                        Icons.Filled.Folder,
                         contentDescription = null
                     )
                 },
@@ -194,7 +195,7 @@ fun FolderItem(
                     selected = false,
                     icon = {
                         Icon(
-                            if (creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Outlined.Folder,
+                            if (creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Filled.Folder,
                             contentDescription = null
                         )
                     },
