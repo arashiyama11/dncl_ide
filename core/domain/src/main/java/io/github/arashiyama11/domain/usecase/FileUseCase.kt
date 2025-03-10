@@ -3,7 +3,6 @@ package io.github.arashiyama11.domain.usecase
 import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.Entry
 import io.github.arashiyama11.domain.model.FileContent
-import io.github.arashiyama11.domain.model.EntryName
 import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.FileName
 import io.github.arashiyama11.domain.model.Folder

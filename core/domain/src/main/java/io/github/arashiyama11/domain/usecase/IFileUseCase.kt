@@ -1,6 +1,5 @@
 package io.github.arashiyama11.domain.usecase
 
-import android.icu.text.CaseMap
 import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.Entry
 import io.github.arashiyama11.domain.model.EntryPath

@@ -10,7 +10,6 @@ import io.github.arashiyama11.dncl.model.DnclObject
 import io.github.arashiyama11.dncl.model.SystemCommand
 import io.github.arashiyama11.dncl.parser.Parser
 import io.github.arashiyama11.domain.model.DnclOutput
-import io.github.arashiyama11.domain.model.EntryName
 import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.FileName
 import io.github.arashiyama11.domain.model.FolderName

@@ -1,6 +1,5 @@
 package io.github.arashiyama11.dncl_interpreter.adapter
 
-import android.util.Log
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

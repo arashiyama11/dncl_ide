@@ -2,12 +2,9 @@ package io.github.arashiyama11.domain.repository
 
 import io.github.arashiyama11.domain.model.CursorPosition
 import io.github.arashiyama11.domain.model.Entry
-import io.github.arashiyama11.domain.model.EntryName
 import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.FileContent
-import io.github.arashiyama11.domain.model.FileName
 import io.github.arashiyama11.domain.model.Folder
-import io.github.arashiyama11.domain.model.FolderName
 import io.github.arashiyama11.domain.model.ProgramFile
 import kotlinx.coroutines.flow.StateFlow
 

@@ -3,7 +3,6 @@ package io.github.arashiyama11.domain.usecase
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import io.github.arashiyama11.domain.model.EntryName
 import io.github.arashiyama11.domain.model.EntryPath
 import io.github.arashiyama11.domain.model.Folder
 import io.github.arashiyama11.domain.model.ValidationError
