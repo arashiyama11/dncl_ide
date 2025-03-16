@@ -82,7 +82,8 @@ class IdeViewModel(
         }
     }
 
-    fun onStart() {
+    fun onStart(isDarkTheme: Boolean) {
+        isDarkThemeCache = isDarkTheme
         viewModelScope.launch {
             var prePath: EntryPath? = null
             fileUseCase.selectedEntryPath.collect { entryPath ->

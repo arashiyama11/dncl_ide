@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_interpreter.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -41,9 +42,10 @@ fun App() {
         val drawerViewModel = koinViewModel<DrawerViewModel>()
         val ideViewModel = koinViewModel<IdeViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
+        val isDarkTheme = isSystemInDarkTheme()
 
         LaunchedEffect(Unit) {
-            ideViewModel.onStart()
+            ideViewModel.onStart(isDarkTheme)
             for (err in ideViewModel.errorChannel) {
                 snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
             }
