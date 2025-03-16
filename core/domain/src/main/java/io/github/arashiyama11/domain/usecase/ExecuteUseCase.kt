@@ -26,7 +26,7 @@ import org.koin.core.annotation.Single
 
 @Single
 class ExecuteUseCase(private val fileRepository: IFileRepository) {
-    operator fun invoke(program: String, input: String): Flow<DnclOutput> {
+    operator fun invoke(program: String, input: String, arrayOrigin: Int): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(
@@ -44,7 +44,7 @@ class ExecuteUseCase(private val fileRepository: IFileRepository) {
         }
         return channelFlow {
             withContext(Dispatchers.Default) {
-                val evaluator = getEvaluator(input) {
+                val evaluator = getEvaluator(input, arrayOrigin) {
                     send(DnclOutput.Stdout(it))
                 }
 
@@ -77,7 +77,12 @@ class ExecuteUseCase(private val fileRepository: IFileRepository) {
         else null
     }
 
-    private fun getEvaluator(input: String, onStdout: suspend (String) -> Unit): Evaluator {
+    private fun getEvaluator(
+        input: String,
+        arrayOrigin: Int,
+        onStdout: suspend (String) -> Unit
+    ): Evaluator {
+        println("getEvaluator $arrayOrigin")
         return Evaluator(
             { fn, arg, env ->
                 when (fn) {
@@ -355,7 +360,7 @@ class ExecuteUseCase(private val fileRepository: IFileRepository) {
                         DnclObject.Null(it.astNode)
                     }
                 }
-            }, 0
+            }, arrayOrigin
         )
     }
 }

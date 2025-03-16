@@ -1,6 +1,5 @@
 package io.github.arashiyama11.dncl_interpreter.adapter
 
-import android.util.Log
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -19,11 +18,11 @@ import io.github.arashiyama11.domain.model.FileContent
 import io.github.arashiyama11.domain.model.ProgramFile
 import io.github.arashiyama11.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.domain.usecase.FileUseCase
+import io.github.arashiyama11.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -69,6 +68,7 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
+    private val settingsUseCase: SettingsUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState = _uiState.asStateFlow()
@@ -146,7 +146,8 @@ class IdeViewModel(
 
             executeUseCase(
                 uiState.value.textFieldValue.text,
-                uiState.value.input
+                uiState.value.input,
+                settingsUseCase.arrayOriginIndex.value
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {

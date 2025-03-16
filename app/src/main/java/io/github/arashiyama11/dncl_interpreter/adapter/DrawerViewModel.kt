@@ -10,6 +10,7 @@ import io.github.arashiyama11.domain.model.FolderName
 import io.github.arashiyama11.domain.model.ProgramFile
 import io.github.arashiyama11.domain.usecase.FileNameValidationUseCase
 import io.github.arashiyama11.domain.usecase.FileUseCase
+import io.github.arashiyama11.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,20 +32,22 @@ data class DrawerUiState(
     val creatingType: CreatingType? = null,
     val inputtingEntryPath: EntryPath? = null,
     val inputtingFileName: String? = null,
-    val lastClickedFolder: Folder? = null
+    val lastClickedFolder: Folder? = null,
+    val list1IndexSwitchEnabled: Boolean = false
 )
 
 @KoinViewModel
 class DrawerViewModel(
     private val fileUseCase: FileUseCase,
-    private val fileNameValidationUseCase: FileNameValidationUseCase
+    private val fileNameValidationUseCase: FileNameValidationUseCase,
+    private val settingsUseCase: SettingsUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DrawerUiState())
     val uiState = combine(
-        _uiState, fileUseCase.selectedEntryPath
-    ) { state, filePath ->
+        _uiState, fileUseCase.selectedEntryPath, settingsUseCase.arrayOriginIndex
+    ) { state, filePath, arrayOrigin ->
         state.copy(
-            selectedEntryPath = filePath,
+            selectedEntryPath = filePath, list1IndexSwitchEnabled = arrayOrigin == 1
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
@@ -120,6 +123,10 @@ class DrawerViewModel(
                 return onFileAddConfirmed(inputtingFileName.dropLast(1))
             else _uiState.update { it.copy(inputtingFileName = inputtingFileName.dropLast(1)) }
         } else _uiState.update { it.copy(inputtingFileName = inputtingFileName) }
+    }
+
+    fun onList1IndexSwitchClicked(enabled: Boolean) {
+        settingsUseCase.setListFirstIndex(if (enabled) 1 else 0)
     }
 
     private fun onFileAddConfirmed(newFileName: String) {

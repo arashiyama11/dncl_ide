@@ -160,7 +160,7 @@ class FileRepository(
     companion object {
         const val PROGRAM_FILES_DIR = "programs"
         const val DEFAULT_FILE_NAME = "index"
-        private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+        private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "file")
 
         object PreferencesKeys {
             val SELECTED_FILE_ID = intPreferencesKey("selected_file_id")

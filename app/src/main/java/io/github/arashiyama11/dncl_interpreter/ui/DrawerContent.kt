@@ -9,11 +9,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,6 +105,34 @@ fun DrawerContent(drawerViewModel: DrawerViewModel) {
                         }
                     )
                 }
+            }
+        }
+
+        var isShowSettings by remember { mutableStateOf(false) }
+
+        NavigationDrawerItem(label = {
+            Text(text = "Settings")
+        }, selected = false, icon = {
+            Icon(Icons.Outlined.Settings, contentDescription = null)
+        }, onClick = {
+            isShowSettings = !isShowSettings
+        })
+
+        AnimatedVisibility(isShowSettings) {
+            HorizontalDivider()
+            Column(
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .wrapContentHeight()
+            ) {
+                NavigationDrawerItem(label = {
+                    Text(text = "配列の最初の要素の添字を1にする")
+                }, selected = false, onClick = {
+                }, badge = {
+                    Switch(uiState.list1IndexSwitchEnabled, onCheckedChange = {
+                        drawerViewModel.onList1IndexSwitchClicked(it)
+                    })
+                })
             }
         }
     }
