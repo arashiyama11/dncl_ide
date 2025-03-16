@@ -466,10 +466,18 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     companion object {
         operator fun invoke(lexer: ILexer): Either<LexerError, Parser> = either {
             val parser = Parser(lexer)
-            parser.currentToken = lexer.nextToken().bind()
-            parser.nextToken = lexer.nextToken().bind()
-            parser.aheadToken = lexer.nextToken().bind()
+            parser.currentToken = skipComment(lexer).bind()
+            parser.nextToken = skipComment(lexer).bind()
+            parser.aheadToken = skipComment(lexer).bind()
             return parser.right()
+        }
+
+        private fun skipComment(lexer: ILexer): Either<LexerError, Token> = either {
+            var tok = lexer.nextToken().bind()
+            while (tok is Token.Comment) {
+                tok = lexer.nextToken().bind()
+            }
+            return tok.right()
         }
 
         fun Token.precedence() = when (this) {
