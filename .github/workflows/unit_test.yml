@@ -1,0 +1,22 @@
+name: Unit Test
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit Test
+        run: ./gradlew testAndroidHostTest

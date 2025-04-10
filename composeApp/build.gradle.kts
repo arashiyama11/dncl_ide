@@ -6,12 +6,6 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.ksp)
-}
-
-
-ksp {
-    arg("KOIN_CONFIG_CHECK", "true")
 }
 
 kotlin {
@@ -96,7 +90,6 @@ android {
 }
 
 dependencies {
-    ksp(libs.koin.ksp)
     debugImplementation(compose.uiTooling)
 }
 
