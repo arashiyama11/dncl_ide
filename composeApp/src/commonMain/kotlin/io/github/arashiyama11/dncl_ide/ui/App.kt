@@ -34,77 +34,74 @@ import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.ui.components.Fab
 import io.github.arashiyama11.dncl_ide.ui.components.SmallFab
 import org.jetbrains.compose.resources.painterResource
-import org.koin.compose.KoinContext
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun App() {
-    KoinContext {
-        DnclIdeTheme {
-            val drawerState = rememberDrawerState(DrawerValue.Closed)
-            val drawerViewModel = koinViewModel<DrawerViewModel>()
-            val ideViewModel = koinViewModel<IdeViewModel>()
-            val snackbarHostState = remember { SnackbarHostState() }
-            val isDarkTheme = isSystemInDarkTheme()
+    DnclIdeTheme {
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val drawerViewModel = koinViewModel<DrawerViewModel>()
+        val ideViewModel = koinViewModel<IdeViewModel>()
+        val snackbarHostState = remember { SnackbarHostState() }
+        val isDarkTheme = isSystemInDarkTheme()
 
-            LaunchedEffect(Unit) {
-                ideViewModel.onStart(isDarkTheme)
-                for (err in ideViewModel.errorChannel) {
-                    snackbarHostState.showSnackbar(err, "OK", SnackbarDuration.Indefinite)
-                }
+        LaunchedEffect(Unit) {
+            ideViewModel.onStart(isDarkTheme)
+            for (err in ideViewModel.errorChannel) {
+                snackbarHostState.showSnackbar(err, "OK", SnackbarDuration.Indefinite)
             }
+        }
 
-            LaunchedEffect(Unit) {
-                for (err in drawerViewModel.errorChannel) {
-                    snackbarHostState.showSnackbar(err, "OK", SnackbarDuration.Indefinite)
-                }
+        LaunchedEffect(Unit) {
+            for (err in drawerViewModel.errorChannel) {
+                snackbarHostState.showSnackbar(err, "OK", SnackbarDuration.Indefinite)
             }
+        }
 
-            Scaffold(snackbarHost = {
-                SnackbarHost(snackbarHostState)
-            }, floatingActionButton = {
-                if (drawerState.isOpen) {
-                    var isShowDetails by remember { mutableStateOf(false) }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        AnimatedVisibility(isShowDetails) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                SmallFab(onClick = { drawerViewModel.onFileAddClicked() }) {
-                                    Icon(
-                                        painterResource(Res.drawable.file_outlined),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colors.primary
-                                    )
-                                }
+        Scaffold(snackbarHost = {
+            SnackbarHost(snackbarHostState)
+        }, floatingActionButton = {
+            if (drawerState.isOpen) {
+                var isShowDetails by remember { mutableStateOf(false) }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AnimatedVisibility(isShowDetails) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            SmallFab(onClick = { drawerViewModel.onFileAddClicked() }) {
+                                Icon(
+                                    painterResource(Res.drawable.file_outlined),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colors.primary
+                                )
+                            }
 
-                                Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(16.dp))
 
-                                SmallFab(onClick = { drawerViewModel.onFolderAddClicked() }) {
-                                    Icon(
-                                        painterResource(Res.drawable.folder_outlined),
-                                        null,
-                                        tint = MaterialTheme.colors.primary
-                                    )
-                                }
+                            SmallFab(onClick = { drawerViewModel.onFolderAddClicked() }) {
+                                Icon(
+                                    painterResource(Res.drawable.folder_outlined),
+                                    null,
+                                    tint = MaterialTheme.colors.primary
+                                )
                             }
                         }
-                        Spacer(Modifier.height(24.dp))
-                        Fab(onClick = { isShowDetails = !isShowDetails }) {
-                            Icon(
-                                Icons.Outlined.Add,
-                                contentDescription = null,
-                                tint = MaterialTheme.colors.onPrimary
-                            )
-                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    Fab(onClick = { isShowDetails = !isShowDetails }) {
+                        Icon(
+                            Icons.Outlined.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colors.onPrimary
+                        )
                     }
                 }
-            }, floatingActionButtonPosition = FabPosition.End) { contentPadding ->
-                ModalDrawer(drawerContent = {
-                    DrawerContent(drawerViewModel)
-                }, drawerState = drawerState) {
-                    DnclIDE(
-                        modifier = Modifier, ideViewModel
-                    )
-                }
+            }
+        }, floatingActionButtonPosition = FabPosition.End) { contentPadding ->
+            ModalDrawer(drawerContent = {
+                DrawerContent(drawerViewModel)
+            }, drawerState = drawerState) {
+                DnclIDE(
+                    modifier = Modifier, ideViewModel
+                )
             }
         }
     }
