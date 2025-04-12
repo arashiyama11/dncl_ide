@@ -26,29 +26,7 @@ import kotlinx.coroutines.launch
 
 
 data class IdeUiState(
-    val textFieldValue: TextFieldValue = TextFieldValue(
-        """Data = [3,18,29,33,48,52,62,77,89,97]
-kazu = 要素数(Data)
-表示する("0～99の数字を入力してください")
-atai = 【外部からの入力】
-hidari = 0 , migi = kazu - 1
-owari = 0
-hidari <= migi and owari == 0 の間繰り返す:
-  aida = (hidari+migi) ÷ 2 # 演算子÷は商の整数値を返す
-  もし Data[aida] == atai ならば:
-    表示する(atai, "は", aida, "番目にありました")
-    owari = 1
-  そうでなくもし Data[aida] < atai ならば:
-    hidari = aida + 1
-  そうでなければ:
-    migi = aida - 1
-もし owari == 0 ならば:
-  表示する(atai, "は見つかりませんでした")
-表示する("添字", " ", "要素")
-i を 0 から kazu - 1 まで 1 ずつ増やしながら繰り返す:
-  表示する(i, " ", Data[i])
-"""
-    ),
+    val textFieldValue: TextFieldValue = TextFieldValue(""),
     val dnclError: DnclError? = null,
     val annotatedString: AnnotatedString? = null,
     val output: String = "",
