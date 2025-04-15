@@ -32,13 +32,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,22 +49,42 @@ fun CodeEditor(
     codeText: TextFieldValue,
     annotatedCodeText: AnnotatedString?,
     modifier: Modifier = Modifier,
+    fontSize: Int,
     onCodeChange: (TextFieldValue) -> Unit,
-    onKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
-    val lineHeight = with(LocalDensity.current) {
-        MaterialTheme.typography.body1.lineHeight.toDp()
-    }
-    val lineHeightPx = with(LocalDensity.current) { lineHeight.toPx() }
+    val fontSizeFloat =
+        fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
+    val codeStyle = TextStyle(
+        fontSize = fontSizeFloat.sp,
+        lineHeight = (fontSizeFloat + 2).sp
+    )
 
+    var lineHeightDp = with(LocalDensity.current) {
+        codeStyle.lineHeight.toDp()
+    }
+
+    val lineHeightPx = with(LocalDensity.current) { lineHeightDp.toPx() }
     val scrollState = rememberScrollState()
 
     var editorHeightPx by remember { mutableIntStateOf(0) }
     var textFieldHeightPx by remember { mutableIntStateOf(0) }
 
     val coroutineScope = rememberCoroutineScope()
-
     val focusRequester = remember { FocusRequester() }
+
+    val textMeasurer = rememberTextMeasurer()
+
+    val lines = codeText.text.lines()
+
+    val largestLineNumberString = lines.size.toString()
+
+    val textLayoutResult = textMeasurer.measure(
+        text = AnnotatedString(largestLineNumberString),
+        style = codeStyle
+    )
+
+    val measuredLineNumberWidth = with(LocalDensity.current) { textLayoutResult.size.width.toDp() }
+    val lineNumberColumnWidth = (measuredLineNumberWidth + 12.dp).coerceAtLeast(40.dp)
 
     Box(
         modifier = modifier
@@ -75,7 +94,8 @@ fun CodeEditor(
             }
             .clickable(
                 indication = null,
-                interactionSource = remember { MutableInteractionSource() }) {
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
                 focusRequester.requestFocus()
             }
     ) {
@@ -89,9 +109,8 @@ fun CodeEditor(
             // 行番号部分
             Column(
                 modifier = Modifier
-                    .width(40.dp)
+                    .width(lineNumberColumnWidth)
             ) {
-                val lines = codeText.text.split("\n")
                 val selectLine = run {
                     var idx = 0
                     for ((i, line) in lines.withIndex()) {
@@ -108,14 +127,14 @@ fun CodeEditor(
                         text = "${index + 1}",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(lineHeight)
+                            .height(lineHeightDp)
                             .padding(horizontal = 4.dp),
-                        color = if (selectLine == index)
-                            if (isSystemInDarkTheme()) Color.LightGray else Color.Black
-                        else Color.DarkGray,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.End,
-                        fontWeight = if (selectLine == index) FontWeight.Bold else FontWeight.Normal
+                        style = codeStyle.copy(
+                            color = if (selectLine == index)
+                                if (isSystemInDarkTheme()) Color.LightGray else Color.Black
+                            else Color.DarkGray,
+                            textAlign = TextAlign.End
+                        )
                     )
                 }
             }
@@ -126,9 +145,7 @@ fun CodeEditor(
             BasicTextField(
                 value = codeText,
                 onValueChange = { onCodeChange(it) },
-                textStyle = MaterialTheme.typography.body1.copy(
-                    if (annotatedCodeText == null) MaterialTheme.colors.onBackground else Color.Gray
-                ),
+                textStyle = codeStyle,
                 modifier = Modifier
                     .weight(1f)
                     .padding(bottom = 32.dp)
@@ -136,10 +153,10 @@ fun CodeEditor(
                     .onGloballyPositioned { coordinates ->
                         textFieldHeightPx = coordinates.size.height
                     }
-                    .onKeyEvent { onKeyEvent(it) }
                     .focusRequester(focusRequester),
                 cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
                 onTextLayout = { textLayoutResult ->
+                    lineHeightDp = textLayoutResult.multiParagraph.getLineHeight(0).dp
                     val cursorOffset = codeText.selection.start
                     val cursorRect = textLayoutResult.getCursorRect(cursorOffset)
                     val margin = 32f
@@ -161,10 +178,9 @@ fun CodeEditor(
                         Text(
                             text = annotatedCodeText,
                             modifier = Modifier.fillMaxSize(),
-                            style = MaterialTheme.typography.body1,
+                            style = codeStyle,
                             softWrap = false
                         )
-
                 }
             )
         }
@@ -172,7 +188,7 @@ fun CodeEditor(
 
     var scrollJob: Job? by remember { mutableStateOf(null) }
 
-    LaunchedEffect(codeText.selection, editorHeightPx) {
+    LaunchedEffect(codeText.selection, editorHeightPx, fontSize) {
         scrollJob?.cancel()
         scrollJob = launch {
             val lines = codeText.text.split("\n")

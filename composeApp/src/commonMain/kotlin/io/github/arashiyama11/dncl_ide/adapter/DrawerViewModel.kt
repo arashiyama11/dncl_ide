@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
@@ -32,7 +33,8 @@ data class DrawerUiState(
     val inputtingEntryPath: EntryPath? = null,
     val inputtingFileName: String? = null,
     val lastClickedFolder: Folder? = null,
-    val list1IndexSwitchEnabled: Boolean = false
+    val list1IndexSwitchEnabled: Boolean = false,
+    val fontSize: Int = DEFAULT_FONT_SIZE
 )
 
 class DrawerViewModel(
@@ -42,10 +44,15 @@ class DrawerViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DrawerUiState())
     val uiState = combine(
-        _uiState, fileUseCase.selectedEntryPath, settingsUseCase.arrayOriginIndex
-    ) { state, filePath, arrayOrigin ->
+        _uiState,
+        fileUseCase.selectedEntryPath,
+        settingsUseCase.arrayOriginIndex,
+        settingsUseCase.fontSize
+    ) { state, filePath, arrayOrigin, fontSize ->
         state.copy(
-            selectedEntryPath = filePath, list1IndexSwitchEnabled = arrayOrigin == 1
+            selectedEntryPath = filePath,
+            list1IndexSwitchEnabled = arrayOrigin == 1,
+            fontSize = fontSize
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
@@ -57,6 +64,10 @@ class DrawerViewModel(
             _uiState.update { it.copy(rootFolder = fileUseCase.getRootFolder()) }
         }
         this.focusRequester = focusRequester
+    }
+
+    fun onFontSizeChanged(fontSize: Int) {
+        settingsUseCase.setFontSize(fontSize)
     }
 
     fun onFileSelected(programFile: ProgramFile) {

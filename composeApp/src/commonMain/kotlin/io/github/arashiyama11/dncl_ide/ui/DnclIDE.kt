@@ -33,13 +33,9 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
             codeText = uiState.textFieldValue,
             annotatedCodeText = uiState.annotatedString,
             onCodeChange = { viewModel.onTextChanged(it, isDarkTheme) },
-            onKeyEvent = {
-                //println("KeyEvent: $it")
-                //viewModel.onEditorKeyEvent(it)
-                false
-            },
             modifier = Modifier
-                .weight(2f)
+                .weight(2f),
+            fontSize = uiState.fontSize,
         )
 
         Row(
