@@ -2,7 +2,7 @@ package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.domain.repository.IFileRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
@@ -24,7 +24,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-class ExecuteUseCase(private val fileRepository: IFileRepository) {
+class ExecuteUseCase(private val fileRepository: FileRepository) {
     operator fun invoke(program: String, input: String, arrayOrigin: Int): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(

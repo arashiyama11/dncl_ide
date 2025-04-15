@@ -8,7 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository.Companion.DEFAULT_FONT_SIZE
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase

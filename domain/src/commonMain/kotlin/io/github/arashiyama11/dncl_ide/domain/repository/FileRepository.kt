@@ -8,7 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import kotlinx.coroutines.flow.StateFlow
 
-interface IFileRepository {
+interface FileRepository {
     val selectedEntryPath: StateFlow<EntryPath?>
     suspend fun getRootFolder(): Folder
     suspend fun getEntryByPath(entryPath: EntryPath): Entry?

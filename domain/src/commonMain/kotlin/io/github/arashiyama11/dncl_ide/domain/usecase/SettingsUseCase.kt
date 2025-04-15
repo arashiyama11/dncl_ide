@@ -1,8 +1,8 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 
-class SettingsUseCase(private val settingsRepository: ISettingsRepository) {
+class SettingsUseCase(private val settingsRepository: SettingsRepository) {
     val arrayOriginIndex = settingsRepository.arrayOriginIndex
     val fontSize = settingsRepository.fontSize
 

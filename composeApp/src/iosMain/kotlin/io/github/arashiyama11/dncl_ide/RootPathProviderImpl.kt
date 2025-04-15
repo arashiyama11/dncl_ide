@@ -1,12 +1,12 @@
 package io.github.arashiyama11.dncl_ide
 
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
-import io.github.arashiyama11.dncl_ide.util.IRootPathProvider
+import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 
-class RootPathProvider : IRootPathProvider {
+class RootPathProviderImpl : RootPathProvider {
     override fun invoke(): EntryPath {
         val paths = NSSearchPathForDirectoriesInDomains(
             directory = NSDocumentDirectory,

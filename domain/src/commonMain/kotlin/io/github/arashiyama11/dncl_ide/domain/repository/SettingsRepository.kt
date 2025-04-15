@@ -2,7 +2,7 @@ package io.github.arashiyama11.dncl_ide.domain.repository
 
 import kotlinx.coroutines.flow.StateFlow
 
-interface ISettingsRepository {
+interface SettingsRepository {
     val arrayOriginIndex: StateFlow<Int>
     val fontSize: StateFlow<Int>
     fun setListFirstIndex(index: Int)

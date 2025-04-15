@@ -8,9 +8,9 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
-import io.github.arashiyama11.dncl_ide.domain.repository.IFileRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 
-class FileUseCase(private val fileRepository: IFileRepository) {
+class FileUseCase(private val fileRepository: FileRepository) {
     val selectedEntryPath = fileRepository.selectedEntryPath
 
     suspend fun getEntryByPath(entryPath: EntryPath): Entry? {

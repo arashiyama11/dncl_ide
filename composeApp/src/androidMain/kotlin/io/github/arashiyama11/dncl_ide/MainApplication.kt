@@ -2,7 +2,7 @@ package io.github.arashiyama11.dncl_ide
 
 import android.app.Application
 import io.github.arashiyama11.dncl_ide.domain.domainModule
-import io.github.arashiyama11.dncl_ide.util.IRootPathProvider
+import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext.startKoin
@@ -16,7 +16,7 @@ class MainApplication : Application() {
             androidLogger()
             androidContext(this@MainApplication)
             modules(domainModule, commonMainModule, module {
-                single { RootPathProvider(androidContext()) } bind IRootPathProvider::class
+                single { RootPathProviderImpl(androidContext()) } bind RootPathProvider::class
             })
         }
     }

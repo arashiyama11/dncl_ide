@@ -6,9 +6,9 @@ import arrow.core.right
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.ValidationError
-import io.github.arashiyama11.dncl_ide.domain.repository.IFileRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 
-class FileNameValidationUseCase(private val fileRepository: IFileRepository) {
+class FileNameValidationUseCase(private val fileRepository: FileRepository) {
     suspend operator fun invoke(entryPath: EntryPath): Either<ValidationError, Unit> {
         val entryName = entryPath.value.lastOrNull() ?: return Unit.right()
 

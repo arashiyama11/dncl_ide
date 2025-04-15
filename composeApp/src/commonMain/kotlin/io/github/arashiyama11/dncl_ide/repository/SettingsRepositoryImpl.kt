@@ -1,13 +1,13 @@
 package io.github.arashiyama11.dncl_ide.repository
 
 import com.russhwolf.settings.Settings
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository.Companion.DEFAULT_ARRAY_ORIGIN_INDEX
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository.Companion.DEFAULT_FONT_SIZE
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ARRAY_ORIGIN_INDEX
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class SettingsRepository() : ISettingsRepository {
+class SettingsRepositoryImpl() : SettingsRepository {
     override val arrayOriginIndex: StateFlow<Int> = MutableStateFlow(DEFAULT_ARRAY_ORIGIN_INDEX)
     override val fontSize: StateFlow<Int> = MutableStateFlow(DEFAULT_FONT_SIZE)
     private val setting = Settings()

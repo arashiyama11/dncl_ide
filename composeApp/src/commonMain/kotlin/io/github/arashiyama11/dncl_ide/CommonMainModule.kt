@@ -3,10 +3,10 @@ package io.github.arashiyama11.dncl_ide
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.domain.repository.IFileRepository
-import io.github.arashiyama11.dncl_ide.domain.repository.ISettingsRepository
-import io.github.arashiyama11.dncl_ide.repository.FileRepository
-import io.github.arashiyama11.dncl_ide.repository.SettingsRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
+import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
+import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
@@ -16,6 +16,6 @@ val commonMainModule = module {
     viewModelOf(::DrawerViewModel)
     viewModelOf(::IdeViewModel)
     singleOf(::SyntaxHighLighter)
-    singleOf(::FileRepository) { binds(listOf(IFileRepository::class)) }
-    singleOf(::SettingsRepository) { binds(listOf(ISettingsRepository::class)) }
+    singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
+    singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
 }

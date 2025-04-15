@@ -10,8 +10,8 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
-import io.github.arashiyama11.dncl_ide.domain.repository.IFileRepository
-import io.github.arashiyama11.dncl_ide.util.IRootPathProvider
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -24,10 +24,10 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 
-class FileRepository(iRootPathProvider: IRootPathProvider) : IFileRepository {
+class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
     override val selectedEntryPath: StateFlow<EntryPath?> = MutableStateFlow(null)
 
-    private val rootPath: EntryPath = iRootPathProvider()
+    private val rootPath: EntryPath = rootPathProvider()
 
     private val setting = Settings()
 
