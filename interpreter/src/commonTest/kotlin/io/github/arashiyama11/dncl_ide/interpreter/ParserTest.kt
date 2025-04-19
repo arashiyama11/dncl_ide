@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
-import io.github.arashiyama11.dncl.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -162,7 +162,7 @@ min_maisu = maisu
             TestCase.Sisaku2022_2, """Data = [3, 18, 29, 33, 48, 52, 62, 77, 89, 97]
 kazu = 要素数(Data)
 表示する("0～99の数字を入力してください")
-atai = 外部からの入力
+atai = 整数変換(外部からの入力)
 hidari = 0, migi = (kazu - 1)
 owari = 0
 while ((hidari ≦ migi) AND (owari == 0)) {
@@ -182,7 +182,7 @@ if (owari == 0) {
 表示する(atai, "は見つかりませんでした")
 }
 表示する("添字", " ", "要素")
-for i in IntLiteral(value=0, range=457..457)..InfixExpression(left=Identifier(value=kazu, range=462..465), operator=Minus(range=467..467, literal=-), right=IntLiteral(value=1, range=469..469)) INCREMENT by IntLiteral(value=1, range=474..474) {
+for i in IntLiteral(value=0, range=463..463)..InfixExpression(left=Identifier(value=kazu, range=468..471), operator=Minus(range=473..473, literal=-), right=IntLiteral(value=1, range=475..475)) INCREMENT by IntLiteral(value=1, range=480..480) {
 表示する(i, " ", Data[i])
 }"""
         )

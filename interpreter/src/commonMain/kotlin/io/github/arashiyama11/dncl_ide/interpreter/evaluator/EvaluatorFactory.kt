@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
@@ -380,8 +381,13 @@ object EvaluatorFactory {
                                 val str = (args[0] as DnclObject.String).value
                                 val delimiter = (args[1] as DnclObject.String).value
                                 val parts = str.split(delimiter)
-                                val result = parts.map { DnclObject.String(it, args[0].astNode) }
-                                    .toMutableList() as MutableList<DnclObject>
+                                val result = parts.map {
+                                    DnclObject.String(
+                                        it,
+                                        args[0].astNode
+                                    ) as DnclObject
+                                }
+                                    .toMutableList()
                                 DnclObject.Array(result, args[0].astNode)
                             }
 
@@ -483,8 +489,11 @@ object EvaluatorFactory {
                     }
 
                     BuiltInFunction.RANDOM -> {
-                        checkArgSize(args, 0)?.let { return@Evaluator it }
-                        DnclObject.Float(kotlin.random.Random.nextFloat(), args[0].astNode)
+                        // For random function with no arguments, we need a valid AstNode
+                        // Use a system literal if args is empty
+                        val astNode =
+                            if (args.isEmpty()) AstNode.SystemLiteral("", 0..0) else args[0].astNode
+                        DnclObject.Float(kotlin.random.Random.nextFloat(), astNode)
                     }
 
                     BuiltInFunction.MAX -> {

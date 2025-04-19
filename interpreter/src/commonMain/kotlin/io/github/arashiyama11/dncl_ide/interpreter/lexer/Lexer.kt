@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl.lexer
+package io.github.arashiyama11.dncl_ide.interpreter.lexer
 
 import arrow.core.Either
 import arrow.core.left
@@ -6,7 +6,6 @@ import arrow.core.raise.either
 import arrow.core.right
 import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
-import io.github.arashiyama11.dncl_ide.interpreter.lexer.ILexer
 
 class Lexer(private val input: String) : ILexer {
     private var position: Int = 0

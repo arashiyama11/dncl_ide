@@ -1,7 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
-import io.github.arashiyama11.dncl.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -10,9 +10,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
-import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
-import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
-import io.github.arashiyama11.dncl.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
