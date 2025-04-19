@@ -7,6 +7,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.runBlocking
 import kotlin.math.max
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -17,14 +18,22 @@ class EvaluatorTest {
     private val nullObj = DnclObject.Null(AstNode.SystemLiteral("", 0..0))
     private var stdin: DnclObject = nullObj
     private var stdout = ""
-    private var evaluator: Evaluator = EvaluatorFactory.create("62", 1, {
-        println("print: $it")
-        stdout += "$it\n"
-    }) { DnclObject.Null(args[0].astNode) }
+    private lateinit var evaluator: Evaluator
+    private lateinit var evaluator0Origin: Evaluator
 
-    val evaluator0Origin = EvaluatorFactory.create("62", 0, {
-        stdout += "$it\n"
-    }) { DnclObject.Null(args[0].astNode) }
+    @BeforeTest
+    fun setUp() {
+        stdin = nullObj
+        stdout = ""
+        evaluator = EvaluatorFactory.create("62", 1, {
+            println("print: $it")
+            stdout += "$it\n"
+        }) { DnclObject.Null(args[0].astNode) }
+
+        evaluator0Origin = EvaluatorFactory.create("62", 0, {
+            stdout += "$it\n"
+        }) { DnclObject.Null(args[0].astNode) }
+    }
 
     @Test
     fun test() {
@@ -63,11 +72,12 @@ D = quick_sort(Data)
 表示する(D)
 """
         val env = Environment()
-        val a =
+        val a = runBlocking {
             evaluator0Origin.evalProgram(
                 program.toProgram(),
                 env
             )
+        }
 
         a.getOrNull()!!.let {
             if (it is DnclObject.Error) println(explain(program, it))
@@ -76,14 +86,11 @@ D = quick_sort(Data)
         assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]\n", stdout)
     }
 
-    @BeforeTest
-    fun setUp() {
-        stdin = nullObj
-        stdout = ""
-    }
 
     fun testEval(evaluator: Evaluator, program: String, expected: String) {
-        evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        runBlocking {
+            evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        }
         assertEquals(expected, stdout)
     }
 
@@ -126,11 +133,13 @@ D = quick_sort(Data)
     @Test
     fun testSisaku2022_1() {
         val env = Environment()
-        evaluator0Origin.evalProgram(TestCase.MaisuFunction.toProgram(), env).leftOrNull()
-            ?.let { fail(it.toString()) }
+        runBlocking {
+            evaluator0Origin.evalProgram(TestCase.MaisuFunction.toProgram(), env).leftOrNull()
+                ?.let { fail(it.toString()) }
 
-        evaluator0Origin.evalProgram(TestCase.Sisaku2022_1.toProgram(), env).leftOrNull()
-            ?.let { fail(it.toString()) }
+            evaluator0Origin.evalProgram(TestCase.Sisaku2022_1.toProgram(), env).leftOrNull()
+                ?.let { fail(it.toString()) }
+        }
 
         assertEquals("3\n", stdout)
     }

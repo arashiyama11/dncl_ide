@@ -19,7 +19,7 @@ interface CallBuiltInFunctionScope {
 }
 
 class Evaluator(
-    private val onCallBuildInFunction: CallBuiltInFunctionScope.() -> DnclObject,
+    private val onCallBuildInFunction: suspend CallBuiltInFunctionScope.() -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0
 ) : IEvaluator {
@@ -28,7 +28,7 @@ class Evaluator(
         return this
     }
 
-    override fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> = either {
+    override suspend fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> = either {
         Either.catch {
             when (node) {
                 is AstNode.Program -> evalProgram(node, env).bind()
@@ -60,7 +60,7 @@ class Evaluator(
         }.mapLeft { InternalError(it.message ?: "") }.bind()
     }
 
-    override fun evalProgram(
+    override suspend fun evalProgram(
         program: AstNode.Program, env: Environment
     ): Either<DnclError, DnclObject> =
         either {
@@ -73,7 +73,7 @@ class Evaluator(
             }.mapLeft { InternalError(it.message ?: "") }.bind()
         }
 
-    private fun evalBlockStatement(
+    private suspend fun evalBlockStatement(
         block: AstNode.BlockStatement,
         env: Environment
     ): Either<DnclError, DnclObject> =
@@ -85,7 +85,7 @@ class Evaluator(
             result
         }
 
-    private fun evalIfStatement(
+    private suspend fun evalIfStatement(
         ifStmt: AstNode.IfStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -99,7 +99,7 @@ class Evaluator(
         }
     }
 
-    private fun evalWhileStatement(
+    private suspend fun evalWhileStatement(
         whileStmt: AstNode.WhileStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -113,7 +113,7 @@ class Evaluator(
         DnclObject.Null(whileStmt)
     }
 
-    private fun evalForStatement(
+    private suspend fun evalForStatement(
         forStmt: AstNode.ForStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -163,7 +163,7 @@ class Evaluator(
         DnclObject.Null(forStmt)
     }
 
-    private fun evalAssignStatement(
+    private suspend fun evalAssignStatement(
         assignStmt: AstNode.AssignStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -198,12 +198,12 @@ class Evaluator(
         DnclObject.Null(assignStmt)
     }
 
-    private fun evalExpressionStatement(
+    private suspend fun evalExpressionStatement(
         exprStmt: AstNode.ExpressionStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = eval(exprStmt.expression, env)
 
-    private fun evalFunctionStatement(
+    private suspend fun evalFunctionStatement(
         functionStmt: AstNode.FunctionStatement,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -217,7 +217,7 @@ class Evaluator(
         DnclObject.Null(functionStmt)
     }
 
-    private fun evalIndexExpression(
+    private suspend fun evalIndexExpression(
         indexExpression: AstNode.IndexExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -241,7 +241,7 @@ class Evaluator(
         )
     }
 
-    private fun evalCallExpression(
+    private suspend fun evalCallExpression(
         callExpression: AstNode.CallExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -276,7 +276,7 @@ class Evaluator(
         if (res is DnclObject.ReturnValue) res.value else res
     }
 
-    private fun evalPrefixExpression(
+    private suspend fun evalPrefixExpression(
         prefixExpression: AstNode.PrefixExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -306,7 +306,7 @@ class Evaluator(
         }
     }
 
-    private fun evalInfixExpression(
+    private suspend fun evalInfixExpression(
         infixExpression: AstNode.InfixExpression,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -526,7 +526,7 @@ class Evaluator(
         }
     }
 
-    private fun evalArrayLiteral(
+    private suspend fun evalArrayLiteral(
         arrayLiteral: AstNode.ArrayLiteral,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
@@ -536,7 +536,7 @@ class Evaluator(
         DnclObject.Array(elements.toMutableList(), arrayLiteral)
     }
 
-    private fun evalIdentifier(
+    private suspend fun evalIdentifier(
         identifier: AstNode.Identifier,
         env: Environment
     ): Either<DnclError, DnclObject> = either {

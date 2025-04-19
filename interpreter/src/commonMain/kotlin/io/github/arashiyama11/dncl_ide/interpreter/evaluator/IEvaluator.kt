@@ -7,8 +7,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 
 interface IEvaluator {
-    fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject>
-    fun evalProgram(
+    suspend fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject>
+    suspend fun evalProgram(
         program: AstNode.Program,
         env: Environment = Environment()
     ): Either<DnclError, DnclObject>

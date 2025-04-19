@@ -43,17 +43,13 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         return channelFlow {
             withContext(Dispatchers.Default) {
                 val evaluator = getEvaluator(
-                    input, 
+                    input,
                     arrayOrigin,
                     onStdout = { text ->
-                        launch {
-                            send(DnclOutput.Stdout(text))
-                        }
+                        send(DnclOutput.Stdout(text))
                     },
                     onClear = {
-                        launch {
-                            send(DnclOutput.Clear)
-                        }
+                        send(DnclOutput.Clear)
                     }
                 )
 
@@ -64,41 +60,35 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
                         val e = err.getOrNull()!! as DnclObject.Error
                         send(DnclOutput.RuntimeError(e))
                     }
-                    coroutineContext[Job]?.invokeOnCompletion {
-                        close()
-                    } ?: println("Job is null")
                 }
             }
-            awaitClose()
         }
     }
 
     private fun getEvaluator(
         input: String,
         arrayOrigin: Int,
-        onStdout: (String) -> Unit,
-        onClear: () -> Unit
+        onStdout: suspend (String) -> Unit,
+        onClear: suspend () -> Unit
     ): Evaluator {
         return EvaluatorFactory.create(
-            input, 
-            arrayOrigin, 
+            input,
+            arrayOrigin,
             onStdout,
             onClear,
         ) {
             val str = it.split("/")
-            val file = runBlocking {
-                withTimeoutOrNull(100) {
-                    fileRepository.getEntryByPath(
-                        EntryPath(
-                            str.dropLast(1).map { FolderName(it) } + FileName(
-                                str.last()
-                            )
-                        ))
-                }
+            val file = withTimeoutOrNull(100) {
+                fileRepository.getEntryByPath(
+                    EntryPath(
+                        str.dropLast(1).map { FolderName(it) } + FileName(
+                            str.last()
+                        )
+                    ))
             }
+
             if (file is ProgramFile) {
-                val content =
-                    runBlocking { fileRepository.getFileContent(file) }.value
+                val content = fileRepository.getFileContent(file).value
                 val parser =
                     Parser(Lexer(content)).getOrElse { err ->
                         return@create DnclObject.RuntimeError(

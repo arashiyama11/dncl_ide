@@ -5,6 +5,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,34 +17,41 @@ import kotlin.time.TimeSource
 class BuiltInFunctionTest {
     private var stdout = ""
     private var clearCalled = false
-    private var evaluator: Evaluator = EvaluatorFactory.create(
-        input = "", 
-        arrayOrigin = 0, 
-        onStdout = {
-            stdout += "$it\n"
-        },
-        onClear = {
-            clearCalled = true
-        }
-    ) { DnclObject.Null(args[0].astNode) }
+    private lateinit var evaluator: Evaluator
 
     @BeforeTest
     fun setUp() {
         stdout = ""
         clearCalled = false
+        evaluator =
+            EvaluatorFactory.create(
+                input = "",
+                arrayOrigin = 0,
+                onStdout = {
+                    stdout += "$it\n"
+                },
+                onClear = {
+                    clearCalled = true
+                }
+            ) { DnclObject.Null(args[0].astNode) }
+
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!
 
     private fun testEval(program: String, expected: String) {
-        evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        runBlocking {
+            evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+        }
         assertEquals(expected, stdout)
     }
 
     private fun evalAndGetResult(program: String): DnclObject {
-        val result = evaluator.evalProgram(program.toProgram())
-        result.leftOrNull()?.let { fail(it.toString()) }
-        return result.getOrNull() ?: fail("Evaluation failed")
+        return runBlocking {
+            val result = evaluator.evalProgram(program.toProgram())
+            result.leftOrNull()?.let { fail(it.toString()) }
+            result.getOrNull() ?: fail("Evaluation failed")
+        }
     }
 
     // Tests for original built-in functions
@@ -340,6 +348,9 @@ class BuiltInFunctionTest {
 
         val elapsed = start.elapsedNow()
         assertTrue(result is DnclObject.Null)
-        assertTrue(elapsed >= Duration.parse("100ms"), "Sleep should pause execution for at least 100ms")
+        assertTrue(
+            elapsed >= Duration.parse("100ms"),
+            "Sleep should pause execution for at least 100ms"
+        )
     }
 }
