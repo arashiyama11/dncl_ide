@@ -35,7 +35,7 @@ sealed class LexerError(override val message: String, open val index: Int) :
             return@run Triple(0, 0, 0)
         }
 
-        return """line: $line, column: $column $spaces
+        return """行: $line, 列: $column $spaces
 $message
 ${programLines.subList(max(0, line - 5), max(1, line + 1)).joinToString("\n")}
 ${" ".repeat(spaces)}${"^"}
@@ -46,7 +46,7 @@ ${" ".repeat(spaces)}${"^"}
         val char: Char, override val index: Int,
         override val errorRange: IntRange = index..index
     ) :
-        LexerError("Unexpected character: $char", index)
+        LexerError("予期しない文字: $char", index)
 
     data class UnExpectedEOF(
         override val index: Int,
@@ -76,7 +76,7 @@ sealed class ParserError(
             return@run Triple(0, 0, 0)
         }
 
-        return """line: $line, column: $column
+        return """行: $line, 列: $column
 $message
 ${programLines.subList(max(0, line - 5), line + 1).joinToString("\n")}
 ${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.first))}"""
@@ -84,24 +84,24 @@ ${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.
 
     data class UnExpectedToken(override val failToken: Token, val expectedToken: String? = null) :
         ParserError(
-            "Unexpected token: ${failToken.literal}, ${if (expectedToken != null) "expected: $expectedToken" else ""}",
+            "予期しないトークン: ${failToken.literal}${if (expectedToken != null) "、期待されるトークン: $expectedToken" else ""}",
             failToken
         )
 
     data class InvalidIntLiteral(override val failToken: Token.Int) :
-        ParserError("Invalid integer literal: ${failToken.literal}", failToken)
+        ParserError("無効な整数リテラル: ${failToken.literal}", failToken)
 
     data class InvalidFloatLiteral(override val failToken: Token.Float) :
-        ParserError("Invalid float literal: ${failToken.literal}", failToken)
+        ParserError("無効な浮動小数点リテラル: ${failToken.literal}", failToken)
 
     data class UnknownPrefixOperator(override val failToken: Token) :
-        ParserError("Unexpected token (Unknown prefix operator): ${failToken.literal}", failToken)
+        ParserError("予期しないトークン（不明な前置演算子）: ${failToken.literal}", failToken)
 
     data class UnknownInfixOperator(override val failToken: Token) :
-        ParserError("Unexpected token (Unknown infix operator): ${failToken.literal}", failToken)
+        ParserError("予期しないトークン（不明な中置演算子）: ${failToken.literal}", failToken)
 
     data class IndentError(override val failToken: Token, val expected: String) :
-        ParserError("Indent Error: ${failToken.literal} expected: $expected", failToken) {
+        ParserError("インデントエラー: ${failToken.literal} 期待される値: $expected", failToken) {
         constructor(failToken: Token, expected: Int) : this(failToken, expected.toString())
     }
 

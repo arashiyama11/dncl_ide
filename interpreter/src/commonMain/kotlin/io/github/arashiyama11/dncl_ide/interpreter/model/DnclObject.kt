@@ -85,7 +85,7 @@ sealed interface DnclObject {
             expected: kotlin.String,
             actual: kotlin.String,
             astNode: AstNode,
-        ) : this("expected: $expected, actual: $actual", astNode)
+        ) : this("期待される型: $expected, 実際の型: $actual", astNode)
 
     }
 
@@ -96,5 +96,5 @@ sealed interface DnclObject {
         val index: kotlin.Int,
         val length: kotlin.Int,
         override val astNode: AstNode
-    ) : Error("index: $index, length: $length", astNode)
+    ) : Error("インデックス: $index, 配列の長さ: $length", astNode)
 }

@@ -48,7 +48,7 @@ class Evaluator(
                     node.parameters, node.body, env.createChildEnvironment(), node
                 )
 
-                is AstNode.WhileExpression -> raise(InternalError("while expression is not supported"))
+                is AstNode.WhileExpression -> raise(InternalError("while式はサポートされていません"))
             }
         }.mapLeft { InternalError(it.message ?: "") }.bind()
     }
@@ -131,7 +131,7 @@ class Evaluator(
         )
         while (true) {
             val loopCounterValue =
-                env.get(loopCounter) ?: raise(InternalError("loop counter not found"))
+                env.get(loopCounter) ?: raise(InternalError("ループカウンターが見つかりません"))
             if (stepType == AstNode.ForStatement.Companion.StepType.INCREMENT) {
                 if (loopCounterValue !is DnclObject.Int) return@either DnclObject.TypeError(
                     "Int",
@@ -532,7 +532,7 @@ class Evaluator(
     ): Either<DnclError, DnclObject> = either {
         env.get(identifier.value) ?: BuiltInFunction.from(identifier.value)
             ?.let { DnclObject.BuiltInFunction(it, identifier) }
-        ?: DnclObject.UndefinedError("identifier not found: ${identifier.value}", identifier)
+        ?: DnclObject.UndefinedError("識別子が見つかりません: ${identifier.value}", identifier)
     }
 
     private fun isTruthy(obj: DnclObject): Boolean = when (obj) {

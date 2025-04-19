@@ -64,7 +64,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 else -> parseExpressionStatement()
             }
 
-            is Token.Indent -> raise(ParserError.IndentError(currentToken, "in $indentStack"))
+            is Token.Indent -> raise(ParserError.IndentError(currentToken, "インデントスタック内: $indentStack"))
 
             else -> parseExpressionStatement()
         }.bind()
@@ -116,7 +116,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         raise(
             ParserError.UnExpectedToken(
                 currentToken,
-                "require NewLine and Indent :${Exception().stackTraceToString()}"
+                "改行とインデントが必要です :${Exception().stackTraceToString()}"
             )
         )
     }
@@ -149,7 +149,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         ) raise(
             ParserError.IndentError(
                 nextToken,
-                ">${indentStack.lastOrNull()}"
+                "より大きい値が必要: ${indentStack.lastOrNull()}"
             )
         )
         indentStack.add(startDepth)
@@ -171,7 +171,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
             if (!indentStack.contains(depth)) {
-                raise(ParserError.IndentError(nextToken, "in $indentStack"))
+                raise(ParserError.IndentError(nextToken, "インデントスタック内: $indentStack"))
             }
 
             if (depth < startDepth) {
@@ -257,7 +257,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val block = parseBlockStatement().bind()
         expectNextToken<Token.Indent>().bind()
         if ((currentToken as Token.Indent).depth != indentStack.lastOrNull()) {
-            raise(ParserError.IndentError(currentToken, indentStack.lastOrNull().toString()))
+            raise(ParserError.IndentError(currentToken, "期待されるインデント: ${indentStack.lastOrNull()}"))
         }
         expectNextToken<Token.Define>().bind()
         nextToken().bind()
@@ -276,7 +276,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             if (currentToken !is Token.Identifier) raise(
                 ParserError.UnExpectedToken(
                     currentToken,
-                    expectedToken = "Identifier"
+                    expectedToken = "識別子"
                 )
             )
             val identifier = (currentToken as Token.Identifier)
