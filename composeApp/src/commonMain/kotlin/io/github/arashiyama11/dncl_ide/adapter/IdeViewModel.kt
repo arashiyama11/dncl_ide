@@ -16,6 +16,7 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -123,6 +124,8 @@ class IdeViewModel(
             saveFile()
         }
 
+        executeJob?.cancel()
+
         executeJob = viewModelScope.launch {
             _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
@@ -159,17 +162,25 @@ class IdeViewModel(
                             )
                         }
                     }
+
+                    is DnclOutput.Clear -> {
+                        _uiState.update {
+                            it.copy(
+                                output = "",
+                                isError = false,
+                                errorRange = null
+                            )
+                        }
+                    }
                 }
             }
             delay(50)
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
-            executeJob = null
         }
     }
 
     fun onCancelButtonClicked() {
         executeJob?.cancel()
-        executeJob = null
     }
 
     fun insertText(text: String) {

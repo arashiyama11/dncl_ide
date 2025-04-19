@@ -42,11 +42,20 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         }
         return channelFlow {
             withContext(Dispatchers.Default) {
-                val evaluator = getEvaluator(input, arrayOrigin) {
-                    launch {
-                        send(DnclOutput.Stdout(it))
+                val evaluator = getEvaluator(
+                    input, 
+                    arrayOrigin,
+                    onStdout = { text ->
+                        launch {
+                            send(DnclOutput.Stdout(text))
+                        }
+                    },
+                    onClear = {
+                        launch {
+                            send(DnclOutput.Clear)
+                        }
                     }
-                }
+                )
 
                 evaluator.evalProgram(ast).let { err ->
                     if (err.isLeft()) {
@@ -67,9 +76,15 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
     private fun getEvaluator(
         input: String,
         arrayOrigin: Int,
-        onStdout: (String) -> Unit
+        onStdout: (String) -> Unit,
+        onClear: () -> Unit
     ): Evaluator {
-        return EvaluatorFactory.create(input, arrayOrigin, onStdout) {
+        return EvaluatorFactory.create(
+            input, 
+            arrayOrigin, 
+            onStdout,
+            onClear,
+        ) {
             val str = it.split("/")
             val file = runBlocking {
                 withTimeoutOrNull(100) {

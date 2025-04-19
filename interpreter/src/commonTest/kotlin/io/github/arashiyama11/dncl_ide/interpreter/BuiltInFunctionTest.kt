@@ -10,16 +10,27 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 class BuiltInFunctionTest {
     private var stdout = ""
-    private var evaluator: Evaluator = EvaluatorFactory.create("", 0, {
-        stdout += "$it\n"
-    }) { DnclObject.Null(args[0].astNode) }
+    private var clearCalled = false
+    private var evaluator: Evaluator = EvaluatorFactory.create(
+        input = "", 
+        arrayOrigin = 0, 
+        onStdout = {
+            stdout += "$it\n"
+        },
+        onClear = {
+            clearCalled = true
+        }
+    ) { DnclObject.Null(args[0].astNode) }
 
     @BeforeTest
     fun setUp() {
         stdout = ""
+        clearCalled = false
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!
@@ -310,5 +321,25 @@ class BuiltInFunctionTest {
         val result = evalAndGetResult("真偽値判定(1 == 1)")
         assertTrue(result is DnclObject.Boolean)
         assertEquals(true, result.value)
+    }
+
+    // System functions
+    @Test
+    fun testClear() {
+        val result = evalAndGetResult("出力消去()")
+        assertTrue(result is DnclObject.Null)
+        assertTrue(clearCalled, "onClear function should be called")
+    }
+
+    @Test
+    fun testSleep() {
+        val timeSource = TimeSource.Monotonic
+        val start = timeSource.markNow()
+
+        val result = evalAndGetResult("待機(100)")
+
+        val elapsed = start.elapsedNow()
+        assertTrue(result is DnclObject.Null)
+        assertTrue(elapsed >= Duration.parse("100ms"), "Sleep should pause execution for at least 100ms")
     }
 }

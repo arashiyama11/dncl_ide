@@ -11,4 +11,6 @@ sealed interface DnclOutput {
     data class Error(val value: String) : DnclOutput
 
     data class RuntimeError(val value: DnclObject.Error) : DnclOutput
+
+    object Clear : DnclOutput
 }

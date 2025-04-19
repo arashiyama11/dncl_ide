@@ -4,12 +4,15 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 
 object EvaluatorFactory {
     fun create(
         input: String,
         arrayOrigin: Int,
         onStdout: (String) -> Unit,
+        onClear: () -> Unit = {},
         onImport: CallBuiltInFunctionScope.(String) -> DnclObject
     ): Evaluator {
         return Evaluator(
@@ -584,6 +587,33 @@ object EvaluatorFactory {
                     BuiltInFunction.IS_BOOLEAN -> {
                         checkArgSize(args, 1)?.let { return@Evaluator it }
                         DnclObject.Boolean(args[0] is DnclObject.Boolean, args[0].astNode)
+                    }
+
+                    BuiltInFunction.CLEAR -> {
+                        onClear()
+                        // Use a valid AstNode from args if available, otherwise create a system literal
+                        val astNode = if (args.isNotEmpty()) args[0].astNode else AstNode.SystemLiteral("", 0..0)
+                        DnclObject.Null(astNode)
+                    }
+
+                    BuiltInFunction.SLEEP -> {
+                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        when (args[0]) {
+                            is DnclObject.Int -> {
+                                val milliseconds = (args[0] as DnclObject.Int).value.toLong()
+                                runBlocking { delay(milliseconds) }
+                                DnclObject.Null(args[0].astNode)
+                            }
+                            is DnclObject.Float -> {
+                                val milliseconds = (args[0] as DnclObject.Float).value.toLong()
+                                runBlocking { delay(milliseconds) }
+                                DnclObject.Null(args[0].astNode)
+                            }
+                            else -> DnclObject.TypeError(
+                                "第一引数は数値でなければなりません",
+                                args[0].astNode
+                            )
+                        }
                     }
                 }
             },

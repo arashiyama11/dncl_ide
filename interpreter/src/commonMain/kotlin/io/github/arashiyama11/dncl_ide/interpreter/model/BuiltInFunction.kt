@@ -18,7 +18,10 @@ enum class BuiltInFunction(private val identifier: String) {
 
     // 型チェック関数
     IS_INT("整数判定"), IS_FLOAT("浮動小数点判定"), IS_STRING("文字列判定"),
-    IS_ARRAY("配列判定"), IS_BOOLEAN("真偽値判定");
+    IS_ARRAY("配列判定"), IS_BOOLEAN("真偽値判定"),
+
+    // システム関数
+    CLEAR("出力消去"), SLEEP("待機");
 
     companion object {
         fun from(identifier: String): BuiltInFunction? =
