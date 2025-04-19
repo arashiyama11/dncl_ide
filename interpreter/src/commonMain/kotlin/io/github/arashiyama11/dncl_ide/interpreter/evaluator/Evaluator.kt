@@ -11,8 +11,15 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.InternalError
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 
+interface CallBuiltInFunctionScope {
+    val evaluator: Evaluator
+    val fn: BuiltInFunction
+    val args: List<DnclObject>
+    val env: Environment
+}
+
 class Evaluator(
-    private val onCallBuildInFunction: Evaluator.(BuiltInFunction, List<DnclObject>, Environment) -> DnclObject,
+    private val onCallBuildInFunction: CallBuiltInFunctionScope.() -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0
 ) : IEvaluator {
@@ -241,12 +248,15 @@ class Evaluator(
         val func =
             eval(callExpression.function, env).bind().onReturnValueOrError { return@either it }
         if (func is DnclObject.BuiltInFunction) {
-            return@either onCallBuildInFunction(
-                func.identifier,
-                callExpression.arguments.map {
-                    eval(it, env).bind().onReturnValueOrError { return@either it }
-                }, env
-            )
+            val args = callExpression.arguments.map {
+                eval(it, env).bind().onReturnValueOrError { return@either it }
+            }
+            return@either onCallBuildInFunction(object : CallBuiltInFunctionScope {
+                override val args: List<DnclObject> = args
+                override val env: Environment = env
+                override val evaluator: Evaluator = this@Evaluator
+                override val fn: BuiltInFunction = func.identifier
+            })
         }
 
         if (func !is DnclObject.Function) {

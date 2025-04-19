@@ -56,7 +56,7 @@ tsuri を 0 から 99 まで 1 ずつ増やしながら繰り返す：
     const val Sisaku2022_2 = """Data = [3,18,29,33,48,52,62,77,89,97]
 kazu = 要素数(Data)
 表示する("0～99の数字を入力してください")
-atai = 【外部からの入力】
+atai = 整数変換(【外部からの入力】)
 hidari = 0 , migi = kazu - 1
 owari = 0
 hidari <= migi and owari == 0 の間繰り返す:

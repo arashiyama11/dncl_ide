@@ -9,6 +9,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
@@ -65,299 +66,54 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         }
     }
 
-    private fun checkArgSize(
-        arg: List<DnclObject>,
-        expectedSize: Int,
-    ): DnclObject.ArgumentSizeError? {
-        return if (arg.size < expectedSize) DnclObject.ArgumentSizeError(
-            "引数が少ないです",
-            arg[0].astNode
-        )
-        else if (arg.size > expectedSize) DnclObject.ArgumentSizeError(
-            "引数が多すぎます",
-            arg[0].astNode
-        )
-        else null
-    }
-
     private fun getEvaluator(
         input: String,
         arrayOrigin: Int,
         onStdout: (String) -> Unit
     ): Evaluator {
-        return Evaluator(
-            { fn, arg, env ->
-                when (fn) {
-                    BuiltInFunction.PRINT -> {
-                        onStdout(arg.joinToString(" ") { it.toString() })
-                        DnclObject.Null(arg[0].astNode)
-                    }
-
-                    BuiltInFunction.LENGTH -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Array -> DnclObject.Int(
-                                (arg[0] as DnclObject.Array).value.size,
-                                arg[0].astNode
+        return EvaluatorFactory.create(input, arrayOrigin, onStdout) {
+            val str = it.split("/")
+            val file = runBlocking {
+                withTimeoutOrNull(100) {
+                    fileRepository.getEntryByPath(
+                        EntryPath(
+                            str.dropLast(1).map { FolderName(it) } + FileName(
+                                str.last()
                             )
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.DIFF -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value
-                                require(str.length == 1)
-                                if (str == " ") DnclObject.Int(
-                                    -1,
-                                    arg[0].astNode
-                                ) else DnclObject.Int(
-                                    str[0].code - 'a'.code,
-                                    arg[0].astNode
-                                )
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は文字列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.RETURN -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        DnclObject.ReturnValue(arg[0], arg[0].astNode)
-                    }
-
-                    BuiltInFunction.CONCAT -> {
-                        require(arg.size == 2) {
-                            "concat error"
-                        }
-                        when {
-                            arg[0] is DnclObject.Array && arg[1] is DnclObject.Array -> {
-                                val a = (arg[0] as DnclObject.Array).value
-                                val b = (arg[1] as DnclObject.Array).value
-                                DnclObject.Array((a + b).toMutableList(), arg[0].astNode)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数、第二引数ともに配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.PUSH -> {
-                        checkArgSize(arg, 2)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Array -> {
-                                val a = (arg[0] as DnclObject.Array).value
-                                val b = arg[1]
-                                a.add(b)
-                                DnclObject.Null(arg[0].astNode)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.SHIFT -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Array -> {
-                                val a = (arg[0] as DnclObject.Array).value
-                                if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(0)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.UNSHIFT -> {
-                        checkArgSize(arg, 2)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Array -> {
-                                val a = (arg[0] as DnclObject.Array).value
-                                val b = arg[1]
-                                a.add(0, b)
-                                DnclObject.Null(arg[0].astNode)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.POP -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Array -> {
-                                val a = (arg[0] as DnclObject.Array).value
-                                if (a.isEmpty()) DnclObject.Null(arg[0].astNode) else a.removeAt(a.size - 1)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は配列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.INT -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value
-                                DnclObject.Int(str.toIntOrNull() ?: 0, arg[0].astNode)
-                            }
-
-                            is DnclObject.Float -> {
-                                val flt = (arg[0] as DnclObject.Float).value
-                                DnclObject.Int(flt.toInt(), arg[0].astNode)
-                            }
-
-                            is DnclObject.Int -> arg[0]
-
-                            else -> DnclObject.TypeError(
-                                "文字列,小数,整数でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.FLOAT -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value
-                                DnclObject.Float(str.toFloatOrNull() ?: 0f, arg[0].astNode)
-                            }
-
-                            is DnclObject.Int -> {
-                                val int = (arg[0] as DnclObject.Int).value
-                                DnclObject.Float(int.toFloat(), arg[0].astNode)
-                            }
-
-                            is DnclObject.Float -> arg[0]
-
-                            else -> DnclObject.TypeError(
-                                "文字列,小数,整数でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.STRING -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        DnclObject.String(arg[0].toString(), arg[0].astNode)
-                    }
-
-                    BuiltInFunction.IMPORT -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value.split("/")
-                                val file = runBlocking {
-                                    withTimeoutOrNull(100) {
-                                        fileRepository.getEntryByPath(
-                                            EntryPath(
-                                                str.dropLast(1).map { FolderName(it) } + FileName(
-                                                    str.last()
-                                                )
-                                            ))
-                                    }
-                                }
-                                if (file is ProgramFile) {
-                                    val content =
-                                        runBlocking { fileRepository.getFileContent(file) }.value
-                                    val parser =
-                                        Parser(Lexer(content)).getOrElse { err ->
-                                            return@Evaluator DnclObject.RuntimeError(
-                                                err.explain(content),
-                                                arg[0].astNode
-                                            )
-                                        }
-
-                                    val prog = parser.parseProgram().getOrElse { err ->
-                                        return@Evaluator DnclObject.RuntimeError(
-                                            err.explain(content),
-                                            arg[0].astNode
-                                        )
-                                    }
-                                    evalProgram(prog, env)
-                                } else {
-                                    return@Evaluator DnclObject.RuntimeError(
-                                        "ファイル:$str が見つかりません",
-                                        arg[0].astNode
-                                    )
-                                }
-                            }
-
-                            else -> return@Evaluator DnclObject.TypeError("", arg[0].astNode)
-                        }
-                        DnclObject.Null(arg[0].astNode)
-                    }
-
-                    BuiltInFunction.CHAR_CODE -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.String -> {
-                                val str = (arg[0] as DnclObject.String).value
-                                if (str.length != 1) return@Evaluator DnclObject.RuntimeError(
-                                    "文字列の長さは1でなければなりません",
-                                    arg[0].astNode
-                                )
-                                DnclObject.Int(str[0].code, arg[0].astNode)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は文字列でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
-
-                    BuiltInFunction.FROM_CHAR_CODE -> {
-                        checkArgSize(arg, 1)?.let { return@Evaluator it }
-                        when (arg[0]) {
-                            is DnclObject.Int -> {
-                                val int = (arg[0] as DnclObject.Int).value
-                                DnclObject.String(int.toChar().toString(), arg[0].astNode)
-                            }
-
-                            else -> DnclObject.TypeError(
-                                "第一引数は正数でなければなりません",
-                                arg[0].astNode
-                            )
-                        }
-                    }
+                        ))
                 }
-            },
-            {
-                when (it) {
-                    is SystemCommand.Input -> {
-                        DnclObject.String(input, it.astNode)
+            }
+            if (file is ProgramFile) {
+                val content =
+                    runBlocking { fileRepository.getFileContent(file) }.value
+                val parser =
+                    Parser(Lexer(content)).getOrElse { err ->
+                        return@create DnclObject.RuntimeError(
+                            err.explain(content),
+                            args[0].astNode
+                        )
                     }
 
-                    is SystemCommand.Unknown -> {
-                        DnclObject.Null(it.astNode)
-                    }
+                val prog = parser.parseProgram().getOrElse { err ->
+                    return@create DnclObject.RuntimeError(
+                        err.explain(content),
+                        args[0].astNode
+                    )
                 }
-            }, arrayOrigin
-        )
+                evaluator.evalProgram(prog, env).fold(ifLeft = {
+                    DnclObject.RuntimeError(
+                        it.message.orEmpty(),
+                        args[0].astNode
+                    )
+                }, ifRight = {
+                    DnclObject.Null(args[0].astNode)
+                })
+            } else {
+                return@create DnclObject.RuntimeError(
+                    "ファイル:$str が見つかりません",
+                    args[0].astNode
+                )
+            }
+        }
     }
 }
