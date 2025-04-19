@@ -64,7 +64,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 else -> parseExpressionStatement()
             }
 
-            is Token.Indent -> raise(ParserError.IndentError(currentToken, "インデントスタック内: $indentStack"))
+            is Token.Indent -> raise(
+                ParserError.IndentError(
+                    currentToken,
+                    "インデントスタック内: $indentStack"
+                )
+            )
 
             else -> parseExpressionStatement()
         }.bind()
@@ -149,7 +154,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         ) raise(
             ParserError.IndentError(
                 nextToken,
-                "より大きい値が必要: ${indentStack.lastOrNull()}"
+                "${indentStack.lastOrNull()}より大きいインデントが必要です"
             )
         )
         indentStack.add(startDepth)
@@ -198,6 +203,11 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
         val consequence = parseBlockStatement().bind()
         requireEndOfLine().bind()
+        if (nextToken is Token.Indent) {
+            if ((nextToken as Token.Indent).depth != indentStack.lastOrNull()) {
+                return@either AstNode.IfStatement(condition, consequence, null)
+            }
+        }
         if (aheadToken is Token.Else) {
             expectNextToken<Token.Indent>().bind()
             expectNextToken<Token.Else>().bind()
@@ -257,7 +267,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val block = parseBlockStatement().bind()
         expectNextToken<Token.Indent>().bind()
         if ((currentToken as Token.Indent).depth != indentStack.lastOrNull()) {
-            raise(ParserError.IndentError(currentToken, "期待されるインデント: ${indentStack.lastOrNull()}"))
+            raise(
+                ParserError.IndentError(
+                    currentToken,
+                    "期待されるインデント: ${indentStack.lastOrNull()}"
+                )
+            )
         }
         expectNextToken<Token.Define>().bind()
         nextToken().bind()
