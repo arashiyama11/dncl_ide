@@ -109,7 +109,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
 
     override suspend fun getFileContent(programFile: ProgramFile): FileContent {
         return FileContent(
-            SystemFileSystem.source(programFile.path.toPath()).buffered().readString()
+            SystemFileSystem.source(programFile.path.toPath()).buffered().use { it.readString() }
         )
     }
 
