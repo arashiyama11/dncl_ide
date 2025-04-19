@@ -18,6 +18,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -60,58 +61,61 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
         }
     }
 
-    override suspend fun getRootFolder(): Folder {
-        return getEntryByPath(rootPath) as Folder
+    override suspend fun getRootFolder(): Folder = withContext(Dispatchers.IO) {
+        getEntryByPath(rootPath) as Folder
     }
 
-    override suspend fun getEntryByPath(entryPath: EntryPath): Entry? {
-        if (!SystemFileSystem.exists(entryPath.toPath())) return null
-        return when (SystemFileSystem.metadataOrNull(entryPath.toPath())?.isDirectory) {
-            null -> null
-            true -> {
-                val entries = SystemFileSystem.list(entryPath.toPath()).map {
-                    getEntryByPath(entryPath + FileName(it.name))
+    override suspend fun getEntryByPath(entryPath: EntryPath): Entry? =
+        withContext(Dispatchers.IO) {
+            if (!SystemFileSystem.exists(entryPath.toPath())) return@withContext null
+            when (SystemFileSystem.metadataOrNull(entryPath.toPath())?.isDirectory) {
+                null -> null
+                true -> {
+                    val entries = SystemFileSystem.list(entryPath.toPath()).map {
+                        getEntryByPath(entryPath + FileName(it.name))
+                    }
+                    Folder(
+                        name = FolderName(entryPath.value.last().value),
+                        path = entryPath,
+                        entities = entries.filterNotNull()
+                    )
                 }
-                Folder(
-                    name = FolderName(entryPath.value.last().value),
-                    path = entryPath,
-                    entities = entries.filterNotNull()
-                )
-            }
 
-            false -> {
-                ProgramFile(
-                    name = FileName(entryPath.value.last().value),
-                    path = entryPath,
-                )
+                false -> {
+                    ProgramFile(
+                        name = FileName(entryPath.value.last().value),
+                        path = entryPath,
+                    )
+                }
             }
         }
-    }
 
     override suspend fun saveFile(
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) {
+    ) = withContext(Dispatchers.IO) {
         SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
             it.writeString(fileContent.value)
         }
     }
 
-    override suspend fun createFolder(path: EntryPath) {
+    override suspend fun createFolder(path: EntryPath) = withContext(Dispatchers.IO) {
         SystemFileSystem.createDirectories(path.toPath())
     }
 
-    override suspend fun selectFile(entryPath: EntryPath) {
+    override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {
         (selectedEntryPath as MutableStateFlow).value = entryPath
         setting[SELECTED_ENTRY_PATH] = entryPath.toString()
     }
 
-    override suspend fun getFileContent(programFile: ProgramFile): FileContent {
-        return FileContent(
-            SystemFileSystem.source(programFile.path.toPath()).buffered().use { it.readString() }
-        )
-    }
+    override suspend fun getFileContent(programFile: ProgramFile): FileContent =
+        withContext(Dispatchers.IO) {
+            FileContent(
+                SystemFileSystem.source(programFile.path.toPath()).buffered()
+                    .use { it.readString() }
+            )
+        }
 
     override suspend fun getCursorPosition(programFile: ProgramFile): CursorPosition {
         return CursorPosition(0)
