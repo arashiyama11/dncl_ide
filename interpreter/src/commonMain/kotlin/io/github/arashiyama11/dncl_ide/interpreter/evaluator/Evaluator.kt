@@ -16,10 +16,11 @@ interface CallBuiltInFunctionScope {
     val fn: BuiltInFunction
     val args: List<DnclObject>
     val env: Environment
+    val astNode: AstNode
 }
 
 class Evaluator(
-    private val onCallBuildInFunction: suspend CallBuiltInFunctionScope.() -> DnclObject,
+    private val onCallBuiltInFunction: suspend CallBuiltInFunctionScope.() -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0
 ) : IEvaluator {
@@ -28,37 +29,38 @@ class Evaluator(
         return this
     }
 
-    override suspend fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> = either {
-        Either.catch {
-            when (node) {
-                is AstNode.Program -> evalProgram(node, env).bind()
-                is AstNode.BlockStatement -> evalBlockStatement(node, env).bind()
-                is AstNode.WhileStatement -> evalWhileStatement(node, env).bind()
-                is AstNode.IfStatement -> evalIfStatement(node, env).bind()
-                is AstNode.ForStatement -> evalForStatement(node, env).bind()
-                is AstNode.AssignStatement -> evalAssignStatement(node, env).bind()
-                is AstNode.ExpressionStatement -> evalExpressionStatement(node, env).bind()
-                is AstNode.FunctionStatement -> evalFunctionStatement(node, env).bind()
+    override suspend fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> =
+        either {
+            Either.catch {
+                when (node) {
+                    is AstNode.Program -> evalProgram(node, env).bind()
+                    is AstNode.BlockStatement -> evalBlockStatement(node, env).bind()
+                    is AstNode.WhileStatement -> evalWhileStatement(node, env).bind()
+                    is AstNode.IfStatement -> evalIfStatement(node, env).bind()
+                    is AstNode.ForStatement -> evalForStatement(node, env).bind()
+                    is AstNode.AssignStatement -> evalAssignStatement(node, env).bind()
+                    is AstNode.ExpressionStatement -> evalExpressionStatement(node, env).bind()
+                    is AstNode.FunctionStatement -> evalFunctionStatement(node, env).bind()
 
-                is AstNode.IndexExpression -> evalIndexExpression(node, env).bind()
-                is AstNode.CallExpression -> evalCallExpression(node, env).bind()
-                is AstNode.InfixExpression -> evalInfixExpression(node, env).bind()
-                is AstNode.PrefixExpression -> evalPrefixExpression(node, env).bind()
+                    is AstNode.IndexExpression -> evalIndexExpression(node, env).bind()
+                    is AstNode.CallExpression -> evalCallExpression(node, env).bind()
+                    is AstNode.InfixExpression -> evalInfixExpression(node, env).bind()
+                    is AstNode.PrefixExpression -> evalPrefixExpression(node, env).bind()
 
-                is AstNode.ArrayLiteral -> evalArrayLiteral(node, env).bind()
-                is AstNode.Identifier -> evalIdentifier(node, env).bind()
-                is AstNode.FloatLiteral -> DnclObject.Float(node.value, node)
-                is AstNode.IntLiteral -> DnclObject.Int(node.value, node)
-                is AstNode.StringLiteral -> DnclObject.String(node.value, node)
-                is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node))
-                is AstNode.FunctionLiteral -> DnclObject.Function(
-                    node.parameters, node.body, env.createChildEnvironment(), node
-                )
+                    is AstNode.ArrayLiteral -> evalArrayLiteral(node, env).bind()
+                    is AstNode.Identifier -> evalIdentifier(node, env).bind()
+                    is AstNode.FloatLiteral -> DnclObject.Float(node.value, node)
+                    is AstNode.IntLiteral -> DnclObject.Int(node.value, node)
+                    is AstNode.StringLiteral -> DnclObject.String(node.value, node)
+                    is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node))
+                    is AstNode.FunctionLiteral -> DnclObject.Function(
+                        node.parameters, node.body, env.createChildEnvironment(), node
+                    )
 
-                is AstNode.WhileExpression -> raise(InternalError("while式はサポートされていません"))
-            }
-        }.mapLeft { InternalError(it.message ?: "") }.bind()
-    }
+                    is AstNode.WhileExpression -> raise(InternalError("while式はサポートされていません"))
+                }
+            }.mapLeft { InternalError(it.message ?: "") }.bind()
+        }
 
     override suspend fun evalProgram(
         program: AstNode.Program, env: Environment
@@ -251,11 +253,12 @@ class Evaluator(
             val args = callExpression.arguments.map {
                 eval(it, env).bind().onReturnValueOrError { return@either it }
             }
-            return@either onCallBuildInFunction(object : CallBuiltInFunctionScope {
+            return@either onCallBuiltInFunction(object : CallBuiltInFunctionScope {
                 override val args: List<DnclObject> = args
                 override val env: Environment = env
                 override val evaluator: Evaluator = this@Evaluator
                 override val fn: BuiltInFunction = func.identifier
+                override val astNode: AstNode = callExpression
             })
         }
 

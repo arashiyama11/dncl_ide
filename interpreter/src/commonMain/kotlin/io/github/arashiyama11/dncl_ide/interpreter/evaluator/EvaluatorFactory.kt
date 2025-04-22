@@ -1,6 +1,5 @@
 package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 
-import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
@@ -10,8 +9,8 @@ object EvaluatorFactory {
     fun create(
         input: String,
         arrayOrigin: Int,
-        onStdout: suspend (String) -> Unit,
-        onClear: suspend () -> Unit = {},
+        onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
+        onClear: suspend CallBuiltInFunctionScope.() -> Unit = {},
         onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject
     ): Evaluator {
         return Evaluator(
@@ -19,88 +18,86 @@ object EvaluatorFactory {
                 when (fn) {
                     BuiltInFunction.PRINT -> {
                         onStdout(args.joinToString(" ") { it.toString() })
-                        DnclObject.Null(args[0].astNode)
+                        DnclObject.Null(astNode)
                     }
 
                     BuiltInFunction.LENGTH -> {
-                        checkArgSize(this.args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> DnclObject.Int(
                                 (args[0] as DnclObject.Array).value.size,
-                                args[0].astNode
+                                astNode
                             )
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.DIFF -> {
-                        checkArgSize(this.args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
                                 require(str.length == 1)
                                 if (str == " ") DnclObject.Int(
                                     -1,
-                                    args[0].astNode
+                                    astNode
                                 ) else DnclObject.Int(
                                     str[0].code - 'a'.code,
-                                    args[0].astNode
+                                    astNode
                                 )
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.RETURN -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.ReturnValue(args[0], args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.ReturnValue(args[0], astNode)
                     }
 
                     BuiltInFunction.CONCAT -> {
-                        require(args.size == 2) {
-                            "concat error"
-                        }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.Array && args[1] is DnclObject.Array -> {
                                 val a = (args[0] as DnclObject.Array).value
                                 val b = (args[1] as DnclObject.Array).value
-                                DnclObject.Array((a + b).toMutableList(), args[0].astNode)
+                                DnclObject.Array((a + b).toMutableList(), astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数、第二引数ともに配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.PUSH -> {
-                        checkArgSize(args, 2)?.let { return@Evaluator it }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val a = (args[0] as DnclObject.Array).value
                                 val b = args[1]
                                 a.add(b)
-                                DnclObject.Null(args[0].astNode)
+                                DnclObject.Null(astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.SHIFT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val a = (args[0] as DnclObject.Array).value
@@ -109,140 +106,140 @@ object EvaluatorFactory {
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.UNSHIFT -> {
-                        checkArgSize(args, 2)?.let { return@Evaluator it }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val a = (args[0] as DnclObject.Array).value
                                 val b = args[1]
                                 a.add(0, b)
-                                DnclObject.Null(args[0].astNode)
+                                DnclObject.Null(astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.POP -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val a = (args[0] as DnclObject.Array).value
-                                if (a.isEmpty()) DnclObject.Null(args[0].astNode) else a.removeAt(a.size - 1)
+                                if (a.isEmpty()) DnclObject.Null(astNode) else a.removeAt(a.size - 1)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.INT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
-                                DnclObject.Int(str.toIntOrNull() ?: 0, args[0].astNode)
+                                DnclObject.Int(str.toIntOrNull() ?: 0, astNode)
                             }
 
                             is DnclObject.Float -> {
                                 val flt = (args[0] as DnclObject.Float).value
-                                DnclObject.Int(flt.toInt(), args[0].astNode)
+                                DnclObject.Int(flt.toInt(), astNode)
                             }
 
                             is DnclObject.Int -> args[0]
 
                             else -> DnclObject.TypeError(
                                 "文字列,小数,整数でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.FLOAT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
-                                DnclObject.Float(str.toFloatOrNull() ?: 0f, args[0].astNode)
+                                DnclObject.Float(str.toFloatOrNull() ?: 0f, astNode)
                             }
 
                             is DnclObject.Int -> {
                                 val int = (args[0] as DnclObject.Int).value
-                                DnclObject.Float(int.toFloat(), args[0].astNode)
+                                DnclObject.Float(int.toFloat(), astNode)
                             }
 
                             is DnclObject.Float -> args[0]
 
                             else -> DnclObject.TypeError(
                                 "文字列,小数,整数でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.STRING -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.String(args[0].toString(), args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.String(args[0].toString(), astNode)
                     }
 
                     BuiltInFunction.IMPORT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 onImport((args[0] as DnclObject.String).value)
                             }
 
-                            else -> return@Evaluator DnclObject.TypeError("", args[0].astNode)
+                            else -> return@Evaluator DnclObject.TypeError("", astNode)
                         }
                     }
 
                     BuiltInFunction.CHAR_CODE -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
                                 if (str.length != 1) return@Evaluator DnclObject.RuntimeError(
                                     "文字列の長さは1でなければなりません",
-                                    args[0].astNode
+                                    astNode
                                 )
-                                DnclObject.Int(str[0].code, args[0].astNode)
+                                DnclObject.Int(str[0].code, astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.FROM_CHAR_CODE -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Int -> {
                                 val int = (args[0] as DnclObject.Int).value
-                                DnclObject.String(int.toChar().toString(), args[0].astNode)
+                                DnclObject.String(int.toChar().toString(), astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は正数でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     // 配列操作関数
                     BuiltInFunction.SLICE -> {
-                        checkArgSize(args, 3)?.let { return@Evaluator it }
+                        checkArgSize(3)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.Array && args[1] is DnclObject.Int && args[2] is DnclObject.Int -> {
                                 val array = (args[0] as DnclObject.Array).value
@@ -252,44 +249,44 @@ object EvaluatorFactory {
                                     DnclObject.IndexOutOfRangeError(
                                         start,
                                         array.size,
-                                        args[0].astNode
+                                        astNode
                                     )
                                 } else {
                                     DnclObject.Array(
                                         array.subList(start, end).toMutableList(),
-                                        args[0].astNode
+                                        astNode
                                     )
                                 }
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列、第二引数と第三引数は整数でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.JOIN -> {
-                        checkArgSize(args, 2)?.let { return@Evaluator it }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.Array && args[1] is DnclObject.String -> {
                                 val array = (args[0] as DnclObject.Array).value
                                 val separator = (args[1] as DnclObject.String).value
                                 DnclObject.String(
                                     array.joinToString(separator) { it.toString() },
-                                    args[0].astNode
+                                    astNode
                                 )
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列、第二引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.SORT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val array = (args[0] as DnclObject.Array).value
@@ -307,52 +304,52 @@ object EvaluatorFactory {
                                         else -> 0
                                     }
                                 }.toMutableList()
-                                DnclObject.Array(sortedArray, args[0].astNode)
+                                DnclObject.Array(sortedArray, astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.REVERSE -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val array = (args[0] as DnclObject.Array).value
-                                DnclObject.Array(array.reversed().toMutableList(), args[0].astNode)
+                                DnclObject.Array(array.reversed().toMutableList(), astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.FIND -> {
-                        checkArgSize(args, 2)?.let { return@Evaluator it }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Array -> {
                                 val array = (args[0] as DnclObject.Array).value
                                 val target = args[1]
                                 val index =
                                     array.indexOfFirst { it.toString() == target.toString() }
-                                DnclObject.Int(index, args[0].astNode)
+                                DnclObject.Int(index, astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は配列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     // 文字列操作関数
                     BuiltInFunction.SUBSTRING -> {
-                        checkArgSize(args, 3)?.let { return@Evaluator it }
+                        checkArgSize(3)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.String && args[1] is DnclObject.Int && args[2] is DnclObject.Int -> {
                                 val str = (args[0] as DnclObject.String).value
@@ -362,22 +359,22 @@ object EvaluatorFactory {
                                     DnclObject.IndexOutOfRangeError(
                                         start,
                                         str.length,
-                                        args[0].astNode
+                                        astNode
                                     )
                                 } else {
-                                    DnclObject.String(str.substring(start, end), args[0].astNode)
+                                    DnclObject.String(str.substring(start, end), astNode)
                                 }
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は文字列、第二引数と第三引数は整数でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.SPLIT -> {
-                        checkArgSize(args, 2)?.let { return@Evaluator it }
+                        checkArgSize(2)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.String && args[1] is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
@@ -386,115 +383,111 @@ object EvaluatorFactory {
                                 val result = parts.map {
                                     DnclObject.String(
                                         it,
-                                        args[0].astNode
+                                        astNode
                                     ) as DnclObject
                                 }
                                     .toMutableList()
-                                DnclObject.Array(result, args[0].astNode)
+                                DnclObject.Array(result, astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数と第二引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.TRIM -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
-                                DnclObject.String(str.trim(), args[0].astNode)
+                                DnclObject.String(str.trim(), astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "第一引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.REPLACE -> {
-                        checkArgSize(args, 3)?.let { return@Evaluator it }
+                        checkArgSize(3)?.let { return@Evaluator it }
                         when {
                             args[0] is DnclObject.String && args[1] is DnclObject.String && args[2] is DnclObject.String -> {
                                 val str = (args[0] as DnclObject.String).value
                                 val oldValue = (args[1] as DnclObject.String).value
                                 val newValue = (args[2] as DnclObject.String).value
-                                DnclObject.String(str.replace(oldValue, newValue), args[0].astNode)
+                                DnclObject.String(str.replace(oldValue, newValue), astNode)
                             }
 
                             else -> DnclObject.TypeError(
                                 "すべての引数は文字列でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     // 数学関数
                     BuiltInFunction.ROUND -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Float -> {
                                 val value = (args[0] as DnclObject.Float).value
                                 DnclObject.Int(
                                     kotlin.math.round(value.toDouble()).toInt(),
-                                    args[0].astNode
+                                    astNode
                                 )
                             }
 
                             is DnclObject.Int -> args[0]
                             else -> DnclObject.TypeError(
                                 "第一引数は数値でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.FLOOR -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Float -> {
                                 val value = (args[0] as DnclObject.Float).value
                                 DnclObject.Int(
                                     kotlin.math.floor(value.toDouble()).toInt(),
-                                    args[0].astNode
+                                    astNode
                                 )
                             }
 
                             is DnclObject.Int -> args[0]
                             else -> DnclObject.TypeError(
                                 "第一引数は数値でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.CEIL -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Float -> {
                                 val value = (args[0] as DnclObject.Float).value
                                 DnclObject.Int(
                                     kotlin.math.ceil(value.toDouble()).toInt(),
-                                    args[0].astNode
+                                    astNode
                                 )
                             }
 
                             is DnclObject.Int -> args[0]
                             else -> DnclObject.TypeError(
                                 "第一引数は数値でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
                     }
 
                     BuiltInFunction.RANDOM -> {
-                        // For random function with no arguments, we need a valid AstNode
-                        // Use a system literal if args is empty
-                        val astNode =
-                            if (args.isEmpty()) AstNode.SystemLiteral("", 0..0) else args[0].astNode
                         DnclObject.Float(kotlin.random.Random.nextFloat(), astNode)
                     }
 
@@ -502,7 +495,7 @@ object EvaluatorFactory {
                         if (args.isEmpty()) {
                             return@Evaluator DnclObject.ArgumentSizeError(
                                 "引数が少ないです",
-                                args[0].astNode
+                                astNode
                             )
                         }
 
@@ -510,7 +503,7 @@ object EvaluatorFactory {
                         if (!allNumbers) {
                             return@Evaluator DnclObject.TypeError(
                                 "すべての引数は数値でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
 
@@ -534,7 +527,7 @@ object EvaluatorFactory {
                         if (args.isEmpty()) {
                             return@Evaluator DnclObject.ArgumentSizeError(
                                 "引数が少ないです",
-                                args[0].astNode
+                                astNode
                             )
                         }
 
@@ -542,7 +535,7 @@ object EvaluatorFactory {
                         if (!allNumbers) {
                             return@Evaluator DnclObject.TypeError(
                                 "すべての引数は数値でなければなりません",
-                                args[0].astNode
+                                astNode
                             )
                         }
 
@@ -556,51 +549,45 @@ object EvaluatorFactory {
 
                         val minValue = values.minOrNull() ?: 0f
                         if (minValue == minValue.toInt().toFloat()) {
-                            DnclObject.Int(minValue.toInt(), args[0].astNode)
+                            DnclObject.Int(minValue.toInt(), astNode)
                         } else {
-                            DnclObject.Float(minValue, args[0].astNode)
+                            DnclObject.Float(minValue, astNode)
                         }
                     }
 
                     // 型チェック関数
                     BuiltInFunction.IS_INT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.Boolean(args[0] is DnclObject.Int, args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.Boolean(args[0] is DnclObject.Int, astNode)
                     }
 
                     BuiltInFunction.IS_FLOAT -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.Boolean(args[0] is DnclObject.Float, args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.Boolean(args[0] is DnclObject.Float, astNode)
                     }
 
                     BuiltInFunction.IS_STRING -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.Boolean(args[0] is DnclObject.String, args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.Boolean(args[0] is DnclObject.String, astNode)
                     }
 
                     BuiltInFunction.IS_ARRAY -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.Boolean(args[0] is DnclObject.Array, args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.Boolean(args[0] is DnclObject.Array, astNode)
                     }
 
                     BuiltInFunction.IS_BOOLEAN -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
-                        DnclObject.Boolean(args[0] is DnclObject.Boolean, args[0].astNode)
+                        checkArgSize(1)?.let { return@Evaluator it }
+                        DnclObject.Boolean(args[0] is DnclObject.Boolean, astNode)
                     }
 
                     BuiltInFunction.CLEAR -> {
                         onClear()
-                        // Use a valid AstNode from args if available, otherwise create a system literal
-                        val astNode =
-                            if (args.isNotEmpty()) args[0].astNode else AstNode.SystemLiteral(
-                                "",
-                                0..0
-                            )
                         DnclObject.Null(astNode)
                     }
 
                     BuiltInFunction.SLEEP -> {
-                        checkArgSize(args, 1)?.let { return@Evaluator it }
+                        checkArgSize(1)?.let { return@Evaluator it }
                         when (args[0]) {
                             is DnclObject.Int -> {
                                 val milliseconds = (args[0] as DnclObject.Int).value.toLong()
@@ -636,17 +623,16 @@ object EvaluatorFactory {
         )
     }
 
-    private fun checkArgSize(
-        arg: List<DnclObject>,
+    private fun CallBuiltInFunctionScope.checkArgSize(
         expectedSize: Int,
     ): DnclObject.ArgumentSizeError? {
-        return if (arg.size < expectedSize) DnclObject.ArgumentSizeError(
+        return if (args.size < expectedSize) DnclObject.ArgumentSizeError(
             "引数が少ないです",
-            arg[0].astNode
+            astNode
         )
-        else if (arg.size > expectedSize) DnclObject.ArgumentSizeError(
+        else if (args.size > expectedSize) DnclObject.ArgumentSizeError(
             "引数が多すぎます",
-            arg[0].astNode
+            astNode
         )
         else null
     }

@@ -208,7 +208,7 @@ sealed interface AstNode {
             get() = "${function.literal}(${arguments.joinToString(separator = ", ") { it.literal }})"
 
         override val range: IntRange
-            get() = function.range.first..(arguments.lastOrNull()?.range?.last
-                ?: function.range.last)
+            get() = function.range.first..(arguments.lastOrNull()?.range?.last?.plus(2)
+                ?: (function.range.last + 3))
     }
 }

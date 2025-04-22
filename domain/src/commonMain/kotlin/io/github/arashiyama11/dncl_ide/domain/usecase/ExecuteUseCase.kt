@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
@@ -68,8 +69,8 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
     private fun getEvaluator(
         input: String,
         arrayOrigin: Int,
-        onStdout: suspend (String) -> Unit,
-        onClear: suspend () -> Unit
+        onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
+        onClear: suspend CallBuiltInFunctionScope.() -> Unit
     ): Evaluator {
         return EvaluatorFactory.create(
             input,
