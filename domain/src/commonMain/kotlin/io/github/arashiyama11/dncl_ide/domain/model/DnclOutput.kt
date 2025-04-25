@@ -12,5 +12,7 @@ sealed interface DnclOutput {
 
     data class RuntimeError(val value: DnclObject.Error) : DnclOutput
 
+    data class LineEvaluation(val lineNumber: Int) : DnclOutput
+
     object Clear : DnclOutput
 }

@@ -52,7 +52,9 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
                         send(DnclOutput.Clear)
                     },
                     onEval = { astNode, environment ->
-                        onEvaluate(astNode, environment, program)
+                        val lineNumber = calculateLineNumber(astNode, program)
+                        send(DnclOutput.LineEvaluation(lineNumber))
+                        delay(10)
                     }
                 )
 
@@ -68,21 +70,17 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         }
     }
 
-    private suspend fun onEvaluate(astNode: AstNode, environment: Environment, program: String) {
+    private fun calculateLineNumber(astNode: AstNode, program: String): Int {
         val index = astNode.range.first
-        val line = run {
-            var idx = 0
-            for ((i, line) in program.lines().withIndex()) {
-                if (idx + line.length < index) {
-                    idx += line.length + 1
-                } else {
-                    return@run i
-                }
+        var idx = 0
+        for ((i, line) in program.lines().withIndex()) {
+            if (idx + line.length < index) {
+                idx += line.length + 1
+            } else {
+                return i
             }
-            return@run 0
         }
-        println("Evaluating: $line,env:${environment}")
-        delay(10)
+        return 0
     }
 
     private fun getEvaluator(

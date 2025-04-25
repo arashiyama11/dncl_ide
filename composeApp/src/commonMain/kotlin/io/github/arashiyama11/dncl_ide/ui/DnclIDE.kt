@@ -36,6 +36,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
             modifier = Modifier
                 .weight(2f),
             fontSize = uiState.fontSize,
+            currentEvaluatingLine = uiState.currentEvaluatingLine,
         )
 
         Row(

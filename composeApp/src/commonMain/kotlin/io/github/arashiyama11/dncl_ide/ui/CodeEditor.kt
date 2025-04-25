@@ -35,10 +35,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Job
@@ -51,6 +54,7 @@ fun CodeEditor(
     modifier: Modifier = Modifier,
     fontSize: Int,
     onCodeChange: (TextFieldValue) -> Unit,
+    currentEvaluatingLine: Int? = null,
 ) {
     val fontSizeFloat =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
@@ -123,12 +127,25 @@ fun CodeEditor(
                     lines.lastIndex
                 }
                 lines.forEachIndexed { index, _ ->
+                    val string = buildAnnotatedString {
+                        if (currentEvaluatingLine == index) {
+                            withStyle(SpanStyle(color = Color.Green)) {
+                                append(">> ")
+                            }
+                        }
+                        append("${index + 1}")
+                    }
                     Text(
-                        text = "${index + 1}",
+                        text = string,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(lineHeightDp)
                             .padding(horizontal = 4.dp),
+                        //.background(
+                        /* if (currentEvaluatingLine == index)
+                             if (isSystemInDarkTheme()) Color(0xFF3F51B5) else Color(0xFFBBDEFB)
+                         else*? Color.Transparent
+                     ),*/
                         style = codeStyle.copy(
                             color = if (selectLine == index)
                                 if (isSystemInDarkTheme()) Color.LightGray else Color.Black

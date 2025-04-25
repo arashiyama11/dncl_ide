@@ -18,6 +18,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -27,6 +28,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
+import kotlin.coroutines.EmptyCoroutineContext
 
 
 data class IdeUiState(
@@ -38,7 +41,8 @@ data class IdeUiState(
     val isError: Boolean = false,
     val errorRange: IntRange? = null,
     val isInputMode: Boolean = false,
-    val fontSize: Int = DEFAULT_FONT_SIZE
+    val fontSize: Int = DEFAULT_FONT_SIZE,
+    val currentEvaluatingLine: Int? = null
 )
 
 class IdeViewModel(
@@ -59,6 +63,7 @@ class IdeViewModel(
 
     fun onPause() {
         viewModelScope.launch {
+            Dispatchers.IO
             saveFile()
         }
     }
@@ -127,7 +132,14 @@ class IdeViewModel(
         executeJob?.cancel()
 
         executeJob = viewModelScope.launch {
-            _uiState.update { it.copy(output = "", isError = false, errorRange = null) }
+            _uiState.update {
+                it.copy(
+                    output = "",
+                    isError = false,
+                    errorRange = null,
+                    currentEvaluatingLine = null
+                )
+            }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
 
             executeUseCase(
@@ -172,15 +184,25 @@ class IdeViewModel(
                             )
                         }
                     }
+
+                    is DnclOutput.LineEvaluation -> {
+                        _uiState.update {
+                            it.copy(
+                                currentEvaluatingLine = output.lineNumber
+                            )
+                        }
+                    }
                 }
             }
             delay(50)
+            _uiState.update { it.copy(currentEvaluatingLine = null) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
         }
     }
 
     fun onCancelButtonClicked() {
         executeJob?.cancel()
+        _uiState.update { it.copy(currentEvaluatingLine = null) }
     }
 
     fun insertText(text: String) {
