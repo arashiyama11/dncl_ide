@@ -1,7 +1,9 @@
 package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
 import kotlinx.coroutines.delay
 
@@ -11,7 +13,8 @@ object EvaluatorFactory {
         arrayOrigin: Int,
         onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
         onClear: suspend CallBuiltInFunctionScope.() -> Unit = {},
-        onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject
+        onEval: (suspend (AstNode, Environment) -> Unit)? = null,
+        onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
     ): Evaluator {
         return Evaluator(
             {
@@ -619,7 +622,7 @@ object EvaluatorFactory {
                         DnclObject.Null(it.astNode)
                     }
                 }
-            }, arrayOrigin
+            }, arrayOrigin, onEval
         )
     }
 

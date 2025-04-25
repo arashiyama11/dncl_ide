@@ -11,16 +11,15 @@ import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -51,6 +50,9 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
                     },
                     onClear = {
                         send(DnclOutput.Clear)
+                    },
+                    onEval = { astNode, environment ->
+                        onEvaluate(astNode, environment, program)
                     }
                 )
 
@@ -66,17 +68,36 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         }
     }
 
+    private suspend fun onEvaluate(astNode: AstNode, environment: Environment, program: String) {
+        val index = astNode.range.first
+        val line = run {
+            var idx = 0
+            for ((i, line) in program.lines().withIndex()) {
+                if (idx + line.length < index) {
+                    idx += line.length + 1
+                } else {
+                    return@run i
+                }
+            }
+            return@run 0
+        }
+        println("Evaluating: $line,env:${environment}")
+        delay(10)
+    }
+
     private fun getEvaluator(
         input: String,
         arrayOrigin: Int,
         onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
-        onClear: suspend CallBuiltInFunctionScope.() -> Unit
+        onClear: suspend CallBuiltInFunctionScope.() -> Unit,
+        onEval: suspend (AstNode, Environment) -> Unit
     ): Evaluator {
         return EvaluatorFactory.create(
             input,
             arrayOrigin,
             onStdout,
             onClear,
+            onEval
         ) {
             val str = it.split("/")
             val file = withTimeoutOrNull(100) {

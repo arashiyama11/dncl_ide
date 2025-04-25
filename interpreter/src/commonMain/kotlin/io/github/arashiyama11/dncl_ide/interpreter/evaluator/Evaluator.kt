@@ -22,7 +22,8 @@ interface CallBuiltInFunctionScope {
 class Evaluator(
     private val onCallBuiltInFunction: suspend CallBuiltInFunctionScope.() -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
-    private val arrayOrigin: Int = 0
+    private val arrayOrigin: Int = 0,
+    private val onEval: (suspend (AstNode, Environment) -> Unit)? = null
 ) : IEvaluator {
     private inline fun DnclObject.onReturnValueOrError(action: (DnclObject) -> Unit): DnclObject {
         if (this is DnclObject.ReturnValue || this is DnclObject.Error) action(this)
@@ -32,6 +33,7 @@ class Evaluator(
     override suspend fun eval(node: AstNode, env: Environment): Either<DnclError, DnclObject> =
         either {
             Either.catch {
+                onEval?.invoke(node, env)
                 when (node) {
                     is AstNode.Program -> evalProgram(node, env).bind()
                     is AstNode.BlockStatement -> evalBlockStatement(node, env).bind()

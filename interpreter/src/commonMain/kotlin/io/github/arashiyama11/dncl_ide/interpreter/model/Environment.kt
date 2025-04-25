@@ -14,4 +14,8 @@ class Environment(private val outer: Environment? = null) {
     fun createChildEnvironment(): Environment {
         return Environment(this)
     }
+
+    override fun toString(): String {
+        return store.toString()
+    }
 }
