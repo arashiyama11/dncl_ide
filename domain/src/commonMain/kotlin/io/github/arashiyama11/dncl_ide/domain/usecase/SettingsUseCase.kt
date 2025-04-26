@@ -5,6 +5,8 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 class SettingsUseCase(private val settingsRepository: SettingsRepository) {
     val arrayOriginIndex = settingsRepository.arrayOriginIndex
     val fontSize = settingsRepository.fontSize
+    val onEvalDelay = settingsRepository.onEvalDelay
+    val debugMode = settingsRepository.debugMode
 
     fun setListFirstIndex(index: Int) {
         settingsRepository.setListFirstIndex(index)
@@ -12,5 +14,13 @@ class SettingsUseCase(private val settingsRepository: SettingsRepository) {
 
     fun setFontSize(size: Int) {
         settingsRepository.setFontSize(size)
+    }
+
+    fun setOnEvalDelay(delay: Int) {
+        settingsRepository.setOnEvalDelay(delay)
+    }
+
+    fun setDebugMode(enabled: Boolean) {
+        settingsRepository.setDebugMode(enabled)
     }
 }

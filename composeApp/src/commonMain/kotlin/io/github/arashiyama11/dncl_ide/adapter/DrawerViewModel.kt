@@ -8,7 +8,9 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ON_EVAL_DELAY
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
@@ -34,7 +36,9 @@ data class DrawerUiState(
     val inputtingFileName: String? = null,
     val lastClickedFolder: Folder? = null,
     val list1IndexSwitchEnabled: Boolean = false,
-    val fontSize: Int = DEFAULT_FONT_SIZE
+    val fontSize: Int = DEFAULT_FONT_SIZE,
+    val onEvalDelay: Int = DEFAULT_ON_EVAL_DELAY,
+    val debugModeEnabled: Boolean = DEFAULT_DEBUG_MODE
 )
 
 class DrawerViewModel(
@@ -54,6 +58,10 @@ class DrawerViewModel(
             list1IndexSwitchEnabled = arrayOrigin == 1,
             fontSize = fontSize
         )
+    }.combine(settingsUseCase.onEvalDelay) { state, onEvalDelay ->
+        state.copy(onEvalDelay = onEvalDelay)
+    }.combine(settingsUseCase.debugMode) { state, debugMode ->
+        state.copy(debugModeEnabled = debugMode)
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
     private var focusRequester: FocusRequester? = null
@@ -136,6 +144,14 @@ class DrawerViewModel(
 
     fun onList1IndexSwitchClicked(enabled: Boolean) {
         settingsUseCase.setListFirstIndex(if (enabled) 1 else 0)
+    }
+
+    fun onOnEvalDelayChanged(delay: Int) {
+        settingsUseCase.setOnEvalDelay(delay)
+    }
+
+    fun onDebugModeChanged(enabled: Boolean) {
+        settingsUseCase.setDebugMode(enabled)
     }
 
     private fun onFileAddConfirmed(newFileName: String) {

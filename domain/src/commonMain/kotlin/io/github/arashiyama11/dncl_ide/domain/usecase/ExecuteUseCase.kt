@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
@@ -23,7 +24,10 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-class ExecuteUseCase(private val fileRepository: FileRepository) {
+class ExecuteUseCase(
+    private val fileRepository: FileRepository,
+    private val settingsRepository: SettingsRepository
+) {
     operator fun invoke(program: String, input: String, arrayOrigin: Int): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
@@ -42,6 +46,7 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         }
         return channelFlow {
             withContext(Dispatchers.Default) {
+                val delayDuration = settingsRepository.onEvalDelay.value.toLong()
                 val evaluator = getEvaluator(
                     input,
                     arrayOrigin,
@@ -51,11 +56,11 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
                     onClear = {
                         send(DnclOutput.Clear)
                     },
-                    onEval = { astNode, environment ->
+                    onEval = if (settingsRepository.debugMode.value) { astNode, environment ->
                         val lineNumber = calculateLineNumber(astNode, program)
                         send(DnclOutput.LineEvaluation(lineNumber))
-                        delay(10)
-                    }
+                        delay(delayDuration)
+                    } else null
                 )
 
                 evaluator.evalProgram(ast).let { err ->
@@ -88,7 +93,7 @@ class ExecuteUseCase(private val fileRepository: FileRepository) {
         arrayOrigin: Int,
         onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
         onClear: suspend CallBuiltInFunctionScope.() -> Unit,
-        onEval: suspend (AstNode, Environment) -> Unit
+        onEval: (suspend (AstNode, Environment) -> Unit)?
     ): Evaluator {
         return EvaluatorFactory.create(
             input,

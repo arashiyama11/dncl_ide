@@ -133,7 +133,7 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
             }
         }
 
-        var isShowSettings by remember { mutableStateOf(false) }
+        var isShowSettings by remember { mutableStateOf(true) }
 
         NavigationDrawerItem(label = {
             Text(text = "Settings")
@@ -184,6 +184,52 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                                 onValueChange = {
                                     fontSizeText = it
                                     it.toIntOrNull()?.let { drawerViewModel.onFontSizeChanged(it) }
+                                },
+                                modifier = Modifier
+                                    .width(80.dp)
+                                    .padding(vertical = 8.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                            )
+                        }
+                    )
+
+                    var onEvalDelayText by remember { mutableStateOf(uiState.onEvalDelay.toString()) }
+
+                    NavigationDrawerItem(label = {
+                        Text(
+                            text = "デバッグモード（実行中の行を表示）",
+                            style = MaterialTheme.typography.body2
+                        )
+                    }, selected = false, onClick = null, badge = {
+                        Switch(
+                            checked = uiState.debugModeEnabled,
+                            onCheckedChange = {
+                                drawerViewModel.onDebugModeChanged(it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colors.primary,
+                                checkedTrackColor = MaterialTheme.colors.primary.copy(alpha = 0.5f),
+                                uncheckedThumbColor = MaterialTheme.colors.secondary,
+                                uncheckedTrackColor = MaterialTheme.colors.secondary.copy(alpha = 0.5f)
+                            )
+                        )
+                    })
+
+
+                    NavigationDrawerItem(
+                        label = {
+                            Text(
+                                "ゆっくり実行",
+                                style = MaterialTheme.typography.body2
+                            )
+                        }, selected = false, onClick = null, badge = {
+                            OutlinedTextField(
+                                value = onEvalDelayText,
+                                onValueChange = {
+                                    onEvalDelayText = it
+                                    it.toIntOrNull()
+                                        ?.let { drawerViewModel.onOnEvalDelayChanged(it) }
                                 },
                                 modifier = Modifier
                                     .width(80.dp)
