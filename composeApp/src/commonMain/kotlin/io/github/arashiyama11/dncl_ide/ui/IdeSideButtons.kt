@@ -21,6 +21,7 @@ import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Create
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import dncl_ide.composeapp.generated.resources.Res
 import dncl_ide.composeapp.generated.resources.download_outlined
 import dncl_ide.composeapp.generated.resources.upload_outlined
+import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import org.jetbrains.compose.resources.painterResource
 
 
@@ -48,7 +50,8 @@ fun IdeSideButtons(
     onCancelButtonClicked: () -> Unit,
     insertText: (String) -> Unit,
     onChangeIOButtonClicked: () -> Unit,
-    isInputMode: Boolean,
+    onChangeDebugOutputClicked: () -> Unit,
+    textFieldType: TextFieldType,
     modifier: Modifier = Modifier
 ) {
     //TODO アニメーションをつける
@@ -268,9 +271,18 @@ fun IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painterResource(if (isInputMode) Res.drawable.upload_outlined else Res.drawable.download_outlined),
+                    painterResource(if (textFieldType != TextFieldType.OUTPUT) Res.drawable.upload_outlined else Res.drawable.download_outlined),
                     contentDescription = "Change IO"
                 )
+            }
+
+            IconButton(
+                onClick = {
+                    onChangeDebugOutputClicked()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.Create, contentDescription = "debug output")
             }
 
             IconButton(

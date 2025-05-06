@@ -20,7 +20,8 @@ class SettingsRepositoryImpl() : SettingsRepository {
         (arrayOriginIndex as MutableStateFlow).value =
             setting.getInt(ARRAY_ORIGIN_INDEX, DEFAULT_ARRAY_ORIGIN_INDEX)
         (fontSize as MutableStateFlow).value = setting.getInt(FONT_SIZE, DEFAULT_FONT_SIZE)
-        (onEvalDelay as MutableStateFlow).value = setting.getInt(ON_EVAL_DELAY, DEFAULT_ON_EVAL_DELAY)
+        (onEvalDelay as MutableStateFlow).value =
+            setting.getInt(ON_EVAL_DELAY, DEFAULT_ON_EVAL_DELAY)
         (debugMode as MutableStateFlow).value = setting.getBoolean(DEBUG_MODE, DEFAULT_DEBUG_MODE)
     }
 

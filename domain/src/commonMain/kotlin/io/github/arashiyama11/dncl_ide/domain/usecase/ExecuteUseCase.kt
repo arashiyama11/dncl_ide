@@ -59,6 +59,7 @@ class ExecuteUseCase(
                     onEval = if (settingsRepository.debugMode.value) { astNode, environment ->
                         val lineNumber = calculateLineNumber(astNode, program)
                         send(DnclOutput.LineEvaluation(lineNumber))
+                        send(DnclOutput.EnvironmentUpdate(environment))
                         delay(delayDuration)
                     } else null
                 )

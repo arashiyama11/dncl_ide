@@ -15,8 +15,8 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -28,8 +28,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
-import kotlin.coroutines.EmptyCoroutineContext
 
 
 data class IdeUiState(
@@ -40,10 +38,15 @@ data class IdeUiState(
     val input: String = "",
     val isError: Boolean = false,
     val errorRange: IntRange? = null,
-    val isInputMode: Boolean = false,
     val fontSize: Int = DEFAULT_FONT_SIZE,
-    val currentEvaluatingLine: Int? = null
+    val currentEvaluatingLine: Int? = null,
+    val textFieldType: TextFieldType = TextFieldType.OUTPUT,
+    val currentEnvironment: Environment? = null
 )
+
+enum class TextFieldType {
+    OUTPUT, INPUT, DEBUG_OUTPUT
+}
 
 class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
@@ -192,6 +195,14 @@ class IdeViewModel(
                             )
                         }
                     }
+
+                    is DnclOutput.EnvironmentUpdate -> {
+                        _uiState.update {
+                            it.copy(
+                                currentEnvironment = output.environment.copy()
+                            )
+                        }
+                    }
                 }
             }
             delay(50)
@@ -249,13 +260,19 @@ class IdeViewModel(
 
     fun onChangeIOButtonClicked() {
         _uiState.update {
-            it.copy(isInputMode = !it.isInputMode)
+            it.copy(textFieldType = if (it.textFieldType == TextFieldType.OUTPUT) TextFieldType.INPUT else TextFieldType.OUTPUT)
         }
     }
 
     fun onInputTextChanged(input: String) {
         _uiState.update {
             it.copy(input = input)
+        }
+    }
+
+    fun onChangeDebugOutputClicked() {
+        _uiState.update {
+            it.copy(textFieldType = if (it.textFieldType == TextFieldType.DEBUG_OUTPUT) TextFieldType.OUTPUT else TextFieldType.DEBUG_OUTPUT)
         }
     }
 

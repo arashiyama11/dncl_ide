@@ -1,5 +1,8 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.internal.synchronized
+
 sealed interface DnclObject {
     val astNode: AstNode
     fun hash(): kotlin.Int
@@ -26,7 +29,8 @@ sealed interface DnclObject {
 
     data class Array(val value: MutableList<DnclObject>, override val astNode: AstNode) :
         DnclObject {
-        override fun toString() = value.joinToString(", ", "[", "]")
+        @OptIn(InternalCoroutinesApi::class)
+        override fun toString() = value.toMutableList().joinToString(", ", "[", "]")
         override fun hash() = value.hashCode()
     }
 
