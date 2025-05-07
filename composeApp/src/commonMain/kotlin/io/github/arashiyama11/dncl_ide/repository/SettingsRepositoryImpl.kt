@@ -1,9 +1,11 @@
 package io.github.arashiyama11.dncl_ide.repository
 
 import com.russhwolf.settings.Settings
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ARRAY_ORIGIN_INDEX
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ON_EVAL_DELAY
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +16,8 @@ class SettingsRepositoryImpl() : SettingsRepository {
     override val fontSize: StateFlow<Int> = MutableStateFlow(DEFAULT_FONT_SIZE)
     override val onEvalDelay: StateFlow<Int> = MutableStateFlow(DEFAULT_ON_EVAL_DELAY)
     override val debugMode: StateFlow<Boolean> = MutableStateFlow(DEFAULT_DEBUG_MODE)
+    override val debugRunningMode: StateFlow<DebugRunningMode> =
+        MutableStateFlow(DEFAULT_DEBUG_RUNNING_MODE)
     private val setting = Settings()
 
     init {
@@ -22,7 +26,18 @@ class SettingsRepositoryImpl() : SettingsRepository {
         (fontSize as MutableStateFlow).value = setting.getInt(FONT_SIZE, DEFAULT_FONT_SIZE)
         (onEvalDelay as MutableStateFlow).value =
             setting.getInt(ON_EVAL_DELAY, DEFAULT_ON_EVAL_DELAY)
-        (debugMode as MutableStateFlow).value = setting.getBoolean(DEBUG_MODE, DEFAULT_DEBUG_MODE)
+        (debugMode as MutableStateFlow).value =
+            setting.getBoolean(DEBUG_MODE, DEFAULT_DEBUG_MODE)
+        (debugRunningMode as MutableStateFlow).value = try {
+            DebugRunningMode.valueOf(
+                setting.getString(
+                    DEBUG_RUNNING_MODE,
+                    DEFAULT_DEBUG_RUNNING_MODE.name
+                )
+            )
+        } catch (e: IllegalArgumentException) {
+            DEFAULT_DEBUG_RUNNING_MODE
+        }
     }
 
 
@@ -46,10 +61,17 @@ class SettingsRepositoryImpl() : SettingsRepository {
         (debugMode as MutableStateFlow).value = enabled
     }
 
+    override fun setDebugRunningMode(mode: DebugRunningMode) {
+        setting.putString(DEBUG_RUNNING_MODE, mode.name)
+        (debugRunningMode as MutableStateFlow).value = mode
+    }
+
+
     companion object {
         const val ARRAY_ORIGIN_INDEX = "arrayOriginIndex"
         const val FONT_SIZE = "fontSize"
         const val ON_EVAL_DELAY = "onEvalDelay"
         const val DEBUG_MODE = "debugMode"
+        const val DEBUG_RUNNING_MODE = "debugRunningMode"
     }
 }

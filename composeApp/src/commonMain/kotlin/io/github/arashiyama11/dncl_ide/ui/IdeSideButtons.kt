@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Create
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,21 +41,17 @@ import androidx.compose.ui.unit.sp
 import dncl_ide.composeapp.generated.resources.Res
 import dncl_ide.composeapp.generated.resources.download_outlined
 import dncl_ide.composeapp.generated.resources.upload_outlined
+import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import org.jetbrains.compose.resources.painterResource
 
 
 @Composable
-fun IdeSideButtons(
-    onRunButtonClicked: () -> Unit,
-    onCancelButtonClicked: () -> Unit,
-    insertText: (String) -> Unit,
-    onChangeIOButtonClicked: () -> Unit,
-    onChangeDebugOutputClicked: () -> Unit,
-    textFieldType: TextFieldType,
+fun IdeViewModel.IdeSideButtons(
     modifier: Modifier = Modifier
 ) {
-    //TODO アニメーションをつける
+    val uiState by uiState.collectAsState()
     var openSyntaxTemplate by remember { mutableStateOf(false) }
     val fontSize = 14.sp
     val fontSize5 = 11.sp
@@ -64,180 +61,207 @@ fun IdeSideButtons(
             modifier = Modifier
                 .fillMaxHeight()
         ) {
-            LazyVerticalGrid(
-                GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(top = 8.dp)
-                    .widthIn(52.dp, 104.dp),
-            ) {
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("もし 1 ならば:") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .defaultMinSize(1.dp, 1.dp)
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "IF",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
+            if (!uiState.debugMode || uiState.debugRunningMode == DebugRunningMode.NON_BLOCKING)
+                LazyVerticalGrid(
+                    GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(top = 8.dp)
+                        .widthIn(52.dp, 104.dp),
+                ) {
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("もし 1 ならば:") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .defaultMinSize(1.dp, 1.dp)
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "IF",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("そうでなくもし 1 ならば:") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(1.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .defaultMinSize(1.dp, 1.dp)
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "ELIF",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("そうでなければ:") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(1.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .defaultMinSize(1.dp, 1.dp)
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "ELSE",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("i を 1 から 10 まで 1 ずつ増やしながら繰り返す:") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "FOR",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("i < 10 の間繰り返す:") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "WHILE",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize5
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("関数 f(x) を:\n  戻り値(x+1)\nと定義する") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "FUNC",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("表示する()") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "PRINT",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize5
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("要素数()") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "LEN",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize
+                            )
+                        }
+                    }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { insertText("【外部からの入力】") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            border = BorderStroke(4.dp, Color.Gray),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(36.dp)
+                        ) {
+                            Text(
+                                "INPUT",
+                                color = Color.Gray,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = fontSize5
+                            )
+                        }
                     }
                 }
-
-                item {
+            else {
+                Column {
                     OutlinedButton(
-                        onClick = { insertText("そうでなくもし 1 ならば:") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(1.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .defaultMinSize(1.dp, 1.dp)
-                            .width(52.dp)
-                            .height(36.dp)
+                        onClick = { onStepButtonClicked() },
+                        modifier = Modifier.width(104.dp).weight(1f, true)
                     ) {
                         Text(
-                            "ELIF",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("そうでなければ:") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(1.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .defaultMinSize(1.dp, 1.dp)
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "ELSE",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("i を 1 から 10 まで 1 ずつ増やしながら繰り返す:") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "FOR",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("i < 10 の間繰り返す:") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "WHILE",
+                            "Next",
                             color = Color.Gray,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = fontSize5
                         )
                     }
-                }
-
-                item {
                     OutlinedButton(
-                        onClick = { insertText("関数 f(x) を:\n  戻り値(x+1)\nと定義する") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
+                        onClick = { onLineButtonClicked() },
+                        modifier = Modifier.width(104.dp).height(40.dp).weight(1f, true)
                     ) {
                         Text(
-                            "FUNC",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("表示する()") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "PRINT",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize5
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("要素数()") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(0.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "LEN",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = fontSize
-                        )
-                    }
-                }
-
-                item {
-                    OutlinedButton(
-                        onClick = { insertText("【外部からの入力】") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        border = BorderStroke(4.dp, Color.Gray),
-                        modifier = Modifier
-                            .width(52.dp)
-                            .height(36.dp)
-                    ) {
-                        Text(
-                            "INPUT",
+                            "Next Line",
                             color = Color.Gray,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = fontSize5
@@ -256,7 +280,7 @@ fun IdeSideButtons(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             IconButton(
-                onClick = onRunButtonClicked,
+                onClick = ::onRunButtonClicked,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
@@ -271,7 +295,7 @@ fun IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painterResource(if (textFieldType != TextFieldType.OUTPUT) Res.drawable.upload_outlined else Res.drawable.download_outlined),
+                    painterResource(if (uiState.textFieldType != TextFieldType.OUTPUT) Res.drawable.upload_outlined else Res.drawable.download_outlined),
                     contentDescription = "Change IO"
                 )
             }

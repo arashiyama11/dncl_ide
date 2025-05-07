@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
@@ -16,18 +17,58 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import org.koin.core.definition._createDefinition
+import kotlin.coroutines.resume
+
+private enum class DebugStepRunMode {
+    STEP, LINE
+}
 
 class ExecuteUseCase(
     private val fileRepository: FileRepository,
     private val settingsRepository: SettingsRepository
 ) {
+    private val stepChannel = Channel<Unit>(Channel.CONFLATED)
+    private val lineChannel = Channel<Unit>(Channel.CONFLATED)
+    private var lastDebugStepRunMode: DebugStepRunMode? = null
+
+    private var currentLineNumber: Int = -1
+
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            settingsRepository.debugRunningMode.collect {
+                if (it == DebugRunningMode.NON_BLOCKING) {
+                    lastDebugStepRunMode = null
+                    stepChannel.send(Unit)
+                    lineChannel.send(Unit)
+                }
+            }
+        }
+    }
+
+
+    suspend fun triggerNextStep() {
+        stepChannel.send(Unit)
+    }
+
+    suspend fun triggerNextLine() {
+        lineChannel.send(Unit)
+    }
+
     operator fun invoke(program: String, input: String, arrayOrigin: Int): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
@@ -56,11 +97,54 @@ class ExecuteUseCase(
                     onClear = {
                         send(DnclOutput.Clear)
                     },
-                    onEval = if (settingsRepository.debugMode.value) { astNode, environment ->
+                    onEval = if (settingsRepository.debugMode.value) onEvalLambda@{ astNode, environment ->
                         val lineNumber = calculateLineNumber(astNode, program)
                         send(DnclOutput.LineEvaluation(lineNumber))
                         send(DnclOutput.EnvironmentUpdate(environment))
-                        delay(delayDuration)
+                        if (lastDebugStepRunMode == DebugStepRunMode.LINE && currentLineNumber == lineNumber) {
+                            return@onEvalLambda
+                        }
+                        when (settingsRepository.debugRunningMode.value) {
+                            DebugRunningMode.BUTTON -> {
+                                val step = launch(Dispatchers.IO) {
+                                    stepChannel.receive()
+                                }
+
+                                val line = launch(Dispatchers.IO) {
+                                    lineChannel.receive()
+                                }
+
+                                suspendCancellableCoroutine<Unit> { cont ->
+                                    step.invokeOnCompletion {
+                                        if (it != null) return@invokeOnCompletion
+                                        currentLineNumber = lineNumber
+                                        lastDebugStepRunMode = DebugStepRunMode.STEP
+                                        line.cancel()
+                                        if (cont.isActive)
+                                            cont.resume(Unit)
+                                    }
+
+                                    line.invokeOnCompletion {
+                                        if (it != null) return@invokeOnCompletion
+                                        currentLineNumber = lineNumber
+                                        lastDebugStepRunMode = DebugStepRunMode.LINE
+                                        step.cancel()
+                                        if (cont.isActive)
+                                            cont.resume(Unit)
+                                    }
+
+
+                                    cont.invokeOnCancellation {
+                                        step.cancel()
+                                        line.cancel()
+                                    }
+                                }
+                            }
+
+                            DebugRunningMode.NON_BLOCKING -> {
+                                delay(delayDuration)
+                            }
+                        }
                     } else null
                 )
 
@@ -73,6 +157,9 @@ class ExecuteUseCase(
                     }
                 }
             }
+        }.also {
+            currentLineNumber = -1
+            lastDebugStepRunMode = null
         }
     }
 

@@ -6,10 +6,12 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
@@ -41,7 +43,12 @@ data class IdeUiState(
     val fontSize: Int = DEFAULT_FONT_SIZE,
     val currentEvaluatingLine: Int? = null,
     val textFieldType: TextFieldType = TextFieldType.OUTPUT,
-    val currentEnvironment: Environment? = null
+    val currentEnvironment: Environment? = null,
+    val isStepMode: Boolean = false,
+    val isLineMode: Boolean = false,
+    val isExecuting: Boolean = false,
+    val debugMode: Boolean = false,
+    val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE
 )
 
 enum class TextFieldType {
@@ -55,18 +62,25 @@ class IdeViewModel(
     private val settingsUseCase: SettingsUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
-    val uiState = combine(_uiState, settingsUseCase.fontSize) { state, fontSize ->
-        state.copy(
-            fontSize = fontSize
-        )
-    }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
+    val uiState =
+        combine(
+            _uiState,
+            settingsUseCase.fontSize,
+            settingsUseCase.debugMode,
+            settingsUseCase.debugRunningMode
+        ) { state, fontSize, debugMode, debugRunningMode ->
+            state.copy(
+                fontSize = fontSize,
+                debugMode = debugMode,
+                debugRunningMode = debugRunningMode
+            )
+        }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
     private var isDarkThemeCache = false
     private var executeJob: Job? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
     fun onPause() {
         viewModelScope.launch {
-            Dispatchers.IO
             saveFile()
         }
     }
@@ -140,7 +154,8 @@ class IdeViewModel(
                     output = "",
                     isError = false,
                     errorRange = null,
-                    currentEvaluatingLine = null
+                    currentEvaluatingLine = null,
+                    isExecuting = true
                 )
             }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
@@ -206,14 +221,26 @@ class IdeViewModel(
                 }
             }
             delay(50)
-            _uiState.update { it.copy(currentEvaluatingLine = null) }
+            _uiState.update { it.copy(currentEvaluatingLine = null, isExecuting = false) }
             onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
         }
     }
 
     fun onCancelButtonClicked() {
         executeJob?.cancel()
-        _uiState.update { it.copy(currentEvaluatingLine = null) }
+        _uiState.update { it.copy(currentEvaluatingLine = null, isExecuting = false) }
+    }
+
+    fun onStepButtonClicked() {
+        viewModelScope.launch {
+            executeUseCase.triggerNextStep()
+        }
+    }
+
+    fun onLineButtonClicked() {
+        viewModelScope.launch {
+            executeUseCase.triggerNextLine()
+        }
     }
 
     fun insertText(text: String) {

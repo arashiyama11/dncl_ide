@@ -3,12 +3,14 @@ package io.github.arashiyama11.dncl_ide.adapter
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ON_EVAL_DELAY
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
@@ -38,7 +40,8 @@ data class DrawerUiState(
     val list1IndexSwitchEnabled: Boolean = false,
     val fontSize: Int = DEFAULT_FONT_SIZE,
     val onEvalDelay: Int = DEFAULT_ON_EVAL_DELAY,
-    val debugModeEnabled: Boolean = DEFAULT_DEBUG_MODE
+    val debugModeEnabled: Boolean = DEFAULT_DEBUG_MODE,
+    val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE
 )
 
 class DrawerViewModel(
@@ -51,12 +54,14 @@ class DrawerViewModel(
         _uiState,
         fileUseCase.selectedEntryPath,
         settingsUseCase.arrayOriginIndex,
-        settingsUseCase.fontSize
-    ) { state, filePath, arrayOrigin, fontSize ->
+        settingsUseCase.fontSize,
+        settingsUseCase.debugRunningMode
+    ) { state, filePath, arrayOrigin, fontSize, debugRunningMode ->
         state.copy(
             selectedEntryPath = filePath,
             list1IndexSwitchEnabled = arrayOrigin == 1,
-            fontSize = fontSize
+            fontSize = fontSize,
+            debugRunningMode = debugRunningMode
         )
     }.combine(settingsUseCase.onEvalDelay) { state, onEvalDelay ->
         state.copy(onEvalDelay = onEvalDelay)
@@ -72,6 +77,20 @@ class DrawerViewModel(
             _uiState.update { it.copy(rootFolder = fileUseCase.getRootFolder()) }
         }
         this.focusRequester = focusRequester
+    }
+
+    fun onDebugRunByButtonClicked() {
+        when (settingsUseCase.debugRunningMode.value) {
+            DebugRunningMode.BUTTON -> settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
+            DebugRunningMode.NON_BLOCKING -> settingsUseCase.setDebugRunningMode(DebugRunningMode.BUTTON)
+        }
+    }
+
+    fun onDebugRunNonBlockingClicked() {
+        when (settingsUseCase.debugRunningMode.value) {
+            DebugRunningMode.BUTTON -> settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
+            DebugRunningMode.NON_BLOCKING -> settingsUseCase.setDebugRunningMode(DebugRunningMode.BUTTON)
+        }
     }
 
     fun onFontSizeChanged(fontSize: Int) {

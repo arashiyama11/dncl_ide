@@ -45,6 +45,7 @@ import dncl_ide.composeapp.generated.resources.file_outlined
 import dncl_ide.composeapp.generated.resources.folder_outlined
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
+import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
@@ -216,29 +217,87 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                         )
                     })
 
+                    AnimatedVisibility(
+                        uiState.debugModeEnabled,
+                        modifier = Modifier.padding(start = 16.dp)
+                    ) {
+                        Column {
 
-                    NavigationDrawerItem(
-                        label = {
-                            Text(
-                                "ゆっくり実行",
-                                style = MaterialTheme.typography.body2
-                            )
-                        }, selected = false, onClick = null, badge = {
-                            OutlinedTextField(
-                                value = onEvalDelayText,
-                                onValueChange = {
-                                    onEvalDelayText = it
-                                    it.toIntOrNull()
-                                        ?.let { drawerViewModel.onOnEvalDelayChanged(it) }
+
+                            NavigationDrawerItem(
+                                label = {
+                                    Text("ボタンを押して実行")
                                 },
-                                modifier = Modifier
-                                    .width(80.dp)
-                                    .padding(vertical = 8.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true,
+                                badge = {
+                                    Switch(
+                                        checked = uiState.debugRunningMode == DebugRunningMode.BUTTON,
+                                        onCheckedChange = {
+                                            drawerViewModel.onDebugRunByButtonClicked()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = MaterialTheme.colors.primary,
+                                            checkedTrackColor = MaterialTheme.colors.primary.copy(
+                                                alpha = 0.5f
+                                            ),
+                                            uncheckedThumbColor = MaterialTheme.colors.secondary,
+                                            uncheckedTrackColor = MaterialTheme.colors.secondary.copy(
+                                                alpha = 0.5f
+                                            )
+                                        )
+                                    )
+                                }
                             )
+
+                            NavigationDrawerItem(
+                                label = {
+                                    Text("自動実行")
+                                }, badge = {
+                                    Switch(
+                                        checked = uiState.debugRunningMode == DebugRunningMode.NON_BLOCKING,
+                                        onCheckedChange = {
+                                            drawerViewModel.onDebugRunNonBlockingClicked()
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = MaterialTheme.colors.primary,
+                                            checkedTrackColor = MaterialTheme.colors.primary.copy(
+                                                alpha = 0.5f
+                                            ),
+                                            uncheckedThumbColor = MaterialTheme.colors.secondary,
+                                            uncheckedTrackColor = MaterialTheme.colors.secondary.copy(
+                                                alpha = 0.5f
+                                            )
+                                        )
+                                    )
+                                }
+                            )
+
+                            AnimatedVisibility(uiState.debugRunningMode == DebugRunningMode.NON_BLOCKING) {
+
+                                NavigationDrawerItem(
+                                    label = {
+                                        Text(
+                                            "ゆっくり実行",
+                                            style = MaterialTheme.typography.body2
+                                        )
+                                    }, selected = false, onClick = null, badge = {
+                                        OutlinedTextField(
+                                            value = onEvalDelayText,
+                                            onValueChange = {
+                                                onEvalDelayText = it
+                                                it.toIntOrNull()
+                                                    ?.let { drawerViewModel.onOnEvalDelayChanged(it) }
+                                            },
+                                            modifier = Modifier
+                                                .width(80.dp)
+                                                .padding(vertical = 8.dp),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            singleLine = true,
+                                        )
+                                    }
+                                )
+                            }
                         }
-                    )
+                    }
                 }
             }
         }

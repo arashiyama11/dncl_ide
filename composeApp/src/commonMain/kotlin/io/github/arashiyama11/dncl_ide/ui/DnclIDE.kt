@@ -88,14 +88,8 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                 }
             }
 
-            IdeSideButtons(
-                onRunButtonClicked = { viewModel.onRunButtonClicked() },
-                onCancelButtonClicked = { viewModel.onCancelButtonClicked() },
-                insertText = { viewModel.insertText(it) },
-                onChangeIOButtonClicked = { viewModel.onChangeIOButtonClicked() },
-                onChangeDebugOutputClicked = { viewModel.onChangeDebugOutputClicked() },
-                textFieldType = uiState.textFieldType,
-                modifier = Modifier
+            viewModel.IdeSideButtons(
+                Modifier
                     .fillMaxHeight()
             )
         }
