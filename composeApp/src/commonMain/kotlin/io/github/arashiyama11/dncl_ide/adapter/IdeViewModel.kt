@@ -65,14 +65,12 @@ class IdeViewModel(
     val uiState =
         combine(
             _uiState,
-            settingsUseCase.fontSize,
-            settingsUseCase.debugMode,
-            settingsUseCase.debugRunningMode
-        ) { state, fontSize, debugMode, debugRunningMode ->
+            settingsUseCase.settingsState
+        ) { state, settings ->
             state.copy(
-                fontSize = fontSize,
-                debugMode = debugMode,
-                debugRunningMode = debugRunningMode
+                fontSize = settings.fontSize,
+                debugMode = settings.debugMode,
+                debugRunningMode = settings.debugRunningMode
             )
         }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
     private var isDarkThemeCache = false

@@ -1,7 +1,9 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SettingsState
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.combine
 
 class SettingsUseCase(private val settingsRepository: SettingsRepository) {
     val arrayOriginIndex = settingsRepository.arrayOriginIndex
@@ -9,6 +11,15 @@ class SettingsUseCase(private val settingsRepository: SettingsRepository) {
     val onEvalDelay = settingsRepository.onEvalDelay
     val debugMode = settingsRepository.debugMode
     val debugRunningMode = settingsRepository.debugRunningMode
+    val settingsState = combine(
+        arrayOriginIndex,
+        fontSize,
+        onEvalDelay,
+        debugMode,
+        debugRunningMode
+    ) { i, s, e, d, r ->
+        SettingsState(i, s, e, d, r)
+    }
 
     fun setListFirstIndex(index: Int) {
         settingsRepository.setListFirstIndex(index)

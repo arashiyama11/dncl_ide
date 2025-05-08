@@ -53,15 +53,13 @@ class DrawerViewModel(
     val uiState = combine(
         _uiState,
         fileUseCase.selectedEntryPath,
-        settingsUseCase.arrayOriginIndex,
-        settingsUseCase.fontSize,
-        settingsUseCase.debugRunningMode
-    ) { state, filePath, arrayOrigin, fontSize, debugRunningMode ->
+        settingsUseCase.settingsState
+    ) { state, filePath, settings ->
         state.copy(
             selectedEntryPath = filePath,
-            list1IndexSwitchEnabled = arrayOrigin == 1,
-            fontSize = fontSize,
-            debugRunningMode = debugRunningMode
+            list1IndexSwitchEnabled = settings.arrayOriginIndex == 1,
+            fontSize = settings.fontSize,
+            debugRunningMode = settings.debugRunningMode
         )
     }.combine(settingsUseCase.onEvalDelay) { state, onEvalDelay ->
         state.copy(onEvalDelay = onEvalDelay)
