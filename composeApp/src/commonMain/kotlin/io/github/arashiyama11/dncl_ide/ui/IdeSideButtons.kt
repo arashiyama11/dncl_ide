@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dncl_ide.composeapp.generated.resources.Res
+import dncl_ide.composeapp.generated.resources.debug_mode
 import dncl_ide.composeapp.generated.resources.download_outlined
 import dncl_ide.composeapp.generated.resources.upload_outlined
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
@@ -306,7 +308,11 @@ fun IdeViewModel.IdeSideButtons(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Outlined.Create, contentDescription = "debug output")
+                Icon(
+                    painterResource(Res.drawable.debug_mode),
+                    contentDescription = "debug output",
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             IconButton(
