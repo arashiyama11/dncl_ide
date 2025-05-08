@@ -135,7 +135,8 @@ class DrawerViewModel(
         _uiState.update {
             it.copy(
                 creatingType = CreatingType.FOLDER,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path
+                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
+                inputtingFileName = ""
             )
         }
 

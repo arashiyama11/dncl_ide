@@ -5,6 +5,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.DrawerValue
 import androidx.compose.material.FabPosition
 import androidx.compose.material.Icon
@@ -97,7 +99,9 @@ fun App() {
             }
         }, floatingActionButtonPosition = FabPosition.End) { contentPadding ->
             ModalDrawer(drawerContent = {
-                DrawerContent(drawerViewModel)
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    DrawerContent(drawerViewModel)
+                }
             }, drawerState = drawerState) {
                 DnclIDE(
                     modifier = Modifier, ideViewModel
