@@ -1,7 +1,5 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.internal.synchronized
 
 sealed interface DnclObject {
     val astNode: AstNode
@@ -29,7 +27,6 @@ sealed interface DnclObject {
 
     data class Array(val value: MutableList<DnclObject>, override val astNode: AstNode) :
         DnclObject {
-        @OptIn(InternalCoroutinesApi::class)
         override fun toString() = value.toMutableList().joinToString(", ", "[", "]")
         override fun hash() = value.hashCode()
     }
@@ -39,7 +36,7 @@ sealed interface DnclObject {
         val body: AstNode.BlockStatement,
         val env: Environment, override val astNode: AstNode
     ) : DnclObject {
-        override fun toString() = "<fn $parameters>"
+        override fun toString() = "<関数 $parameters>"
         override fun hash() =
             parameters.hashCode() + 31 * body.hashCode() + 31 * 31 * env.hashCode()
     }
