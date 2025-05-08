@@ -22,7 +22,6 @@ import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Create
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.runtime.Composable
@@ -46,6 +45,7 @@ import dncl_ide.composeapp.generated.resources.upload_outlined
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.ui.components.TapOrRepeatButton
 import org.jetbrains.compose.resources.painterResource
 
 
@@ -247,9 +247,10 @@ fun IdeViewModel.IdeSideButtons(
                 }
             else {
                 Column {
-                    OutlinedButton(
+                    TapOrRepeatButton(
+                        modifier = Modifier.width(104.dp).weight(1f, true),
                         onClick = { onStepButtonClicked() },
-                        modifier = Modifier.width(104.dp).weight(1f, true)
+                        onRepeat = { onStepButtonClicked() },
                     ) {
                         Text(
                             "Next",
@@ -258,8 +259,13 @@ fun IdeViewModel.IdeSideButtons(
                             fontSize = fontSize5
                         )
                     }
-                    OutlinedButton(
-                        onClick = { onLineButtonClicked() },
+                    TapOrRepeatButton(
+                        onClick = {
+                            onLineButtonClicked()
+                        },
+                        onRepeat = {
+                            onLineButtonClicked()
+                        },
                         modifier = Modifier.width(104.dp).height(40.dp).weight(1f, true)
                     ) {
                         Text(
