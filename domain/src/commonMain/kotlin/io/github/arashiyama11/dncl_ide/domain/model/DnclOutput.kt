@@ -9,13 +9,17 @@ sealed interface DnclOutput {
     @JvmInline
     value class Stdout(val value: String) : DnclOutput
 
-    data class Error(val value: String) : DnclOutput
+    @JvmInline
+    value class Error(val value: String) : DnclOutput
 
-    data class RuntimeError(val value: DnclObject.Error) : DnclOutput
+    @JvmInline
+    value class RuntimeError(val value: DnclObject.Error) : DnclOutput
 
-    data class LineEvaluation(val lineNumber: Int) : DnclOutput
+    @JvmInline
+    value class LineEvaluation(val value: Int) : DnclOutput
 
-    data class EnvironmentUpdate(val environment: Environment) : DnclOutput
+    @JvmInline
+    value class EnvironmentUpdate(val environment: Environment) : DnclOutput
 
     object Clear : DnclOutput
 }

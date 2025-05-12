@@ -20,7 +20,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -204,7 +203,7 @@ class IdeViewModel(
                     is DnclOutput.LineEvaluation -> {
                         _uiState.update {
                             it.copy(
-                                currentEvaluatingLine = output.lineNumber
+                                currentEvaluatingLine = output.value
                             )
                         }
                     }
