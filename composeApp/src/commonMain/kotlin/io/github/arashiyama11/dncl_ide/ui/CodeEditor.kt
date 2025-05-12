@@ -56,11 +56,11 @@ fun CodeEditor(
     onCodeChange: (TextFieldValue) -> Unit,
     currentEvaluatingLine: Int? = null,
 ) {
-    val fontSizeFloat =
+    val fontSizeDouble =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
     val codeStyle = TextStyle(
-        fontSize = fontSizeFloat.sp,
-        lineHeight = (fontSizeFloat + 2).sp
+        fontSize = fontSizeDouble.sp,
+        lineHeight = (fontSizeDouble + 2).sp
     )
 
     var lineHeightDp = with(LocalDensity.current) {
