@@ -26,7 +26,8 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 
 class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
-    override val selectedEntryPath: StateFlow<EntryPath?> = MutableStateFlow(null)
+    private val _selectedEntryPath: MutableStateFlow<EntryPath?> = MutableStateFlow(null)
+    override val selectedEntryPath: StateFlow<EntryPath?> = _selectedEntryPath
 
     private val rootPath: EntryPath = rootPathProvider()
 
@@ -51,7 +52,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
                 }
                 val selectedEntryPathString =
                     setting.getString(SELECTED_ENTRY_PATH, it.toString())
-                (selectedEntryPath as MutableStateFlow).value =
+                _selectedEntryPath.value =
                     EntryPath.fromString(selectedEntryPathString)
             }
 
@@ -105,7 +106,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
     }
 
     override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {
-        (selectedEntryPath as MutableStateFlow).value = entryPath
+        _selectedEntryPath.value = entryPath
         setting[SELECTED_ENTRY_PATH] = entryPath.toString()
     }
 
@@ -131,3 +132,4 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
         const val SELECTED_ENTRY_PATH = "selectedEntryPath"
     }
 }
+
