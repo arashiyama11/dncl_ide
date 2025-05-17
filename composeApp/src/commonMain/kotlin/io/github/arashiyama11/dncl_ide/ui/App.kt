@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -47,10 +47,10 @@ fun App() {
         val drawerViewModel = koinViewModel<DrawerViewModel>()
         val ideViewModel = koinViewModel<IdeViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
-        val isDarkTheme = isSystemInDarkTheme()
+        val isDarkThemeStateFlow = rememberDarkThemeStateFlow()
 
         LaunchedEffect(Unit) {
-            ideViewModel.onStart(isDarkTheme)
+            ideViewModel.onStart(isDarkThemeStateFlow)
             for (err in ideViewModel.errorChannel) {
                 snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
             }
@@ -114,8 +114,11 @@ fun App() {
             }
         }, floatingActionButtonPosition = FabPosition.EndOverlay) { contentPadding ->
             ModalNavigationDrawer(modifier = Modifier.fillMaxSize(), drawerContent = {
-                Column(modifier = Modifier.fillMaxHeight().verticalScroll(rememberScrollState())) {
-                    DrawerContent(Modifier.weight(1f, fill = true), drawerViewModel)
+                Column(modifier = Modifier.fillMaxHeight()) {
+                    DrawerContent(
+                        Modifier.weight(1f, fill = true).verticalScroll(rememberScrollState()),
+                        drawerViewModel
+                    )
                 }
             }, drawerState = drawerState) {
                 DnclIDE(

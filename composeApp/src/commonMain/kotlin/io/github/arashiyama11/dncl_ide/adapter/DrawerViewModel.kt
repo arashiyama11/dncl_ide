@@ -59,12 +59,10 @@ class DrawerViewModel(
             selectedEntryPath = filePath,
             list1IndexSwitchEnabled = settings.arrayOriginIndex == 1,
             fontSize = settings.fontSize,
-            debugRunningMode = settings.debugRunningMode
+            debugRunningMode = settings.debugRunningMode,
+            debugModeEnabled = settings.debugMode,
+            onEvalDelay = settings.onEvalDelay
         )
-    }.combine(settingsUseCase.onEvalDelay) { state, onEvalDelay ->
-        state.copy(onEvalDelay = onEvalDelay)
-    }.combine(settingsUseCase.debugMode) { state, debugMode ->
-        state.copy(debugModeEnabled = debugMode)
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
     private var focusRequester: FocusRequester? = null

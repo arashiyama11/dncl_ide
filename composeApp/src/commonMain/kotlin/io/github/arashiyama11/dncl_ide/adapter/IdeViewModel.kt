@@ -20,15 +20,18 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 data class IdeUiState(
@@ -47,7 +50,8 @@ data class IdeUiState(
     val isLineMode: Boolean = false,
     val isExecuting: Boolean = false,
     val debugMode: Boolean = false,
-    val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE
+    val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
+    val isDarkTheme: Boolean = false,
 )
 
 enum class TextFieldType {
@@ -72,7 +76,6 @@ class IdeViewModel(
                 debugRunningMode = settings.debugRunningMode
             )
         }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
-    private var isDarkThemeCache = false
     private var executeJob: Job? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
@@ -82,8 +85,16 @@ class IdeViewModel(
         }
     }
 
-    fun onStart(isDarkTheme: Boolean) {
-        isDarkThemeCache = isDarkTheme
+    fun onStart(isDarkTheme: StateFlow<Boolean>) {
+        viewModelScope.launch {
+            isDarkTheme.collect {
+                _uiState.update { state ->
+                    state.copy(isDarkTheme = it)
+                }
+
+                onTextChanged(uiState.value.textFieldValue)
+            }
+        }
         viewModelScope.launch {
             var prePath: EntryPath? = null
             fileUseCase.selectedEntryPath.collect { entryPath ->
@@ -96,7 +107,7 @@ class IdeViewModel(
                             TextFieldValue(
                                 fileUseCase.getFileContent(programFile).value,
                                 TextRange(fileUseCase.getCursorPosition(programFile).value)
-                            ), isDarkThemeCache
+                            )
                         )
                     } else {
                         errorChannel.send("ファイルが開けませんでした")
@@ -107,19 +118,19 @@ class IdeViewModel(
         }
     }
 
-    fun onTextChanged(text: TextFieldValue, isDarkTheme: Boolean) {
-        isDarkThemeCache = isDarkTheme
+    fun onTextChanged(text: TextFieldValue) {
         val indentedText = autoIndent(uiState.value.textFieldValue, text)
-        _uiState.update {
-            it.copy(textFieldValue = indentedText)
-        }
+
         viewModelScope.launch(Dispatchers.Default) {
+            _uiState.updateOnMain {
+                it.copy(textFieldValue = indentedText)
+            }
             val (annotatedString, error) = syntaxHighLighter(
-                indentedText.text, isDarkTheme, uiState.value.errorRange
+                indentedText.text, uiState.value.isDarkTheme, uiState.value.errorRange
             )
 
             if (error != null) {
-                _uiState.update {
+                _uiState.updateOnMain {
                     error
                     it.copy(
                         dnclError = error,
@@ -129,7 +140,7 @@ class IdeViewModel(
                 }
             }
 
-            _uiState.update {
+            _uiState.updateOnMain {
                 it.copy(
                     annotatedString = annotatedString,
                     isError = error != null
@@ -155,7 +166,7 @@ class IdeViewModel(
                     isExecuting = true
                 )
             }
-            onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
+            onTextChanged(uiState.value.textFieldValue)
 
             executeUseCase(
                 uiState.value.textFieldValue.text,
@@ -164,7 +175,7 @@ class IdeViewModel(
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 output = "${it.output}\n${output.value.message}",
                                 isError = true,
@@ -174,7 +185,7 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.Error -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 output = "${it.output}\n${output.value}",
                                 isError = true
@@ -183,7 +194,7 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.Stdout -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 output = "${it.output}\n${output.value}",
                             )
@@ -191,7 +202,7 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.Clear -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 output = "",
                                 isError = false,
@@ -201,7 +212,7 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.LineEvaluation -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 currentEvaluatingLine = output.value
                             )
@@ -209,7 +220,7 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.EnvironmentUpdate -> {
-                        _uiState.update {
+                        _uiState.updateOnMain {
                             it.copy(
                                 currentEnvironment = output.environment.copy()
                             )
@@ -217,9 +228,11 @@ class IdeViewModel(
                     }
                 }
             }
-            delay(50)
-            _uiState.update { it.copy(currentEvaluatingLine = null, isExecuting = false) }
-            onTextChanged(uiState.value.textFieldValue, isDarkThemeCache)
+            withContext(Dispatchers.IO) {
+                delay(50)
+            }
+            _uiState.updateOnMain { it.copy(currentEvaluatingLine = null, isExecuting = false) }
+            onTextChanged(uiState.value.textFieldValue)
         }
     }
 
@@ -246,7 +259,7 @@ class IdeViewModel(
             uiState.value.textFieldValue.selection.start
         ) + text + uiState.value.textFieldValue.text.substring(uiState.value.textFieldValue.selection.end)
         val newRange = TextRange(uiState.value.textFieldValue.selection.start + text.length)
-        onTextChanged(TextFieldValue(newText, newRange), isDarkThemeCache)
+        onTextChanged(TextFieldValue(newText, newRange))
     }
 
 
@@ -314,6 +327,14 @@ class IdeViewModel(
             )
         } else {
             errorChannel.send("ファイルを保存できませんでした")
+        }
+    }
+
+    private suspend fun <T> MutableStateFlow<T>.updateOnMain(
+        block: suspend (T) -> T
+    ) {
+        withContext(Dispatchers.Main) {
+            update { block(value) }
         }
     }
 }

@@ -1,6 +1,5 @@
 package io.github.arashiyama11.dncl_ide.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +22,6 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
-    val isDarkTheme = isSystemInDarkTheme()
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
@@ -34,7 +32,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
         CodeEditor(
             codeText = uiState.textFieldValue,
             annotatedCodeText = uiState.annotatedString,
-            onCodeChange = { viewModel.onTextChanged(it, isDarkTheme) },
+            onCodeChange = { viewModel.onTextChanged(it) },
             modifier = Modifier
                 .weight(2f),
             fontSize = uiState.fontSize,
