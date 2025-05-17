@@ -9,6 +9,15 @@ import kotlin.test.fail
 
 class ParserTest {
     @Test
+    fun test() {
+        val input = """
+もし Akibi[buin] < Akibi[tantou] ならば:
+    tantou = buin
+表示する("次の工芸品の担当は部員", tantou, "です")"""
+        println(Parser(Lexer(input)).getOrNull()!!.parseProgram())
+    }
+
+    @Test
     fun testExpression() {
         val input = """
 -a+b

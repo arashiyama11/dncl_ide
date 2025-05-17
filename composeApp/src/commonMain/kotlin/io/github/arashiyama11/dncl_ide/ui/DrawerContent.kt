@@ -1,30 +1,24 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.indication
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Switch
-import androidx.compose.material.SwitchDefaults
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.ripple
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,32 +28,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import arrow.fx.coroutines.onCancel
-import dncl_ide.composeapp.generated.resources.Res
-import dncl_ide.composeapp.generated.resources.file_outlined
-import dncl_ide.composeapp.generated.resources.folder_outlined
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
-import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
+fun DrawerContent(
+    modifier: Modifier = Modifier,
+    drawerViewModel: DrawerViewModel = koinViewModel()
+) {
     val uiState by drawerViewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         drawerViewModel.onStart(focusRequester)
     }
-    ModalDrawerSheet {
+    ModalDrawerSheet(modifier = modifier.fillMaxHeight()) {
 
         var isShowFiles by remember { mutableStateOf(true) }
 
@@ -69,7 +60,7 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
 
             icon = {
                 Icon(
-                    painterResource(Res.drawable.folder_outlined),
+                    Icons.Outlined.Folder,
                     contentDescription = null
                 )
             },
@@ -121,7 +112,7 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                             selected = false,
                             icon = {
                                 Icon(
-                                    painterResource(if (uiState.creatingType == CreatingType.FILE) Res.drawable.file_outlined else Res.drawable.folder_outlined),
+                                    if (uiState.creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Outlined.Folder,
                                     contentDescription = null
                                 )
                             },
@@ -154,20 +145,14 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                     NavigationDrawerItem(label = {
                         Text(
                             text = "配列の最初の要素の添字を1にする",
-                            style = MaterialTheme.typography.body2
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                    }, selected = false, onClick = null, badge = {
+                    }, selected = false, onClick = {}, badge = {
                         Switch(
                             checked = uiState.list1IndexSwitchEnabled,
                             onCheckedChange = {
                                 drawerViewModel.onList1IndexSwitchClicked(it)
                             },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colors.primary,
-                                checkedTrackColor = MaterialTheme.colors.primary.copy(alpha = 0.5f),
-                                uncheckedThumbColor = MaterialTheme.colors.secondary,
-                                uncheckedTrackColor = MaterialTheme.colors.secondary.copy(alpha = 0.5f)
-                            )
                         )
                     })
 
@@ -177,9 +162,9 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                         label = {
                             Text(
                                 "フォントサイズ",
-                                style = MaterialTheme.typography.body2
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                        }, selected = false, onClick = null, badge = {
+                        }, selected = false, onClick = {}, badge = {
                             OutlinedTextField(
                                 value = fontSizeText,
                                 onValueChange = {
@@ -200,20 +185,14 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                     NavigationDrawerItem(label = {
                         Text(
                             text = "デバッグモード（実行中の行を表示）",
-                            style = MaterialTheme.typography.body2
+                            style = MaterialTheme.typography.bodyMedium
                         )
-                    }, selected = false, onClick = null, badge = {
+                    }, selected = false, onClick = {}, badge = {
                         Switch(
                             checked = uiState.debugModeEnabled,
                             onCheckedChange = {
                                 drawerViewModel.onDebugModeChanged(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colors.primary,
-                                checkedTrackColor = MaterialTheme.colors.primary.copy(alpha = 0.5f),
-                                uncheckedThumbColor = MaterialTheme.colors.secondary,
-                                uncheckedTrackColor = MaterialTheme.colors.secondary.copy(alpha = 0.5f)
-                            )
+                            }
                         )
                     })
 
@@ -225,6 +204,8 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
 
 
                             NavigationDrawerItem(
+                                selected = false,
+                                onClick = {},
                                 label = {
                                     Text("ボタンを押して実行")
                                 },
@@ -234,21 +215,13 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                                         onCheckedChange = {
                                             drawerViewModel.onDebugRunByButtonClicked()
                                         },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = MaterialTheme.colors.primary,
-                                            checkedTrackColor = MaterialTheme.colors.primary.copy(
-                                                alpha = 0.5f
-                                            ),
-                                            uncheckedThumbColor = MaterialTheme.colors.secondary,
-                                            uncheckedTrackColor = MaterialTheme.colors.secondary.copy(
-                                                alpha = 0.5f
-                                            )
-                                        )
                                     )
                                 }
                             )
 
                             NavigationDrawerItem(
+                                selected = false,
+                                onClick = {},
                                 label = {
                                     Text("自動実行")
                                 }, badge = {
@@ -257,16 +230,6 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                                         onCheckedChange = {
                                             drawerViewModel.onDebugRunNonBlockingClicked()
                                         },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = MaterialTheme.colors.primary,
-                                            checkedTrackColor = MaterialTheme.colors.primary.copy(
-                                                alpha = 0.5f
-                                            ),
-                                            uncheckedThumbColor = MaterialTheme.colors.secondary,
-                                            uncheckedTrackColor = MaterialTheme.colors.secondary.copy(
-                                                alpha = 0.5f
-                                            )
-                                        )
                                     )
                                 }
                             )
@@ -274,12 +237,13 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
                             AnimatedVisibility(uiState.debugRunningMode == DebugRunningMode.NON_BLOCKING) {
 
                                 NavigationDrawerItem(
+
                                     label = {
                                         Text(
                                             "ゆっくり実行",
-                                            style = MaterialTheme.typography.body2
+                                            style = MaterialTheme.typography.bodyMedium
                                         )
-                                    }, selected = false, onClick = null, badge = {
+                                    }, selected = false, onClick = {}, badge = {
                                         OutlinedTextField(
                                             value = onEvalDelayText,
                                             onValueChange = {
@@ -305,56 +269,6 @@ fun DrawerContent(drawerViewModel: DrawerViewModel = koinViewModel()) {
 }
 
 @Composable
-fun NavigationDrawerItem(
-    label: @Composable (() -> Unit) = {},
-    selected: Boolean = false,
-    icon: @Composable (() -> Unit)? = null,
-    onClick: (() -> Unit)? = null, modifier: Modifier = Modifier,
-    badge: @Composable (() -> Unit)? = null
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    Row(
-        modifier = modifier.size(width = 360.dp, height = 66.dp)
-            .clip(RoundedCornerShape(28.dp)).let {
-                if (onClick != null) it.clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(),
-                    onClick = onClick
-                ).indication(interactionSource, indication = ripple()) else it
-            }
-            .padding(end = 24.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            if (icon != null)
-                Box(modifier = Modifier.size(24.dp)) {
-                    icon()
-                }
-            Spacer(Modifier.size(12.dp))
-            label()
-        }
-        badge?.invoke()
-    }
-}
-
-@Composable
-fun ModalDrawerSheet(content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(360.dp)
-            .padding(16.dp)
-            .wrapContentHeight()
-    ) {
-        content()
-    }
-}
-
-@Composable
 fun FileItem(
     file: ProgramFile,
     depth: Int,
@@ -365,7 +279,7 @@ fun FileItem(
         selected = false,
         icon = {
             Icon(
-                painterResource(Res.drawable.file_outlined),
+                Icons.AutoMirrored.Outlined.InsertDriveFile,
                 contentDescription = null
             )
         },
@@ -397,7 +311,7 @@ fun FolderItem(
                 selected = false,
                 icon = {
                     Icon(
-                        painterResource(Res.drawable.folder_outlined),
+                        Icons.Outlined.Folder,
                         contentDescription = null
                     )
                 },
@@ -440,7 +354,7 @@ fun FolderItem(
                         selected = false,
                         icon = {
                             Icon(
-                                painterResource(if (creatingType == CreatingType.FILE) Res.drawable.file_outlined else Res.drawable.folder_outlined),
+                                if (creatingType == CreatingType.FILE) Icons.AutoMirrored.Outlined.InsertDriveFile else Icons.Outlined.Folder,
                                 contentDescription = null
                             )
                         },

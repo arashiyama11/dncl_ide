@@ -8,9 +8,9 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.ripple
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -77,7 +77,7 @@ fun TapOrRepeatButton(
                 )
             }
             .clip(MaterialTheme.shapes.small)
-            .border(ButtonDefaults.outlinedBorder, MaterialTheme.shapes.small)
+            .border(ButtonDefaults.outlinedButtonBorder(true), MaterialTheme.shapes.small)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {

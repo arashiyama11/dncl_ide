@@ -16,14 +16,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,15 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dncl_ide.composeapp.generated.resources.Res
-import dncl_ide.composeapp.generated.resources.debug_mode
-import dncl_ide.composeapp.generated.resources.download_outlined
-import dncl_ide.composeapp.generated.resources.upload_outlined
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.ui.components.TapOrRepeatButton
-import org.jetbrains.compose.resources.painterResource
 
 
 @Composable
@@ -246,7 +244,7 @@ fun IdeViewModel.IdeSideButtons(
                     }
                 }
             else {
-                Column {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
                     TapOrRepeatButton(
                         modifier = Modifier.width(104.dp).weight(1f, true),
                         onClick = { onStepButtonClicked() },
@@ -303,8 +301,8 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painterResource(if (uiState.textFieldType != TextFieldType.OUTPUT) Res.drawable.upload_outlined else Res.drawable.download_outlined),
-                    contentDescription = "Change IO"
+                    if (uiState.textFieldType != TextFieldType.OUTPUT) Icons.Outlined.UploadFile else Icons.Outlined.FileDownload,
+                    contentDescription = "Change IO",
                 )
             }
 
@@ -315,7 +313,7 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painterResource(Res.drawable.debug_mode),
+                    Icons.Outlined.BugReport,
                     contentDescription = "debug output",
                     modifier = Modifier.size(24.dp)
                 )

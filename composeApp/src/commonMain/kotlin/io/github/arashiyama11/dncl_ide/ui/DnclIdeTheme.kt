@@ -1,20 +1,19 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material.Colors
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 @Composable
 fun DnclIdeTheme(content: @Composable () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    val colors = if (isDark)
-        Colors(
+    val darkColorScheme =
+        darkColorScheme(
             primary = Color(0xFF4b8aff),
-            primaryVariant = Color(0xFF284777),
             secondary = Color(0xFFbec6dc),
-            secondaryVariant = Color(0xFF3e4759),
             background = Color(0xFF121212),
             surface = Color(0xFF111318),
             error = Color(0xFFCF6679),
@@ -23,23 +22,25 @@ fun DnclIdeTheme(content: @Composable () -> Unit) {
             onBackground = Color.White,
             onSurface = Color(0xFFe2e2e9),
             onError = Color.White,
-            isLight = false
+            primaryContainer = Color(0xFF284777),
+            secondaryContainer = Color(0xFF3e4759),
         )
-    else
-        Colors(
-            primary = Color(0xFF4b8aff),
-            primaryVariant = Color(0xFFd6e3ff),
-            secondary = Color(0xFF565f71),
-            secondaryVariant = Color(0xFFdae2f9),
-            background = Color(0xFFFFFFFF),
-            surface = Color(0xFFf9f9ff),
-            error = Color(0xFFB00020),
-            onPrimary = Color(0xff0a305f),
-            onSecondary = Color.White,
-            onBackground = Color.Black,
-            onSurface = Color.Black,
-            onError = Color.White,
-            isLight = true
-        )
-    MaterialTheme(colors = colors) { content() }
+
+    val lightColorScheme = lightColorScheme(
+        primary = Color(0xFF4b8aff),
+        secondary = Color(0xFF565f71),
+        background = Color(0xFFFFFFFF),
+        surface = Color(0xFFf9f9ff),
+        error = Color(0xFFB00020),
+        onPrimary = Color(0xff0a305f),
+        onSecondary = Color.White,
+        onBackground = Color.Black,
+        onSurface = Color.Black,
+        onError = Color.White,
+        primaryContainer = Color(0xFFd6e3ff),
+        secondaryContainer = Color(0xFFdae2f9),
+    )
+
+
+    MaterialTheme(colorScheme = if (isDark) darkColorScheme else lightColorScheme) { content() }
 }

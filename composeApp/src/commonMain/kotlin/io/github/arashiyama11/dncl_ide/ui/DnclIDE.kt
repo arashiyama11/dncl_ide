@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,7 +63,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                             onValueChange = { viewModel.onInputTextChanged(it) },
                             modifier = Modifier.weight(1f, fill = true)
                                 .fillMaxHeight(),
-                            textStyle = MaterialTheme.typography.body1,
+                            textStyle = MaterialTheme.typography.bodyLarge,
                             label = { Text(textFieldDesc) },
                             readOnly = true
                         )
@@ -81,7 +81,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                         onValueChange = { viewModel.onInputTextChanged(it) },
                         modifier = Modifier.weight(1f, fill = true)
                             .fillMaxSize(),
-                        textStyle = MaterialTheme.typography.body1,
+                        textStyle = MaterialTheme.typography.bodyLarge,
                         label = { Text(textFieldDesc) },
                         readOnly = uiState.textFieldType == TextFieldType.OUTPUT,
                     )
