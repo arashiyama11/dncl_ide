@@ -186,6 +186,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 nextToken().bind()
                 nextToken().bind()
             }
+            if (currentToken is Token.EOF) break
             val statement = parseStatement().bind()
             statements.add(statement)
         }
