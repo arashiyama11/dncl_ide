@@ -188,44 +188,6 @@ fun IdeViewModel.IdeSideButtons(
 
                     item {
                         OutlinedButton(
-                            onClick = { insertText("表示する()") },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            border = BorderStroke(4.dp, Color.Gray),
-                            modifier = Modifier
-                                .width(52.dp)
-                                .height(36.dp)
-                        ) {
-                            Text(
-                                "PRINT",
-                                color = Color.Gray,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = fontSize5
-                            )
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { insertText("要素数()") },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(0.dp),
-                            border = BorderStroke(4.dp, Color.Gray),
-                            modifier = Modifier
-                                .width(52.dp)
-                                .height(36.dp)
-                        ) {
-                            Text(
-                                "LEN",
-                                color = Color.Gray,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = fontSize
-                            )
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
                             onClick = { insertText("【外部からの入力】") },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp),
