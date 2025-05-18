@@ -43,7 +43,7 @@ class SyntaxHighLighter {
     ): Pair<AnnotatedString, DnclError?> {
         var error: DnclError? = err
         val str = buildAnnotatedString {
-            for (token in Lexer(text)) {
+            for ((token, next) in Lexer(text).windowed(2)) {
                 if (token.isLeft()) {
                     error = token.leftOrNull()
                     val i = token.leftOrNull()!!.index
@@ -82,7 +82,7 @@ class SyntaxHighLighter {
                         }
 
                         is Token.Identifier -> {
-                            withStyle(styles.identifierStyle) {
+                            withStyle(if (next.getOrNull() is Token.ParenOpen) styles.buildInFunctionStyle else styles.identifierStyle) {
                                 append(
                                     text.substring(
                                         t.range
@@ -92,22 +92,17 @@ class SyntaxHighLighter {
                         }
 
                         is Token.Japanese -> {
-                            if (BuiltInFunction.Companion.from(t.literal) == null)
-                                withStyle(styles.identifierStyle) {
-                                    append(
-                                        text.substring(
-                                            t.range
-                                        )
+                            val style = when {
+                                next.getOrNull() is Token.ParenOpen || BuiltInFunction.from(t.literal) != null -> styles.buildInFunctionStyle
+                                else -> styles.identifierStyle
+                            }
+                            withStyle(style) {
+                                append(
+                                    text.substring(
+                                        t.range
                                     )
-                                }
-                            else
-                                withStyle(styles.buildInFunctionStyle) {
-                                    append(
-                                        text.substring(
-                                            t.range
-                                        )
-                                    )
-                                }
+                                )
+                            }
                         }
 
                         is Token.String -> withStyle(styles.stringStyle) {

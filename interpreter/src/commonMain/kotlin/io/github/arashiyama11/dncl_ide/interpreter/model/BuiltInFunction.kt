@@ -26,5 +26,7 @@ enum class BuiltInFunction(private val identifier: String) {
     companion object {
         fun from(identifier: String): BuiltInFunction? =
             entries.find { it.identifier == identifier }
+
+        fun allIdentifiers(): List<String> = entries.map { it.identifier }
     }
 }

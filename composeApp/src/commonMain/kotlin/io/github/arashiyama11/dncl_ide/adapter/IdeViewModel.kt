@@ -19,6 +19,7 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.util.TextSuggestions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -52,6 +53,7 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
+    val textSuggestions: List<String> = emptyList()
 )
 
 enum class TextFieldType {
@@ -62,7 +64,8 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
-    private val settingsUseCase: SettingsUseCase
+    private val settingsUseCase: SettingsUseCase,
+    private val textSuggestions: TextSuggestions
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState =
@@ -129,21 +132,25 @@ class IdeViewModel(
                 indentedText.text, uiState.value.isDarkTheme, uiState.value.errorRange
             )
 
+
             if (error != null) {
+
                 _uiState.updateOnMain {
                     error
                     it.copy(
                         dnclError = error,
                         output = error.explain(uiState.value.textFieldValue.text),
-                        errorRange = error.errorRange
+                        errorRange = error.errorRange,
                     )
                 }
             }
+            val suggestions = textSuggestions.suggest(indentedText.text, indentedText.selection.end)
 
             _uiState.updateOnMain {
                 it.copy(
                     annotatedString = annotatedString,
-                    isError = error != null
+                    isError = error != null,
+                    textSuggestions = suggestions
                 )
             }
         }
@@ -259,6 +266,27 @@ class IdeViewModel(
             uiState.value.textFieldValue.selection.start
         ) + text + uiState.value.textFieldValue.text.substring(uiState.value.textFieldValue.selection.end)
         val newRange = TextRange(uiState.value.textFieldValue.selection.start + text.length)
+        onTextChanged(TextFieldValue(newText, newRange))
+    }
+
+    fun onConfirmTextSuggestion(text: String) {
+        val beforeText = uiState.value.textFieldValue.text.substring(
+            0,
+            uiState.value.textFieldValue.selection.start
+        )
+        val toInsert = mutableListOf<Char>()
+        for (i in text.indices) {
+            if (text[text.length - i - 1] != beforeText.lastOrNull()) {
+                toInsert.add(text[text.length - i - 1])
+            } else break
+        }
+        val newText = uiState.value.textFieldValue.text.substring(
+            0,
+            uiState.value.textFieldValue.selection.start
+        ) + toInsert.reversed().joinToString("") + uiState.value.textFieldValue.text.substring(
+            uiState.value.textFieldValue.selection.end
+        )
+        val newRange = TextRange(uiState.value.textFieldValue.selection.start + toInsert.size)
         onTextChanged(TextFieldValue(newText, newRange))
     }
 

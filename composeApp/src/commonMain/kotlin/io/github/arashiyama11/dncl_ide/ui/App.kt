@@ -2,7 +2,10 @@ package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -34,9 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -121,8 +126,18 @@ fun App() {
                     )
                 }
             }, drawerState = drawerState) {
+                val padding = if (isImeVisible()) {
+                    PaddingValues(
+                        start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
+                        top = contentPadding.calculateTopPadding(),
+                        end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
+                        bottom = 4.dp
+                    )
+                } else {
+                    contentPadding
+                }
                 DnclIDE(
-                    modifier = Modifier.padding(contentPadding), ideViewModel
+                    modifier = Modifier.padding(padding), ideViewModel
                 )
             }
         }

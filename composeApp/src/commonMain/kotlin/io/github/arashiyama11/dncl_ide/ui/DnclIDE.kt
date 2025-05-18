@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -14,9 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -86,10 +90,14 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                 }
             }
 
-            viewModel.IdeSideButtons(
-                Modifier
-                    .fillMaxHeight()
-            )
+            viewModel.IdeSideButtons(Modifier.fillMaxHeight())
+        }
+
+        if (isImeVisible()) {
+            SuggestionListView(
+                uiState.textSuggestions,
+                modifier = Modifier.height(48.dp)
+            ) { viewModel.onConfirmTextSuggestion(it) }
         }
     }
 }
