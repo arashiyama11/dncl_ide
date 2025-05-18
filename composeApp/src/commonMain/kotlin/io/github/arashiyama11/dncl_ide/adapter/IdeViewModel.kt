@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
@@ -16,8 +17,11 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.util.TextSuggestions
 import kotlinx.coroutines.Dispatchers
@@ -128,28 +132,64 @@ class IdeViewModel(
             _uiState.updateOnMain {
                 it.copy(textFieldValue = indentedText)
             }
-            val (annotatedString, error) = syntaxHighLighter(
-                indentedText.text, uiState.value.isDarkTheme, uiState.value.errorRange
+
+            val tokens = Lexer(indentedText.text).toList()
+            var error: DnclError? = null
+            var parsedProgram: Either<DnclError, AstNode.Program>? = null
+
+            if (tokens.all { it.isRight() }) {
+                val parser = Parser(Lexer(indentedText.text)).fold(
+                    ifLeft = { null },
+                    ifRight = { it }
+                )
+
+                if (parser != null) {
+                    parsedProgram = parser.parseProgram()
+                    if (parsedProgram.isLeft()) {
+                        error = parsedProgram.leftOrNull()
+                    }
+                }
+            } else {
+                error = tokens.firstOrNull { it.isLeft() }?.leftOrNull()
+            }
+
+            val (annotatedString, highlightError) = syntaxHighLighter.highlightWithParsedData(
+                indentedText.text,
+                uiState.value.isDarkTheme,
+                uiState.value.errorRange,
+                tokens,
             )
 
-
-            if (error != null) {
-
+            if (error != null || highlightError != null) {
+                val finalError = error ?: highlightError
                 _uiState.updateOnMain {
-                    error
                     it.copy(
-                        dnclError = error,
-                        output = error.explain(uiState.value.textFieldValue.text),
-                        errorRange = error.errorRange,
+                        dnclError = finalError,
+                        output = finalError?.explain(uiState.value.textFieldValue.text) ?: "",
+                        errorRange = finalError?.errorRange,
                     )
                 }
             }
-            val suggestions = textSuggestions.suggest(indentedText.text, indentedText.selection.end)
+
+            // Use the shared results for text suggestions
+            val suggestions = if (parsedProgram?.isRight() == true) {
+                textSuggestions.suggestWithParsedData(
+                    indentedText.text,
+                    indentedText.selection.end,
+                    tokens,
+                    parsedProgram.getOrNull()!!
+                )
+            } else {
+                textSuggestions.suggestWhenFailingParse(
+                    indentedText.text,
+                    indentedText.selection.end
+                )
+            }
 
             _uiState.updateOnMain {
                 it.copy(
                     annotatedString = annotatedString,
-                    isError = error != null,
+                    isError = error != null || highlightError != null,
                     textSuggestions = suggestions
                 )
             }

@@ -1,10 +1,12 @@
 package io.github.arashiyama11.dncl_ide.util
 
+import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import kotlin.math.max
 import kotlin.math.min
 
@@ -12,10 +14,28 @@ class TextSuggestions() {
 
     private data class Definition(val literal: String, val position: Int?)
 
-    fun suggest(code: String, position: Int): List<String> {
-        val parser = Parser(Lexer(code)).fold(ifLeft = { return emptyList() }) { it }
-        val program = parser.parseProgram().fold(ifLeft = { return emptyList() }) { it }
-        val tokens = Lexer(code).toList()
+    fun suggestWhenFailingParse(
+        code: String,
+        position: Int
+    ): List<String> {
+        println("suggestWhenFailingParse")
+        val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
+        val lexer = Lexer(fixedCode)
+        val prog = (Parser(lexer)).fold({
+            return emptyList()
+        }) { it.parseProgram() }.fold({ return emptyList() }) { it }
+        return suggestWithParsedData(
+            code, position, lexer.toList(), prog
+        )
+
+    }
+
+    fun suggestWithParsedData(
+        code: String,
+        position: Int,
+        tokens: List<Either<DnclError, Token>>,
+        program: AstNode.Program
+    ): List<String> {
         val positionTokenIndex =
             tokens.indexOfFirst { it.getOrNull()?.range?.contains(position) == true }
         val currentToken =
@@ -23,7 +43,7 @@ class TextSuggestions() {
                 max(
                     0,
                     positionTokenIndex - 1
-                )..min(positionTokenIndex + 1, tokens.size - 1)
+                ) until min(positionTokenIndex + 1, tokens.size)
             )
                 .firstOrNull { it.getOrNull() is Token.Identifier || it.getOrNull() is Token.Japanese }
         val globalVariables =
@@ -34,7 +54,7 @@ class TextSuggestions() {
                 Int.MAX_VALUE,
                 position
             ) + globalVariables).distinctBy { it.literal }
-        println("!!!!!!!!!!!!!!currentToken: $currentToken")
+
         return (if (currentToken?.isRight() == true) {
             val id = currentToken.getOrNull()!!.literal
             words.sortedWith(
@@ -53,7 +73,7 @@ class TextSuggestions() {
         } else words.sortedBy {
             if (it.position == null) return@sortedBy Int.MAX_VALUE
             if (position > it.position) -it.position else code.length * 5
-        }).map { it.literal }
+        }).map { it.literal }.apply { println("suggestion:$currentToken $this") }
     }
 
     private fun globalVariables(program: AstNode.Program): List<Definition> {
@@ -92,13 +112,16 @@ class TextSuggestions() {
 
                 is AstNode.FunctionStatement -> {
                     result.add(Definition(stmt.name, stmt.range.first))
-                    if (stmt.range.contains(limitPosition)) result.addAll(
-                        filterDefinition(
-                            stmt.block.statements,
-                            depth - 1,
-                            limitPosition
+                    if (stmt.range.contains(limitPosition)) {
+                        result.addAll(stmt.parameters.map { Definition(it, stmt.range.first) })
+                        result.addAll(
+                            filterDefinition(
+                                stmt.block.statements,
+                                depth - 1,
+                                limitPosition
+                            )
                         )
-                    )
+                    }
                 }
 
                 is AstNode.IfStatement -> {

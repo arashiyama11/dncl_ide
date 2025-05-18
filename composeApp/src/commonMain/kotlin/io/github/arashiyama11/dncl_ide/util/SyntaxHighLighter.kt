@@ -7,43 +7,38 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
-import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.InternalError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
-import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
 
 class SyntaxHighLighter {
-    operator fun invoke(
+    fun highlightWithParsedData(
         text: String,
         isDarkTheme: Boolean,
-        errorRange: IntRange?
+        errorRange: IntRange?,
+        tokens: List<Either<LexerError, Token>>,
     ): Pair<AnnotatedString, DnclError?> {
         if (text.isEmpty()) return AnnotatedString(text) to null
-        if (errorRange != null) return annotateByLex(text, isDarkTheme, errorRange)
-        return if (Lexer(text).all { it.isRight() }) annotateByParse(
-            text,
-            isDarkTheme
-        ) else annotateByLex(
-            text,
-            isDarkTheme
-        )
+        return annotateWithTokens(text, isDarkTheme, errorRange, tokens)
     }
 
     private fun IntRange.includes(other: IntRange): Boolean {
         return this.first <= other.first && other.last <= this.last
     }
 
-    private fun annotateByLex(
+    private fun annotateWithTokens(
         text: String,
         isDarkTheme: Boolean,
         errorRange: IntRange? = null,
+        tokens: List<Either<LexerError, Token>>,
         err: DnclError? = null
     ): Pair<AnnotatedString, DnclError?> {
         var error: DnclError? = err
         val str = buildAnnotatedString {
-            for ((token, next) in Lexer(text).windowed(2)) {
+            for ((token, next) in tokens.windowed(2)) {
                 if (token.isLeft()) {
                     error = token.leftOrNull()
                     val i = token.leftOrNull()!!.index
@@ -161,17 +156,6 @@ class SyntaxHighLighter {
             }
         }
         return str to error
-    }
-
-    private fun annotateByParse(
-        text: String,
-        isDarkTheme: Boolean
-    ): Pair<AnnotatedString, DnclError?> {
-        val parser =
-            Parser.Companion(Lexer(text)).getOrNull() ?: return annotateByLex(text, isDarkTheme)
-        val err = parser.parseProgram().leftOrNull() ?: return annotateByLex(text, isDarkTheme)
-        err.errorRange?.let { return annotateByLex(text, isDarkTheme, it, err) }
-        return annotateByLex(text, isDarkTheme)
     }
 
 
