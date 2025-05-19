@@ -16,7 +16,7 @@ runner = "1.6.2"
 core = "1.6.1"
 jetbrainsKotlinJvm = "2.1.21"
 arrow = "2.1.2"
-koin-bom = "4.1.0-Beta8"
+koin-bom = "4.1.0-RC1"
 kotlinx-io = "0.7.0"
 
 [libraries]
