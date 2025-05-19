@@ -364,20 +364,19 @@ class IdeViewModel(
     }
 
     fun onChangeIOButtonClicked() {
+        val next = when (uiState.value.textFieldType) {
+            TextFieldType.OUTPUT -> TextFieldType.INPUT
+            TextFieldType.INPUT -> TextFieldType.DEBUG_OUTPUT
+            TextFieldType.DEBUG_OUTPUT -> TextFieldType.OUTPUT
+        }
         _uiState.update {
-            it.copy(textFieldType = if (it.textFieldType == TextFieldType.OUTPUT) TextFieldType.INPUT else TextFieldType.OUTPUT)
+            it.copy(textFieldType = next)
         }
     }
 
     fun onInputTextChanged(input: String) {
         _uiState.update {
             it.copy(input = input)
-        }
-    }
-
-    fun onChangeDebugOutputClicked() {
-        _uiState.update {
-            it.copy(textFieldType = if (it.textFieldType == TextFieldType.DEBUG_OUTPUT) TextFieldType.OUTPUT else TextFieldType.DEBUG_OUTPUT)
         }
     }
 

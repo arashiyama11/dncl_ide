@@ -26,9 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -266,23 +266,15 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    if (uiState.textFieldType != TextFieldType.OUTPUT) Icons.Outlined.UploadFile else Icons.Outlined.FileDownload,
+                    when (uiState.textFieldType) {
+                        TextFieldType.OUTPUT -> Icons.Outlined.FileUpload
+                        TextFieldType.INPUT -> Icons.Outlined.BugReport
+                        TextFieldType.DEBUG_OUTPUT -> Icons.Outlined.FileDownload
+                    },
                     contentDescription = "Change IO",
                 )
             }
 
-            IconButton(
-                onClick = {
-                    onChangeDebugOutputClicked()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Outlined.BugReport,
-                    contentDescription = "debug output",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
 
             IconButton(
                 onClick = {
