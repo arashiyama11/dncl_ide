@@ -40,7 +40,7 @@ import kotlinx.coroutines.withContext
 
 
 data class IdeUiState(
-    val textFieldValue: TextFieldValue = TextFieldValue(""),
+    val codeTextFieldValue: TextFieldValue = TextFieldValue(""),
     val dnclError: DnclError? = null,
     val annotatedString: AnnotatedString? = null,
     val output: String = "",
@@ -99,7 +99,7 @@ class IdeViewModel(
                     state.copy(isDarkTheme = it)
                 }
 
-                onTextChanged(uiState.value.textFieldValue)
+                onTextChanged(uiState.value.codeTextFieldValue)
             }
         }
         viewModelScope.launch {
@@ -126,11 +126,11 @@ class IdeViewModel(
     }
 
     fun onTextChanged(text: TextFieldValue) {
-        val indentedText = autoIndent(uiState.value.textFieldValue, text)
+        val indentedText = autoIndent(uiState.value.codeTextFieldValue, text)
 
         viewModelScope.launch(Dispatchers.Default) {
             _uiState.updateOnMain {
-                it.copy(textFieldValue = indentedText)
+                it.copy(codeTextFieldValue = indentedText)
             }
 
             val tokens = Lexer(indentedText.text).toList()
@@ -165,7 +165,7 @@ class IdeViewModel(
                 _uiState.updateOnMain {
                     it.copy(
                         dnclError = finalError,
-                        output = finalError?.explain(uiState.value.textFieldValue.text) ?: "",
+                        output = finalError?.explain(uiState.value.codeTextFieldValue.text) ?: "",
                         errorRange = finalError?.errorRange,
                     )
                 }
@@ -213,10 +213,10 @@ class IdeViewModel(
                     isExecuting = true
                 )
             }
-            onTextChanged(uiState.value.textFieldValue)
+            onTextChanged(uiState.value.codeTextFieldValue)
 
             executeUseCase(
-                uiState.value.textFieldValue.text,
+                uiState.value.codeTextFieldValue.text,
                 uiState.value.input,
                 settingsUseCase.arrayOriginIndex.value
             ).collect { output ->
@@ -279,7 +279,7 @@ class IdeViewModel(
                 delay(50)
             }
             _uiState.updateOnMain { it.copy(currentEvaluatingLine = null, isExecuting = false) }
-            onTextChanged(uiState.value.textFieldValue)
+            onTextChanged(uiState.value.codeTextFieldValue)
         }
     }
 
@@ -301,18 +301,18 @@ class IdeViewModel(
     }
 
     fun insertText(text: String) {
-        val newText = uiState.value.textFieldValue.text.substring(
+        val newText = uiState.value.codeTextFieldValue.text.substring(
             0,
-            uiState.value.textFieldValue.selection.start
-        ) + text + uiState.value.textFieldValue.text.substring(uiState.value.textFieldValue.selection.end)
-        val newRange = TextRange(uiState.value.textFieldValue.selection.start + text.length)
+            uiState.value.codeTextFieldValue.selection.start
+        ) + text + uiState.value.codeTextFieldValue.text.substring(uiState.value.codeTextFieldValue.selection.end)
+        val newRange = TextRange(uiState.value.codeTextFieldValue.selection.start + text.length)
         onTextChanged(TextFieldValue(newText, newRange))
     }
 
     fun onConfirmTextSuggestion(text: String) {
-        val beforeText = uiState.value.textFieldValue.text.substring(
+        val beforeText = uiState.value.codeTextFieldValue.text.substring(
             0,
-            uiState.value.textFieldValue.selection.start
+            uiState.value.codeTextFieldValue.selection.start
         )
         val toInsert = mutableListOf<Char>()
         for (i in text.indices) {
@@ -320,13 +320,13 @@ class IdeViewModel(
                 toInsert.add(text[text.length - i - 1])
             } else break
         }
-        val newText = uiState.value.textFieldValue.text.substring(
+        val newText = uiState.value.codeTextFieldValue.text.substring(
             0,
-            uiState.value.textFieldValue.selection.start
-        ) + toInsert.reversed().joinToString("") + uiState.value.textFieldValue.text.substring(
-            uiState.value.textFieldValue.selection.end
+            uiState.value.codeTextFieldValue.selection.start
+        ) + toInsert.reversed().joinToString("") + uiState.value.codeTextFieldValue.text.substring(
+            uiState.value.codeTextFieldValue.selection.end
         )
-        val newRange = TextRange(uiState.value.textFieldValue.selection.start + toInsert.size)
+        val newRange = TextRange(uiState.value.codeTextFieldValue.selection.start + toInsert.size)
         onTextChanged(TextFieldValue(newText, newRange))
     }
 
@@ -390,8 +390,8 @@ class IdeViewModel(
         if (entry is ProgramFile) {
             fileUseCase.saveFile(
                 entry,
-                FileContent(uiState.value.textFieldValue.text),
-                CursorPosition(uiState.value.textFieldValue.selection.start)
+                FileContent(uiState.value.codeTextFieldValue.text),
+                CursorPosition(uiState.value.codeTextFieldValue.selection.start)
             )
         } else {
             errorChannel.send("ファイルを保存できませんでした")

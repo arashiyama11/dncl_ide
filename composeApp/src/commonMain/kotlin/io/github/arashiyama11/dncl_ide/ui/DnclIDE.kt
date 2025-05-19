@@ -34,7 +34,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
             .imePadding()
     ) {
         CodeEditor(
-            codeText = uiState.textFieldValue,
+            codeText = uiState.codeTextFieldValue,
             annotatedCodeText = uiState.annotatedString,
             onCodeChange = { viewModel.onTextChanged(it) },
             modifier = Modifier
