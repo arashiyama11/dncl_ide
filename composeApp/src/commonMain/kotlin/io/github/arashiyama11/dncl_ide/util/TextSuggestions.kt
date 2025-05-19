@@ -18,7 +18,6 @@ class TextSuggestions() {
         code: String,
         position: Int
     ): List<String> {
-        println("suggestWhenFailingParse")
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
         val lexer = Lexer(fixedCode)
         val prog = (Parser(lexer)).fold({
@@ -73,7 +72,7 @@ class TextSuggestions() {
         } else words.sortedBy {
             if (it.position == null) return@sortedBy Int.MAX_VALUE
             if (position > it.position) -it.position else code.length * 5
-        }).map { it.literal }.apply { println("suggestion:$currentToken $this") }
+        }).map { it.literal }
     }
 
     private fun globalVariables(program: AstNode.Program): List<Definition> {
