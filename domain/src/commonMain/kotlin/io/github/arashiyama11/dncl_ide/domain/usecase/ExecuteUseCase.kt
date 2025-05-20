@@ -88,12 +88,6 @@ class ExecuteUseCase(
                 val evaluator = getEvaluator(
                     input,
                     arrayOrigin,
-                    onStdout = { text ->
-                        send(DnclOutput.Stdout(text))
-                    },
-                    onClear = {
-                        send(DnclOutput.Clear)
-                    },
                     onEval = if (settingsRepository.debugMode.value) onEvalLambda@{ astNode, environment ->
                         val lineNumber = calculateLineNumber(astNode, program)
                         send(DnclOutput.LineEvaluation(lineNumber))
@@ -145,7 +139,18 @@ class ExecuteUseCase(
                     } else null
                 )
 
-                evaluator.evalProgram(ast).let { err ->
+                val globalEnv = Environment(
+                    EvaluatorFactory.createBuiltInFunctionEnvironment(
+                        onStdout = { text ->
+                            send(DnclOutput.Stdout(text))
+                        },
+                        onClear = {
+                            send(DnclOutput.Clear)
+                        },
+                        onImport = { onImport(it) }
+                    ))
+
+                evaluator.evalProgram(ast, globalEnv).let { err ->
                     if (err.isLeft()) {
                         send(DnclOutput.Error(err.leftOrNull()!!.message.orEmpty()))
                     } else if (err.getOrNull() is DnclObject.Error) {
@@ -173,60 +178,57 @@ class ExecuteUseCase(
         return 0
     }
 
-    private fun getEvaluator(
-        input: String,
-        arrayOrigin: Int,
-        onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
-        onClear: suspend CallBuiltInFunctionScope.() -> Unit,
-        onEval: (suspend (AstNode, Environment) -> Unit)?
-    ): Evaluator {
-        return EvaluatorFactory.create(
-            input,
-            arrayOrigin,
-            onStdout,
-            onClear,
-            onEval
-        ) {
-            val str = it.split("/")
-            val file = withTimeoutOrNull(100) {
-                fileRepository.getEntryByPath(
-                    EntryPath(
-                        str.dropLast(1).map { FolderName(it) } + FileName(
-                            str.last()
-                        )
-                    ))
-            }
+    private suspend fun CallBuiltInFunctionScope.onImport(it: String): DnclObject {
+        val str = it.split("/")
+        val file = withTimeoutOrNull(100) {
+            fileRepository.getEntryByPath(
+                EntryPath(
+                    str.dropLast(1).map { FolderName(it) } + FileName(
+                        str.last()
+                    )
+                ))
+        }
 
-            if (file is ProgramFile) {
-                val content = fileRepository.getFileContent(file).value
-                val parser =
-                    Parser(Lexer(content)).getOrElse { err ->
-                        return@create DnclObject.RuntimeError(
-                            err.explain(content),
-                            args[0].astNode
-                        )
-                    }
-
-                val prog = parser.parseProgram().getOrElse { err ->
-                    return@create DnclObject.RuntimeError(
+        return if (file is ProgramFile) {
+            val content = fileRepository.getFileContent(file).value
+            val parser =
+                Parser(Lexer(content)).getOrElse { err ->
+                    return DnclObject.RuntimeError(
                         err.explain(content),
                         args[0].astNode
                     )
                 }
-                evaluator.evalProgram(prog, env).fold(ifLeft = {
-                    DnclObject.RuntimeError(
-                        it.message.orEmpty(),
-                        args[0].astNode
-                    )
-                }, ifRight = {
-                    DnclObject.Null(args[0].astNode)
-                })
-            } else {
-                return@create DnclObject.RuntimeError(
-                    "ファイル:$str が見つかりません",
+
+            val prog = parser.parseProgram().getOrElse { err ->
+                return DnclObject.RuntimeError(
+                    err.explain(content),
                     args[0].astNode
                 )
             }
+            evaluator.evalProgram(prog, env).fold(ifLeft = {
+                DnclObject.RuntimeError(
+                    it.message.orEmpty(),
+                    args[0].astNode
+                )
+            }, ifRight = {
+                DnclObject.Null(args[0].astNode)
+            })
+        } else {
+            DnclObject.RuntimeError(
+                "ファイル:$str が見つかりません",
+                args[0].astNode
+            )
         }
+    }
+
+    private fun getEvaluator(
+        input: String,
+        arrayOrigin: Int,
+        onEval: (suspend (AstNode, Environment) -> Unit)?
+    ): Evaluator {
+        return EvaluatorFactory.create(
+            input,
+            arrayOrigin, onEval
+        )
     }
 }

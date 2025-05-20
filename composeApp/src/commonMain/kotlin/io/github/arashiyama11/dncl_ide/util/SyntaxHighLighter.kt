@@ -8,7 +8,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import arrow.core.Either
-import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.InternalError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
@@ -88,7 +88,7 @@ class SyntaxHighLighter {
 
                         is Token.Japanese -> {
                             val style = when {
-                                next.getOrNull() is Token.ParenOpen || BuiltInFunction.from(t.literal) != null -> styles.buildInFunctionStyle
+                                next.getOrNull() is Token.ParenOpen || AllBuiltInFunction.from(t.literal) != null -> styles.buildInFunctionStyle
                                 else -> styles.identifierStyle
                             }
                             withStyle(style) {

@@ -3,7 +3,7 @@ package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 import arrow.core.Either
 import arrow.core.raise.either
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
@@ -13,14 +13,13 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 
 interface CallBuiltInFunctionScope {
     val evaluator: Evaluator
-    val fn: BuiltInFunction
+    val fn: AllBuiltInFunction
     val args: List<DnclObject>
     val env: Environment
     val astNode: AstNode
 }
 
 class Evaluator(
-    private val onCallBuiltInFunction: suspend CallBuiltInFunctionScope.() -> DnclObject,
     private val onCallSystemCommand: (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0,
     private val onEval: (suspend (AstNode, Environment) -> Unit)? = null
@@ -56,6 +55,7 @@ class Evaluator(
                     is AstNode.StringLiteral -> DnclObject.String(node.value, node)
                     is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node))
                     is AstNode.FunctionLiteral -> DnclObject.Function(
+                        null,
                         node.parameters, node.body, env.createChildEnvironment(), node
                     )
 
@@ -212,6 +212,7 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = either {
         val fn = DnclObject.Function(
+            functionStmt.name,
             functionStmt.parameters,
             functionStmt.block,
             env.createChildEnvironment(), functionStmt
@@ -255,13 +256,14 @@ class Evaluator(
             val args = callExpression.arguments.map {
                 eval(it, env).bind().onReturnValueOrError { return@either it }
             }
-            return@either onCallBuiltInFunction(object : CallBuiltInFunctionScope {
+            val scope = object : CallBuiltInFunctionScope {
                 override val args: List<DnclObject> = args
                 override val env: Environment = env
                 override val evaluator: Evaluator = this@Evaluator
-                override val fn: BuiltInFunction = func.identifier
+                override val fn: AllBuiltInFunction = func.identifier
                 override val astNode: AstNode = callExpression
-            })
+            }
+            return@either func.execute(scope)
         }
 
         if (func !is DnclObject.Function) {
@@ -541,13 +543,12 @@ class Evaluator(
         DnclObject.Array(elements.toMutableList(), arrayLiteral)
     }
 
-    private suspend fun evalIdentifier(
+    private fun evalIdentifier(
         identifier: AstNode.Identifier,
         env: Environment
     ): Either<DnclError, DnclObject> = either {
-        env.get(identifier.value) ?: BuiltInFunction.from(identifier.value)
-            ?.let { DnclObject.BuiltInFunction(it, identifier) }
-        ?: DnclObject.UndefinedError("識別子が見つかりません: ${identifier.value}", identifier)
+        env.get(identifier.value)
+            ?: DnclObject.UndefinedError("識別子が見つかりません: ${identifier.value}", identifier)
     }
 
     private fun isTruthy(obj: DnclObject): Boolean = when (obj) {

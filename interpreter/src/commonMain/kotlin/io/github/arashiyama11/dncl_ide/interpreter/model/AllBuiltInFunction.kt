@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
-enum class BuiltInFunction(private val identifier: String) {
+enum class AllBuiltInFunction(val identifier: String) {
     PRINT("表示する"), LENGTH("要素数"), DIFF("差分"), RETURN("戻り値"),
     CONCAT("連結"), PUSH("末尾追加"), SHIFT("先頭削除"), UNSHIFT("先頭追加"),
     POP("末尾削除"), INT("整数変換"), FLOAT("浮動小数点変換"), STRING("文字列変換"),
@@ -24,7 +24,7 @@ enum class BuiltInFunction(private val identifier: String) {
     CLEAR("出力消去"), SLEEP("待機");
 
     companion object {
-        fun from(identifier: String): BuiltInFunction? =
+        fun from(identifier: String): AllBuiltInFunction? =
             entries.find { it.identifier == identifier }
 
         fun allIdentifiers(): List<String> = entries.map { it.identifier }

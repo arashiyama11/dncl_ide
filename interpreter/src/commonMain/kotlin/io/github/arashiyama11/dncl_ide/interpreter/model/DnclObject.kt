@@ -1,5 +1,7 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
+
 
 sealed interface DnclObject {
     val astNode: AstNode
@@ -32,21 +34,22 @@ sealed interface DnclObject {
     }
 
     data class Function(
+        val name: kotlin.String?,
         val parameters: List<kotlin.String>,
         val body: AstNode.BlockStatement,
         val env: Environment, override val astNode: AstNode
     ) : DnclObject {
-        override fun toString() = "<関数 $parameters>"
+        override fun toString() = "<関数 ${name ?: "anonymous"}(${parameters.joinToString(", ")})>"
         override fun hash() =
             parameters.hashCode() + 31 * body.hashCode() + 31 * 31 * env.hashCode()
     }
 
     data class BuiltInFunction(
-        val identifier: io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction,
-        override val astNode: AstNode
-    ) :
-        DnclObject {
-        override fun toString() = identifier.name
+        val identifier: AllBuiltInFunction,
+        override val astNode: AstNode,
+        val execute: suspend CallBuiltInFunctionScope.() -> DnclObject
+    ) : DnclObject {
+        override fun toString() = "<組込関数 ${identifier.name}>"
 
         override fun hash() = identifier.hashCode()
     }

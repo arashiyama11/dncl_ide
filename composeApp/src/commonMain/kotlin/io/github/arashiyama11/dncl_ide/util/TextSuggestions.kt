@@ -3,7 +3,7 @@ package io.github.arashiyama11.dncl_ide.util
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunction
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
@@ -46,7 +46,9 @@ class TextSuggestions() {
             )
                 .firstOrNull { it.getOrNull() is Token.Identifier || it.getOrNull() is Token.Japanese }
         val globalVariables =
-            BuiltInFunction.allIdentifiers().map { Definition(it, null) } + globalVariables(program)
+            AllBuiltInFunction.allIdentifiers().map { Definition(it, null) } + globalVariables(
+                program
+            )
         val words =
             (filterDefinition(
                 statements = program.statements,
