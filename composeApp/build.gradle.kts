@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.aboutlLibraries)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -44,6 +46,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.io)
+            implementation(libs.navigation.compose)
 
             implementation(libs.arrow.core)
             implementation(libs.arrow.fx.coroutines)
@@ -56,6 +59,8 @@ kotlin {
             implementation(libs.multiplatform.settings.no.arg)
 
             implementation(libs.material.icons.core)
+            implementation(libs.aboutlibraries.core)
+            implementation(libs.kotlinx.serialization.json)
 
 
             implementation(project(":domain"))

@@ -39,10 +39,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
+import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -53,6 +58,7 @@ fun App() {
         val ideViewModel = koinViewModel<IdeViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
         val isDarkThemeStateFlow = rememberDarkThemeStateFlow()
+        val navController = rememberNavController()
 
         LaunchedEffect(Unit) {
             ideViewModel.onStart(isDarkThemeStateFlow)
@@ -121,7 +127,11 @@ fun App() {
             ModalNavigationDrawer(modifier = Modifier.fillMaxSize(), drawerContent = {
                 Column(modifier = Modifier.fillMaxHeight()) {
                     DrawerContent(
-                        Modifier.weight(1f, fill = true).verticalScroll(rememberScrollState()),
+                        Modifier.weight(1f, fill = true).verticalScroll(rememberScrollState()), {
+                            navController.navigate(
+                                Destination.LicensesScreen
+                            )
+                        },
                         drawerViewModel
                     )
                 }
@@ -136,11 +146,43 @@ fun App() {
                 } else {
                     contentPadding
                 }
-                DnclIDE(
-                    modifier = Modifier.padding(padding), ideViewModel
-                )
+
+                NavHost(navController, startDestination = Destination.App) {
+                    composable<Destination.App> {
+                        DnclIDE(
+                            modifier = Modifier.padding(padding), ideViewModel
+                        )
+                    }
+
+                    composable<Destination.LicensesScreen> {
+                        LicencesScreen(
+                            onBack = { navController.popBackStack() }
+                        ) {
+                            navController.navigate(Destination.SingleLicenseScreen(it))
+                        }
+                    }
+
+                    composable<Destination.SingleLicenseScreen> {
+                        val license = it.toRoute<Destination.SingleLicenseScreen>()
+                        SingleLicenseScreen(license.content) {
+                            navController.popBackStack()
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+object Destination {
+    @Serializable
+    object App
+
+    @Serializable
+    object LicensesScreen
+
+    @Serializable
+    data class SingleLicenseScreen(
+        val content: String,
+    )
+}

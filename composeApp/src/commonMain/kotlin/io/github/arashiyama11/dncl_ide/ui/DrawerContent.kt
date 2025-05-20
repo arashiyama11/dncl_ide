@@ -43,6 +43,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun DrawerContent(
     modifier: Modifier = Modifier,
+    navigateToLicenses: () -> Unit = {},
     drawerViewModel: DrawerViewModel = koinViewModel()
 ) {
     val uiState by drawerViewModel.uiState.collectAsState()
@@ -262,6 +263,15 @@ fun DrawerContent(
                             }
                         }
                     }
+
+                    NavigationDrawerItem(
+                        label = {
+                            Text(
+                                text = "ライセンス表示",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }, selected = false, onClick = navigateToLicenses
+                    )
                 }
             }
         }
