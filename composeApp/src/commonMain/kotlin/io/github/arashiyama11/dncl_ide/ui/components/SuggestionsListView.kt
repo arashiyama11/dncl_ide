@@ -16,23 +16,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.arashiyama11.dncl_ide.util.TextSuggestions
 
+private val TextSuggestions.Definition.insertText
+    get() = literal + if (isFunction) "()" else ""
 
 @Composable
 fun SuggestionListView(
-    textSuggestions: List<String>,
+    textSuggestions: List<TextSuggestions.Definition>,
     modifier: Modifier = Modifier,
     onConfirmTextSuggestion: (String) -> Unit
 ) {
     LazyRow(modifier.height(48.dp)) {
-        itemsIndexed(textSuggestions) { index, str ->
+        itemsIndexed(textSuggestions) { index, def ->
             Box(
                 Modifier.widthIn(min = 32.dp).fillMaxHeight()
-                    .clickable { onConfirmTextSuggestion(str) },
+                    .clickable { onConfirmTextSuggestion(def.insertText) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    str, color = MaterialTheme.colorScheme.onBackground,
+                    def.literal, color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 8.dp), textAlign = TextAlign.Center
                 )
             }

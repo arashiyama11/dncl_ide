@@ -3,7 +3,6 @@ package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
-import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject.TypeError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
 import kotlinx.coroutines.delay
@@ -68,7 +67,7 @@ object EvaluatorFactory {
                                     astNode
                                 )
 
-                                else -> TypeError(
+                                else -> DnclObject.TypeError(
                                     "第一引数は配列でなければなりません",
                                     astNode
                                 )

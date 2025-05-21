@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 
 @Composable
@@ -42,24 +43,25 @@ fun EnvironmentDebugView(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                environment.allKeys().forEach { key ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 32.dp, top = 4.dp)
-                    ) {
-                        Text(
-                            text = "${key}: ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.width(100.dp)
-                        )
-                        Text(
-                            text = environment.get(key).toString(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            softWrap = false
-                        )
+                environment.allKeys().filter { it !in AllBuiltInFunction.allIdentifiers() }
+                    .forEach { key ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 32.dp, top = 4.dp)
+                        ) {
+                            Text(
+                                text = "${key}: ",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.width(100.dp)
+                            )
+                            Text(
+                                text = environment.get(key).toString(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                softWrap = false
+                            )
+                        }
                     }
-                }
             }
         }
     }

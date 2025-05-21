@@ -27,6 +27,6 @@ enum class AllBuiltInFunction(val identifier: String) {
         fun from(identifier: String): AllBuiltInFunction? =
             entries.find { it.identifier == identifier }
 
-        fun allIdentifiers(): List<String> = entries.map { it.identifier }
+        fun allIdentifiers(): Set<String> = entries.mapTo(mutableSetOf()) { it.identifier }
     }
 }

@@ -12,12 +12,12 @@ import kotlin.math.min
 
 class TextSuggestions() {
 
-    private data class Definition(val literal: String, val position: Int?)
+    data class Definition(val literal: String, val position: Int?, val isFunction: Boolean)
 
     fun suggestWhenFailingParse(
         code: String,
         position: Int
-    ): List<String> {
+    ): List<Definition> {
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
         val lexer = Lexer(fixedCode)
         val prog = (Parser(lexer)).fold({
@@ -34,7 +34,7 @@ class TextSuggestions() {
         position: Int,
         tokens: List<Either<DnclError, Token>>,
         program: AstNode.Program
-    ): List<String> {
+    ): List<Definition> {
         val positionTokenIndex =
             tokens.indexOfFirst { it.getOrNull()?.range?.contains(position) == true }
         val currentToken =
@@ -46,7 +46,8 @@ class TextSuggestions() {
             )
                 .firstOrNull { it.getOrNull() is Token.Identifier || it.getOrNull() is Token.Japanese }
         val globalVariables =
-            AllBuiltInFunction.allIdentifiers().map { Definition(it, null) } + globalVariables(
+            AllBuiltInFunction.allIdentifiers()
+                .map { Definition(it, null, true) } + globalVariables(
                 program
             )
         val words =
@@ -74,7 +75,7 @@ class TextSuggestions() {
         } else words.sortedBy {
             if (it.position == null) return@sortedBy Int.MAX_VALUE
             if (position > it.position) -it.position else code.length * 5
-        }).map { it.literal }
+        })
     }
 
     private fun globalVariables(program: AstNode.Program): List<Definition> {
@@ -96,7 +97,8 @@ class TextSuggestions() {
                     result.addAll(stmt.assignments.map {
                         Definition(
                             it.first.literal,
-                            it.first.range.first
+                            it.first.range.first,
+                            it.second is AstNode.FunctionLiteral
                         )
                     })
                 }
@@ -107,14 +109,26 @@ class TextSuggestions() {
 
                 is AstNode.ExpressionStatement -> {}
                 is AstNode.ForStatement -> {
-                    result.add(Definition(stmt.loopCounter.literal, stmt.loopCounter.range.first))
+                    result.add(
+                        Definition(
+                            stmt.loopCounter.literal,
+                            stmt.loopCounter.range.first,
+                            false
+                        )
+                    )
                     result.addAll(filterDefinition(stmt.block.statements, depth - 1, limitPosition))
                 }
 
                 is AstNode.FunctionStatement -> {
-                    result.add(Definition(stmt.name, stmt.range.first))
+                    result.add(Definition(stmt.name, stmt.range.first, true))
                     if (stmt.range.contains(limitPosition)) {
-                        result.addAll(stmt.parameters.map { Definition(it, stmt.range.first) })
+                        result.addAll(stmt.parameters.map {
+                            Definition(
+                                it,
+                                stmt.range.first,
+                                false
+                            )
+                        })
                         result.addAll(
                             filterDefinition(
                                 stmt.block.statements,

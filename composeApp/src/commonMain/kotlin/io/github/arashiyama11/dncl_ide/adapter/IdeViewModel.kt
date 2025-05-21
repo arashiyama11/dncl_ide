@@ -57,7 +57,7 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
-    val textSuggestions: List<String> = emptyList()
+    val textSuggestions: List<TextSuggestions.Definition> = emptyList()
 )
 
 enum class TextFieldType {
