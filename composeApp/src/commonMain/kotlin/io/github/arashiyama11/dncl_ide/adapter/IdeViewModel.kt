@@ -138,10 +138,7 @@ class IdeViewModel(
             var parsedProgram: Either<DnclError, AstNode.Program>? = null
 
             if (tokens.all { it.isRight() }) {
-                val parser = Parser(Lexer(indentedText.text)).fold(
-                    ifLeft = { null },
-                    ifRight = { it }
-                )
+                val parser = Parser(Lexer(indentedText.text)).getOrNull()
 
                 if (parser != null) {
                     parsedProgram = parser.parseProgram()
@@ -160,15 +157,15 @@ class IdeViewModel(
                 tokens,
             )
 
-            if (error != null || highlightError != null) {
-                val finalError = error ?: highlightError
-                _uiState.updateOnMain {
-                    it.copy(
-                        dnclError = finalError,
-                        output = finalError?.explain(uiState.value.codeTextFieldValue.text) ?: "",
-                        errorRange = finalError?.errorRange,
-                    )
-                }
+            val finalError = error ?: highlightError
+            _uiState.updateOnMain {
+                it.copy(
+                    dnclError = finalError,
+                    output = finalError?.explain(uiState.value.codeTextFieldValue.text)
+                        ?: if (it.dnclError == null) it.output else "",
+                    errorRange = finalError?.errorRange
+                        ?: if (it.dnclError == null) it.errorRange else null,
+                )
             }
 
             // Use the shared results for text suggestions
@@ -210,7 +207,8 @@ class IdeViewModel(
                     isError = false,
                     errorRange = null,
                     currentEvaluatingLine = null,
-                    isExecuting = true
+                    isExecuting = true,
+                    dnclError = null
                 )
             }
             onTextChanged(uiState.value.codeTextFieldValue)

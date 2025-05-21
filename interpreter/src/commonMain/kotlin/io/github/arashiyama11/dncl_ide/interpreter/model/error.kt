@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
 import kotlin.math.max
+import kotlin.math.min
 
 sealed interface DnclError {
     val message: String?
@@ -25,11 +26,9 @@ sealed class LexerError(override val message: String, open val index: Int) :
                     idx += line.length + 1
                 } else {
                     val col = index - idx
-                    println(line)
-                    println(line.substring(0, col))
                     val sp = line.substring(0, col)
                         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col, i, sp)
+                    return@run Triple(col, i + 1, sp)
                 }
             }
             return@run Triple(0, 0, 0)
@@ -37,7 +36,7 @@ sealed class LexerError(override val message: String, open val index: Int) :
 
         return """行: $line, 列: $column $spaces
 $message
-${programLines.subList(max(0, line - 5), max(1, line + 1)).joinToString("\n")}
+${programLines.subList(max(0, line - 3), min(programLines.size, line)).joinToString("\n")}
 ${" ".repeat(spaces)}${"^"}
 """
     }
@@ -70,7 +69,7 @@ sealed class ParserError(
                     val col = failToken.range.first - index
                     val sp = str.substring(0, col)
                         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col, l, sp)
+                    return@run Triple(col, l + 1, sp)
                 }
             }
             return@run Triple(0, 0, 0)
@@ -78,13 +77,13 @@ sealed class ParserError(
 
         return """行: $line, 列: $column
 $message
-${programLines.subList(max(0, line - 5), line + 1).joinToString("\n")}
+${programLines.subList(max(0, line - 3), line).joinToString("\n")}
 ${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.first))}"""
     }
 
     data class UnExpectedToken(override val failToken: Token, val expectedToken: String? = null) :
         ParserError(
-            "予期しないトークン: ${failToken.literal}${if (expectedToken != null) "、期待されるトークン: $expectedToken" else ""}",
+            "予期しないトークン: ${failToken.literal}${if (expectedToken != null) "\n期待されるトークン: $expectedToken" else ""}",
             failToken
         )
 

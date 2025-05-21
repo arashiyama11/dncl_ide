@@ -548,7 +548,10 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = either {
         env.get(identifier.value)
-            ?: DnclObject.UndefinedError("識別子が見つかりません: ${identifier.value}", identifier)
+            ?: DnclObject.UndefinedError(
+                "変数「${identifier.value}」は定義されていません",
+                identifier
+            )
     }
 
     private fun isTruthy(obj: DnclObject): Boolean = when (obj) {

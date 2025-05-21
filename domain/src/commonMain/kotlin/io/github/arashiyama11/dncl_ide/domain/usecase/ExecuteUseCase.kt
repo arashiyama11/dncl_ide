@@ -152,7 +152,7 @@ class ExecuteUseCase(
 
                 evaluator.evalProgram(ast, globalEnv).let { err ->
                     if (err.isLeft()) {
-                        send(DnclOutput.Error(err.leftOrNull()!!.message.orEmpty()))
+                        send(DnclOutput.Error(err.leftOrNull()!!.explain(program)))
                     } else if (err.getOrNull() is DnclObject.Error) {
                         val e = err.getOrNull()!! as DnclObject.Error
                         send(DnclOutput.RuntimeError(e))

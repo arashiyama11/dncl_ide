@@ -121,7 +121,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         raise(
             ParserError.UnExpectedToken(
                 currentToken,
-                "改行とインデントが必要です :${Exception().stackTraceToString()}"
+                "改行とインデントが必要です"
             )
         )
     }
@@ -411,7 +411,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             else -> {
-                raise(ParserError.UnknownPrefixOperator(token))
+                if (token is Token.EOF) raise(
+                    ParserError.UnExpectedToken(
+                        token, "期待せず式が終了しました"
+                    )
+                )
+                else
+                    raise(ParserError.UnknownPrefixOperator(token))
             }
         }
     }
