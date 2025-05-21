@@ -691,7 +691,7 @@ object EvaluatorFactory {
                             when (args[0]) {
                                 is DnclObject.Int -> {
                                     val milliseconds = (args[0] as DnclObject.Int).value.toLong()
-                                    kotlinx.coroutines.delay(milliseconds)
+                                    delay(milliseconds)
                                     DnclObject.Null(args[0].astNode)
                                 }
 
