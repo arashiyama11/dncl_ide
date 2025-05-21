@@ -20,19 +20,27 @@ class EvaluatorTest {
     private var stdout = ""
     private lateinit var evaluator: Evaluator
     private lateinit var evaluator0Origin: Evaluator
+    private val builtInEnv = runBlocking {
+        EvaluatorFactory.createBuiltInFunctionEnvironment(
+            onStdout = {
+                stdout += "$it\n"
+            },
+            onClear = {
+                stdout = ""
+            },
+            onImport = { DnclObject.Null(astNode) },
+        )
+    }
 
     @BeforeTest
     fun setUp() {
         stdin = nullObj
         stdout = ""
-        evaluator = EvaluatorFactory.create("62", 1, {
-            println("print: $it")
-            stdout += "$it\n"
-        }) { DnclObject.Null(args[0].astNode) }
+        evaluator =
+            EvaluatorFactory.create("62", 1) { astNode, _ -> DnclObject.Null(astNode) }
 
-        evaluator0Origin = EvaluatorFactory.create("62", 0, {
-            stdout += "$it\n"
-        }) { DnclObject.Null(args[0].astNode) }
+        evaluator0Origin =
+            EvaluatorFactory.create("62", 0) { astNode, _ -> DnclObject.Null(astNode) }
     }
 
     @Test
@@ -71,7 +79,7 @@ Data = [65, 18, 29, 48, 52, 3, 62, 77, 89, 9, 7, 33]
 D = quick_sort(Data)
 表示する(D)
 """
-        val env = Environment()
+        val env = Environment(builtInEnv)
         val a = runBlocking {
             evaluator0Origin.evalProgram(
                 program.toProgram(),
@@ -89,7 +97,8 @@ D = quick_sort(Data)
 
     fun testEval(evaluator: Evaluator, program: String, expected: String) {
         runBlocking {
-            evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+            evaluator.evalProgram(program.toProgram(), Environment(builtInEnv)).leftOrNull()
+                ?.let { fail(it.toString()) }
         }
         assertEquals(expected, stdout)
     }
@@ -132,7 +141,7 @@ D = quick_sort(Data)
 
     @Test
     fun testSisaku2022_1() {
-        val env = Environment()
+        val env = Environment(builtInEnv)
         runBlocking {
             evaluator0Origin.evalProgram(TestCase.MaisuFunction.toProgram(), env).leftOrNull()
                 ?.let { fail(it.toString()) }

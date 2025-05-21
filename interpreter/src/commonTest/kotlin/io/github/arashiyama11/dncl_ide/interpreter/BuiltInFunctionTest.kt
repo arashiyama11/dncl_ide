@@ -4,6 +4,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
@@ -19,6 +20,18 @@ class BuiltInFunctionTest {
     private var clearCalled = false
     private lateinit var evaluator: Evaluator
 
+    private val builtInEnv = runBlocking {
+        EvaluatorFactory.createBuiltInFunctionEnvironment(
+            onStdout = {
+                stdout += "$it\n"
+            },
+            onClear = {
+                clearCalled = true
+            },
+            onImport = { DnclObject.Null(astNode) },
+        )
+    }
+
     @BeforeTest
     fun setUp() {
         stdout = ""
@@ -27,13 +40,9 @@ class BuiltInFunctionTest {
             EvaluatorFactory.create(
                 input = "",
                 arrayOrigin = 0,
-                onStdout = {
-                    stdout += "$it\n"
-                },
-                onClear = {
-                    clearCalled = true
-                }
-            ) { DnclObject.Null(args[0].astNode) }
+            ) { astNode, _ ->
+                DnclObject.Null(astNode)
+            }
 
     }
 
@@ -41,14 +50,15 @@ class BuiltInFunctionTest {
 
     private fun testEval(program: String, expected: String) {
         runBlocking {
-            evaluator.evalProgram(program.toProgram()).leftOrNull()?.let { fail(it.toString()) }
+            evaluator.evalProgram(program.toProgram(), Environment(builtInEnv)).leftOrNull()
+                ?.let { fail(it.toString()) }
         }
         assertEquals(expected, stdout)
     }
 
     private fun evalAndGetResult(program: String): DnclObject {
         return runBlocking {
-            val result = evaluator.evalProgram(program.toProgram())
+            val result = evaluator.evalProgram(program.toProgram(), Environment(builtInEnv))
             result.leftOrNull()?.let { fail(it.toString()) }
             result.getOrNull() ?: fail("Evaluation failed")
         }
