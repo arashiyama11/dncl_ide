@@ -215,7 +215,6 @@ private fun explainError(
         program.substring(errorRange.first, min(program.length, errorRange.last + 1))
             .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
             .let { if (it <= 0) 1 else it }
-    println("""${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}""")
     return """${line}行${column}文字目でエラーが発生しました
 $message
 ${"=".repeat(15)}
