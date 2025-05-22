@@ -129,24 +129,24 @@ class Evaluator(
         val block = forStmt.block
         env.set(loopCounter, start)
         if (start !is DnclObject.Int) return@either DnclObject.TypeError(
-            "Int",
-            start::class.simpleName ?: "", start.astNode
+            message = "繰り返し文の開始値は整数である必要があります。\n開始値として ${start::class.simpleName} が使用されようとしました",
+            start.astNode
         )
         if (end !is DnclObject.Int) return@either DnclObject.TypeError(
-            "Int",
-            end::class.simpleName ?: "", end.astNode
+            message = "繰り返し文の終了値は整数である必要があります。\n終了値として ${end::class.simpleName} が使用されようとしました",
+            end.astNode
         )
         if (step !is DnclObject.Int) return@either DnclObject.TypeError(
-            "Int",
-            step::class.simpleName ?: "", step.astNode
+            message = "繰り返し文の増分値は整数である必要があります。\n増分値として ${step::class.simpleName} が使用されようとしました",
+            step.astNode
         )
         while (true) {
             val loopCounterValue =
                 env.get(loopCounter) ?: raise(InternalError("ループカウンターが見つかりません"))
             if (stepType == AstNode.ForStatement.Companion.StepType.INCREMENT) {
                 if (loopCounterValue !is DnclObject.Int) return@either DnclObject.TypeError(
-                    "Int",
-                    loopCounterValue::class.simpleName ?: "", loopCounterValue.astNode
+                    message = "繰り返し文のカウンタ変数は整数である必要があります。\nカウンタ変数として ${loopCounterValue::class.simpleName} が使用されようとしました",
+                    loopCounterValue.astNode
                 )
                 if (loopCounterValue.value > end.value) break
                 eval(block, env).bind().onReturnValueOrError { return@either it }
@@ -180,13 +180,13 @@ class Evaluator(
                 is AstNode.IndexExpression -> {
                     val array = eval(id.left, env).bind().onReturnValueOrError { return@either it }
                     if (array !is DnclObject.Array) return@either DnclObject.TypeError(
-                        "Array",
-                        array::class.simpleName ?: "", array.astNode
+                        message = "配列添字演算子「[]」は配列に対してのみ使用可能です。\n${array::class.simpleName}[...] が実行されようとしました",
+                        array.astNode
                     )
                     val index = eval(id.right, env).bind().onReturnValueOrError { return@either it }
                     if (index !is DnclObject.Int) return@either DnclObject.TypeError(
-                        "Int",
-                        index::class.simpleName ?: "", index.astNode
+                        message = "配列の添字は整数である必要があります。\n配列[${index::class.simpleName}] が実行されようとしました",
+                        index.astNode
                     )
                     if (index.value - arrayOrigin in array.value.indices)
                         array.value[index.value - arrayOrigin] =
@@ -228,14 +228,14 @@ class Evaluator(
     ): Either<DnclError, DnclObject> = either {
         val array = eval(indexExpression.left, env).bind().onReturnValueOrError { return@either it }
         if (array !is DnclObject.Array) return@either DnclObject.TypeError(
-            "Array",
-            array::class.simpleName ?: "", array.astNode
+            message = "配列添字演算子「[]」は配列に対してのみ使用可能です。\n${array::class.simpleName}[...] が実行されようとしました",
+            array.astNode
         )
         val index =
             eval(indexExpression.right, env).bind().onReturnValueOrError { return@either it }
         if (index !is DnclObject.Int) return@either DnclObject.TypeError(
-            "Int",
-            index::class.simpleName ?: "", index.astNode
+            message = "配列の添字は整数である必要があります。\n配列[${index::class.simpleName}] が実行されようとしました",
+            index.astNode
         )
         if (index.value - arrayOrigin in array.value.indices)
             array.value[index.value - arrayOrigin]
@@ -268,8 +268,8 @@ class Evaluator(
 
         if (func !is DnclObject.Function) {
             return@either DnclObject.TypeError(
-                "Function",
-                func::class.simpleName ?: "", func.astNode
+                message = "関数呼び出しは関数に対してのみ可能です。\n${func::class.simpleName}(...) が実行されようとしました",
+                func.astNode
             )
         }
         val args = callExpression.arguments.map {
@@ -295,8 +295,7 @@ class Evaluator(
                 is DnclObject.Int -> DnclObject.Int(-right.value, prefixExpression)
                 is DnclObject.Float -> DnclObject.Float(-right.value, prefixExpression)
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    right::class.simpleName ?: "",
+                    message = "単項演算子「-」は整数、小数のみに適用可能です。\n-${right::class.simpleName} が実行されようとしました",
                     prefixExpression
                 )
             }
@@ -305,8 +304,7 @@ class Evaluator(
                 is DnclObject.Int -> DnclObject.Int(+right.value, prefixExpression)
                 is DnclObject.Float -> DnclObject.Float(+right.value, prefixExpression)
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    right::class.simpleName ?: "",
+                    message = "単項演算子「+」は整数、小数のみに適用可能です。\n+${right::class.simpleName} が実行されようとしました",
                     prefixExpression
                 )
             }
@@ -343,8 +341,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int, Float or String",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「+」は整数、小数、文字列、配列の同じ型同士の演算のみ可能です。\n${left::class.simpleName} + ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -360,8 +358,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「-」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} - ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -377,8 +375,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「*」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} * ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -394,8 +392,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「/」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} / ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -411,8 +409,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「//」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} // ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
 
             }
@@ -424,8 +422,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「%」は整数同士の演算のみ可能です。\n${left::class.simpleName} % ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -439,20 +437,14 @@ class Evaluator(
                 infixExpression
             ) else DnclObject.Boolean(left.hash() != right.hash(), infixExpression)
 
-            is Token.LessThan -> when {
-                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(
-                    left.value < right.value,
+            is Token.LessThan -> {
+                if ((left is DnclObject.Int || right is DnclObject.Float) && (left is DnclObject.Int || left is DnclObject.Float)) {
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
+                    return@either DnclObject.Boolean(leftFloat < rightFloat, infixExpression)
+                } else DnclObject.TypeError(
+                    message = "演算子「<」は整数または小数の演算のみ可能です。\n${left::class.simpleName} < ${right::class.simpleName} が実行されようとしました",
                     infixExpression
-                )
-
-                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(
-                    left.value < right.value,
-                    infixExpression
-                )
-
-                else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
                 )
             }
 
@@ -468,8 +460,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「<=」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} <= ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -485,8 +477,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「>」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} > ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -502,8 +494,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Int or Float",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「>=」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} >= ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -514,8 +506,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Boolean",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「&&」は論理値同士の演算のみ可能です。\n${left::class.simpleName} && ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
 
@@ -526,8 +518,8 @@ class Evaluator(
                 )
 
                 else -> DnclObject.TypeError(
-                    "Boolean",
-                    "${left::class.simpleName} and ${right::class.simpleName}", infixExpression
+                    message = "演算子「||」は論理値同士の演算のみ可能です。\n${left::class.simpleName} || ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
                 )
             }
         }
