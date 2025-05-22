@@ -36,8 +36,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -58,9 +58,12 @@ fun CodeEditor(
 ) {
     val fontSizeDouble =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
-    val codeStyle = TextStyle(
+
+
+    val codeStyle = LocalCodeTypography.current.bodyMedium.copy(
         fontSize = fontSizeDouble.sp,
-        lineHeight = (fontSizeDouble + 2).sp
+        lineHeight = (fontSizeDouble + 2).sp,
+        fontWeight = FontWeight.Normal
     )
 
     var lineHeightDp = with(LocalDensity.current) {
