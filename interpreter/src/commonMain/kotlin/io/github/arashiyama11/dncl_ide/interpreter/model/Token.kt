@@ -13,10 +13,10 @@ sealed interface Token {
     data class EOF(override val range: IntRange, override val literal: kotlin.String = "EOF") :
         Token
 
-    data class Colon(override val range: IntRange, override val literal: kotlin.String = "COLON") :
+    data class Colon(override val range: IntRange, override val literal: kotlin.String = ":") :
         Token
 
-    data class Comma(override val range: IntRange, override val literal: kotlin.String = "COMMA") :
+    data class Comma(override val range: IntRange, override val literal: kotlin.String = ",") :
         Token
 
     data class NewLine(
@@ -110,45 +110,58 @@ sealed interface Token {
     data class Or(override val range: IntRange, override val literal: kotlin.String = "OR") : Token,
         InfixExpressionToken
 
-    data class If(override val range: IntRange, override val literal: kotlin.String = "IF") : Token
-
-    data class Then(override val range: IntRange, override val literal: kotlin.String = "THEN") :
-        ExpressionStopToken
-
-    data class Else(override val range: IntRange, override val literal: kotlin.String = "ELSE") :
-        ExpressionStopToken
-
-    data class Elif(override val range: IntRange, override val literal: kotlin.String = "ELIF") :
-        ExpressionStopToken
-
-    data class Wo(override val range: IntRange, override val literal: kotlin.String = "WO") : Token,
-        ExpressionStopToken
-
-    data class Kara(override val range: IntRange, override val literal: kotlin.String = "KARA") :
-        ExpressionStopToken
-
-    data class Made(override val range: IntRange, override val literal: kotlin.String = "MADE") :
-        ExpressionStopToken
-
-    data class While(override val range: IntRange, override val literal: kotlin.String = "WHILE") :
+    data class If(override val range: IntRange, override val literal: kotlin.String = "もし") :
         Token
 
-    data class UpTo(override val range: IntRange, override val literal: kotlin.String = "UpTo") :
+    data class Then(override val range: IntRange, override val literal: kotlin.String = "ならば") :
+        ExpressionStopToken
+
+    data class Else(
+        override val range: IntRange,
+        override val literal: kotlin.String = "そうでなければ"
+    ) :
+        ExpressionStopToken
+
+    data class Elif(
+        override val range: IntRange,
+        override val literal: kotlin.String = "そうでなくもし"
+    ) :
+        ExpressionStopToken
+
+    data class Wo(override val range: IntRange, override val literal: kotlin.String = "を") : Token,
+        ExpressionStopToken
+
+    data class Kara(override val range: IntRange, override val literal: kotlin.String = "から") :
+        ExpressionStopToken
+
+    data class Made(override val range: IntRange, override val literal: kotlin.String = "まで") :
+        ExpressionStopToken
+
+    data class While(
+        override val range: IntRange,
+        override val literal: kotlin.String = "の間繰り返す"
+    ) :
+        Token
+
+    data class UpTo(
+        override val range: IntRange,
+        override val literal: kotlin.String = "ずつ増やしながら繰り返す"
+    ) :
         ExpressionStopToken
 
     data class Function(
         override val range: IntRange,
-        override val literal: kotlin.String = "FUNCTION"
+        override val literal: kotlin.String = "関数"
     ) : Token
 
     data class Define(
         override val range: IntRange,
-        override val literal: kotlin.String = "DEFINE"
+        override val literal: kotlin.String = "と定義する"
     ) : Token
 
     data class DownTo(
         override val range: IntRange,
-        override val literal: kotlin.String = "DownTo"
+        override val literal: kotlin.String = "ずつ減らしながら繰り返す"
     ) : ExpressionStopToken
 
     data class Indent(

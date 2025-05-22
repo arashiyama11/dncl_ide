@@ -1,7 +1,10 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
+import arrow.core.leftNel
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.reflect.KClass
+import kotlin.reflect.KClassifier
 
 sealed interface DnclError {
     val message: String?
@@ -18,6 +21,7 @@ private fun isHalfWidth(char: Char): Boolean {
 sealed class LexerError(override val message: String, open val index: Int) :
     DnclError {
     override fun explain(program: String): String {
+        return explainError(program, message, index until index)
         val programLines = program.split("\n")
         val (column, line, spaces) = run {
             var idx = 0
@@ -28,16 +32,24 @@ sealed class LexerError(override val message: String, open val index: Int) :
                     val col = index - idx
                     val sp = line.substring(0, col)
                         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col, i + 1, sp)
+                    return@run Triple(col + 1, i + 1, sp)
                 }
             }
             return@run Triple(0, 0, 0)
         }
 
-        return """行: $line, 列: $column $spaces
+        return """${line}行${column}文字目でエラーが発生しました
 $message
-${programLines.subList(max(0, line - 3), min(programLines.size, line)).joinToString("\n")}
-${" ".repeat(spaces)}${"^"}
+${"=".repeat(15)}
+${
+            programLines.withIndex().toList().subList(max(0, line - 3), line)
+                .joinToString("\n") { (index, value) ->
+                    "${
+                        (index + 1).toString().padStart((line).toString().length, ' ')
+                    }| $value"
+                }
+        }
+${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^"}
 """
     }
 
@@ -45,7 +57,7 @@ ${" ".repeat(spaces)}${"^"}
         val char: Char, override val index: Int,
         override val errorRange: IntRange = index..index
     ) :
-        LexerError("予期しない文字: $char", index)
+        LexerError("「$char」は無効な文字です", index)
 
     data class UnExpectedEOF(
         override val index: Int,
@@ -56,9 +68,10 @@ ${" ".repeat(spaces)}${"^"}
 
 sealed class ParserError(
     override val message: String, open val failToken: Token,
-    override val errorRange: IntRange? = failToken.range
+    override val errorRange: IntRange = failToken.range
 ) : DnclError {
     override fun explain(program: String): String {
+        return explainError(program, message, errorRange)
         val programLines = program.split("\n")
         val (column, line, spaces) = run {
             var index = 0
@@ -69,17 +82,35 @@ sealed class ParserError(
                     val col = failToken.range.first - index
                     val sp = str.substring(0, col)
                         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col, l + 1, sp)
+                    return@run Triple(col + 1, l + 1, sp)
                 }
             }
             return@run Triple(0, 0, 0)
         }
 
-        return """行: $line, 列: $column
+        val hats =
+            program.substring(errorRange.first, min(program.length, errorRange.last + 1))
+                .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
+                .let { if (it == 0) 1 else it }
+        return """${line}行${column}文字目でエラーが発生しました
 $message
-${programLines.subList(max(0, line - 3), line).joinToString("\n")}
-${" ".repeat(spaces)}${"^".repeat(max(1, failToken.range.last - failToken.range.first))}"""
+${"=".repeat(15)}
+${
+            programLines.withIndex().toList().subList(max(0, line - 3), line)
+                .joinToString("\n") { (index, value) ->
+                    "${
+                        (index + 1).toString().padStart((line).toString().length, ' ')
+                    }| $value"
+                }
+        }
+${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
     }
+
+    data class ParseError(
+        override val message: String,
+        override val failToken: Token,
+        override val errorRange: IntRange = failToken.range
+    ) : ParserError(message, failToken, errorRange)
 
     data class UnExpectedToken(override val failToken: Token, val expectedToken: String? = null) :
         ParserError(
@@ -111,4 +142,95 @@ data class InternalError(override val message: String, override val errorRange: 
     override fun explain(program: String): String {
         return message
     }
+}
+
+
+inline fun <reified T : Token> tokenToLiteral(): String? {
+    return when (T::class) {
+        Token.Colon::class -> ":"
+        Token.Comma::class -> ","
+        Token.NewLine::class -> "NEW_LINE"
+        Token.ParenOpen::class -> "("
+        Token.ParenClose::class -> ")"
+        Token.BracketOpen::class -> "["
+        Token.BracketClose::class -> "]"
+        Token.BraceOpen::class -> "{"
+        Token.BraceClose::class -> "}"
+        Token.LenticularOpen::class -> "【"
+        Token.LenticularClose::class -> "】"
+        Token.Plus::class -> "+"
+        Token.Minus::class -> "-"
+        Token.Times::class -> "*"
+        Token.DivideInt::class -> "//"
+        Token.Divide::class -> "/"
+        Token.Modulo::class -> "%"
+        Token.Assign::class -> "="
+        Token.Equal::class -> "=="
+        Token.NotEqual::class -> "≠"
+        Token.GreaterThan::class -> ">"
+        Token.LessThan::class -> "<"
+        Token.GreaterThanOrEqual::class -> "≧"
+        Token.LessThanOrEqual::class -> "≦"
+        Token.Bang::class -> "!"
+        Token.And::class -> "AND"
+        Token.Or::class -> "OR"
+        Token.If::class -> "もし"
+        Token.Then::class -> "ならば"
+        Token.Else::class -> "そうでなければ"
+        Token.Elif::class -> "そうでなくもし"
+        Token.Wo::class -> "を"
+        Token.Kara::class -> "から"
+        Token.Made::class -> "まで"
+        Token.While::class -> "の間繰り返す"
+        Token.UpTo::class -> "ずつ増やしながら繰り返す"
+        Token.Function::class -> "関数"
+        Token.Define::class -> "と定義する"
+        Token.DownTo::class -> "ずつ減らしながら"
+        else -> ""
+    }
+}
+
+private fun explainError(
+    program: String,
+    message: String,
+    errorRange: IntRange
+): String {
+    val programLines = program.split("\n")
+    val (column, line, spaces) = run {
+        var index = 0
+        for ((l, str) in programLines.withIndex()) {
+            if (index + str.length < errorRange.first) {
+                index += str.length + 1
+            } else {
+                val col = errorRange.first - index
+                val sp = str.substring(0, col)
+                    .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
+                return@run Triple(col + 1, l + 1, sp)
+            }
+        }
+        return@run Triple(0, 0, 0)
+    }
+
+    val hats =
+        program.substring(errorRange.first, min(program.length, errorRange.last + 1))
+            .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
+            .let { if (it <= 0) 1 else it }
+    println("""${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}""")
+    return """${line}行${column}文字目でエラーが発生しました
+$message
+${"=".repeat(15)}
+${
+        programLines.withIndex().toList().subList(max(0, line - 3), line)
+            .joinToString("\n") { (index, value) ->
+                "${
+                    (index + 1).toString().padStart((line).toString().length, ' ')
+                }| $value"
+            }
+    }
+${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
+}
+
+
+fun DnclObject.Error.explain(program: String): String {
+    return explainError(program, message, astNode.range)
 }

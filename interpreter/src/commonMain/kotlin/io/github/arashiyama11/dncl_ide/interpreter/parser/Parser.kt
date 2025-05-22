@@ -16,6 +16,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.ParserError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Precedence
 import io.github.arashiyama11.dncl_ide.interpreter.model.PrefixExpressionToken
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
+import io.github.arashiyama11.dncl_ide.interpreter.model.tokenToLiteral
 
 class Parser private constructor(private val lexer: ILexer) : IParser {
     private val indentStack: MutableList<Int> = mutableListOf(0)
@@ -96,7 +97,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseExpressionStatement(): Either<DnclError, AstNode.Statement> =
         either {
             val expression = parseExpression(Precedence.LOWEST).bind()
-            requireEndOfLine().bind()
+            requireEndOfLine {
+                ParserError.ParseError(
+                    "一行に複数の式を書けません",
+                    currentToken,
+                )
+            }.bind()
             if (expression is AstNode.WhileExpression) {
                 expression.toStatement()
             } else AstNode.ExpressionStatement(expression)
@@ -126,17 +132,34 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         )
     }
 
-    private inline fun <reified T> expectNextToken(): Either<DnclError, Unit> = either {
+    private inline fun requireEndOfLine(onError: () -> ParserError): Either<DnclError, Unit> =
+        either {
+            if (currentToken is Token.EOF) return@either
+            if (currentToken is Token.NewLine && nextToken is Token.Indent) return@either
+            raise(onError())
+        }
+
+
+    private inline fun <reified T : Token> expectNextToken(): Either<DnclError, Unit> = either {
         nextToken()
         if (currentToken !is T) {
             raise(
                 ParserError.UnExpectedToken(
                     currentToken,
-                    expectedToken = T::class.simpleName
+                    expectedToken = tokenToLiteral<T>()
                 )
             )
         }
     }
+
+    private inline fun <reified T> expectNextToken(onError: () -> ParserError): Either<DnclError, Unit> =
+        either {
+            nextToken()
+            if (currentToken !is T) {
+                raise(onError())
+            }
+        }
+
 
     @EnsuredEndOfLine
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
@@ -370,7 +393,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.ParenOpen -> {
                 nextToken().bind()
                 val expression = parseExpression(Precedence.LOWEST).bind()
-                expectNextToken<Token.ParenClose>().bind()
+                expectNextToken<Token.ParenClose> {
+                    ParserError.ParseError("カッコが閉じていません", token)
+                }.bind()
                 expression
             }
 
@@ -410,19 +435,19 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 lit
             }
 
-            else -> {
-                if (token is Token.EOF) raise(
-                    ParserError.UnExpectedToken(
-                        token, "期待せず式が終了しました"
-                    )
+            is Token.EOF -> raise(
+                ParserError.ParseError(
+                    "期待せず式が終了しました", token
                 )
-                else
-                    raise(ParserError.UnknownPrefixOperator(token))
+            )
+
+            else -> {
+                raise(ParserError.UnknownPrefixOperator(token))
             }
         }
     }
 
-    private inline fun <reified T> parseExpressionList(): Either<DnclError, List<AstNode.Expression>> =
+    private inline fun <reified T : Token> parseExpressionList(): Either<DnclError, List<AstNode.Expression>> =
         either {
             if (currentToken is T) {
                 return emptyList<AstNode.Expression>().right()
@@ -445,7 +470,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
             }
 
-            expectNextToken<T>().bind()
+            expectNextToken<T> {
+                ParserError.ParseError("式が閉じていません", currentToken)
+            }.bind()
             return list.toList().right()
         }
 

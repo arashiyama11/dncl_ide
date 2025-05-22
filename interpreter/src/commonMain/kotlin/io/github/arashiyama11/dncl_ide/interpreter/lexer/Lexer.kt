@@ -284,7 +284,7 @@ class Lexer(private val input: String) : ILexer {
         do {
             readChar()
             if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(
-                position,
+                pos - 1,
                 message = "文字列が閉じていません"
             ).left()
         } while (ch != end)

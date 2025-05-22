@@ -100,5 +100,8 @@ sealed interface DnclObject {
         val index: kotlin.Int,
         val length: kotlin.Int,
         override val astNode: AstNode
-    ) : Error("インデックス: $index, 配列の長さ: $length", astNode)
+    ) : Error(
+        "配列の範囲外アクセスがされました。\n配列の長さ:${length} \nインデックス:$index",
+        astNode
+    )
 }

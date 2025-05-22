@@ -21,6 +21,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.util.TextSuggestions
@@ -222,7 +223,7 @@ class IdeViewModel(
                     is DnclOutput.RuntimeError -> {
                         _uiState.updateOnMain {
                             it.copy(
-                                output = "${it.output}\n${output.value.message}",
+                                output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text),
                                 isError = true,
                                 errorRange = output.value.astNode.range
                             )
