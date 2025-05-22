@@ -2,12 +2,8 @@ package io.github.arashiyama11.dncl_ide.interpreter
 
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
-import io.github.arashiyama11.dncl_ide.interpreter.model.ParserError
-import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
@@ -37,7 +33,7 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testLexerErrors() {
+    fun testInvalidCharacterError() {
         runTest(
             """a;b""",
             """1行2文字目でエラーが発生しました
@@ -46,6 +42,10 @@ class IntegrationErrorTest {
 1| a;b
     ^"""
         )
+    }
+
+    @Test
+    fun testUnclosedStringError() {
         runTest(
             """
 1+1
@@ -61,7 +61,7 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testParserErrors() {
+    fun testMultipleExpressionsInOneLineError() {
         //runTest("""""", """""")
         runTest(
             """let a = 1""", """1行1文字目でエラーが発生しました
@@ -70,7 +70,10 @@ class IntegrationErrorTest {
 1| let a = 1
    ^^^"""
         )
+    }
 
+    @Test
+    fun testUnclosedParenthesisError() {
         runTest(
             """
 
@@ -82,7 +85,10 @@ class IntegrationErrorTest {
 3| 1 + ( 2 + 3 
        ^"""
         )
+    }
 
+    @Test
+    fun testUnexpectedEndOfExpressionInArrayError() {
         runTest(
             """[1,2,""", """1行6文字目でエラーが発生しました
 期待せず式が終了しました
@@ -90,7 +96,10 @@ class IntegrationErrorTest {
 1| [1,2,
         ^"""
         )
+    }
 
+    @Test
+    fun testUnexpectedTokenInIfConditionError() {
         runTest(
             """もし x が 1""", """1行6文字目でエラーが発生しました
 予期しないトークン: が
@@ -102,7 +111,7 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testEvaluatorErrors() {
+    fun testArrayIndexOutOfBoundsError() {
         runTest(
             """[1,2,3][123]""", """1行9文字目でエラーが発生しました
 配列の範囲外アクセスがされました。
@@ -112,7 +121,10 @@ class IntegrationErrorTest {
 1| [1,2,3][123]
            ^^^"""
         )
+    }
 
+    @Test
+    fun testUndefinedVariableError() {
         runTest(
             "\n\na", """3行1文字目でエラーが発生しました
 変数「a」は定義されていません
