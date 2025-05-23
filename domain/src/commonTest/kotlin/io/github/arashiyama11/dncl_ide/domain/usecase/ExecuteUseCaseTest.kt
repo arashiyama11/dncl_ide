@@ -70,7 +70,7 @@ class ExecuteUseCaseTest {
             もし x > 10 ならば:
               表示する(x)
             そうでなければ
-              表示する("小さい") // コロンが抜けている
+              表示する("小さい") # コロンが抜けている
         """.trimIndent()
 
         val outputs = executeUseCase(program, "", 0).toList()
