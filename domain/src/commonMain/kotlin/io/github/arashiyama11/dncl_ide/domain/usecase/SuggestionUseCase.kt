@@ -1,19 +1,17 @@
-package io.github.arashiyama11.dncl_ide.util
+package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.Either
+import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import kotlin.math.max
 import kotlin.math.min
 
-class TextSuggestions() {
-
-    data class Definition(val literal: String, val position: Int?, val isFunction: Boolean)
-
+class SuggestionUseCase() {
     fun suggestWhenFailingParse(
         code: String,
         position: Int
@@ -45,6 +43,7 @@ class TextSuggestions() {
                 ) until min(positionTokenIndex + 1, tokens.size)
             )
                 .firstOrNull { it.getOrNull() is Token.Identifier || it.getOrNull() is Token.Japanese }
+                ?: tokens.getOrNull(positionTokenIndex)
         val globalVariables =
             AllBuiltInFunction.allIdentifiers()
                 .map { Definition(it, null, true) } + globalVariables(
@@ -58,15 +57,25 @@ class TextSuggestions() {
             ) + globalVariables).distinctBy { it.literal }
 
         return (if (currentToken?.isRight() == true) {
-            val id = currentToken.getOrNull()!!.literal
-            words.sortedWith(
-                compareByDescending<Definition> {
-                    val minLengths = min(it.literal.length, id.length)
-                    for (i in 0 until minLengths) {
-                        if (it.literal[i] != id[i]) return@compareByDescending i
+            val compByWord = when (val token = currentToken.getOrNull()!!) {
+                is Token.Japanese, is Token.Identifier -> {
+                    val id = token.literal
+                    compareByDescending<Definition> {
+                        val minLengths = min(it.literal.length, id.length)
+                        for (i in 0 until minLengths) {
+                            if (it.literal[i] != id[i]) return@compareByDescending i
+                        }
+                        minLengths
                     }
-                    minLengths
-                }.thenBy {
+                }
+
+                else -> {
+                    Comparator<Definition> { _, _ -> 0 }
+                }
+            }
+
+            words.sortedWith(
+                compByWord.thenBy {
                     if (it.position == null) return@thenBy Int.MAX_VALUE
                     if (position > it.position) code.length * 5 else
                         position - it.position
@@ -164,4 +173,4 @@ class TextSuggestions() {
         }
         return result
     }
-}
+} 

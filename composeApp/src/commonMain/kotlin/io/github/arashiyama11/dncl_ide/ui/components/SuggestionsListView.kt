@@ -16,14 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.github.arashiyama11.dncl_ide.util.TextSuggestions
+import io.github.arashiyama11.dncl_ide.domain.model.Definition
+import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 
-private val TextSuggestions.Definition.insertText
+private val Definition.insertText
     get() = literal + if (isFunction) "()" else ""
 
 @Composable
 fun SuggestionListView(
-    textSuggestions: List<TextSuggestions.Definition>,
+    textSuggestions: List<Definition>,
     modifier: Modifier = Modifier,
     onConfirmTextSuggestion: (String) -> Unit
 ) {

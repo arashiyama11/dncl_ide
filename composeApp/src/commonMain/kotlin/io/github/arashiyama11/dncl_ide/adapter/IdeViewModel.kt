@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
@@ -24,7 +25,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.util.TextSuggestions
+import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -58,7 +59,7 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
-    val textSuggestions: List<TextSuggestions.Definition> = emptyList()
+    val textSuggestions: List<Definition> = emptyList()
 )
 
 enum class TextFieldType {
@@ -70,7 +71,7 @@ class IdeViewModel(
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
     private val settingsUseCase: SettingsUseCase,
-    private val textSuggestions: TextSuggestions
+    private val suggestionUseCase: SuggestionUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState =
@@ -171,14 +172,14 @@ class IdeViewModel(
 
             // Use the shared results for text suggestions
             val suggestions = if (parsedProgram?.isRight() == true) {
-                textSuggestions.suggestWithParsedData(
+                suggestionUseCase.suggestWithParsedData(
                     indentedText.text,
                     indentedText.selection.end,
                     tokens,
                     parsedProgram.getOrNull()!!
                 )
             } else {
-                textSuggestions.suggestWhenFailingParse(
+                suggestionUseCase.suggestWhenFailingParse(
                     indentedText.text,
                     indentedText.selection.end
                 )
