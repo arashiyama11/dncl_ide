@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
@@ -99,8 +97,7 @@ private fun LicencesContent(libs: Libs, navigateToSingleLicense: (String) -> Uni
         item {
             Text(
                 """このアプリは以下のオープンソースソフトウェアを使用しています。
-一部のライブラリには追加情報（NOTICE等）が付属している場合があります。
-""",
+一部のライブラリには追加情報(NOTICE等)が付属している場合があります。""",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -114,7 +111,7 @@ private fun LicencesContent(libs: Libs, navigateToSingleLicense: (String) -> Uni
         }
 
         // Libraries List
-        items(libs.libraries.toList()) { library ->
+        items(libs.libraries.toList(), key = { it.artifactId }) { library ->
             LibraryItem(
                 library = library,
                 onLicenseClick = { content ->
@@ -132,9 +129,9 @@ private fun LibraryItem(
 ) {
     val uriHandler = LocalUriHandler.current
 
-
     Card(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).padding(vertical = 8.dp)
+        modifier = Modifier.fillMaxWidth()
+            .padding(vertical = 8.dp)
             .clickable {
                 val licenses =
                     library.licenses.mapNotNull { it.licenseContent }.joinToString("\n\n")
@@ -163,11 +160,6 @@ private fun LibraryItem(
                     "Copyright © " + library.developers.joinToString(", ") { it.name ?: "Unknown" },
                     style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                 )
-
-
-
-
-                Spacer(modifier = Modifier.height(4.dp))
 
                 library.licenses.forEach { license ->
                     Text(

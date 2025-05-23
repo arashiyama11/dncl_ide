@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -55,6 +56,7 @@ fun CodeEditor(
     fontSize: Int,
     onCodeChange: (TextFieldValue) -> Unit,
     currentEvaluatingLine: Int? = null,
+    onFocused: (Boolean) -> Unit = {}
 ) {
     val fontSizeDouble =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
@@ -144,11 +146,6 @@ fun CodeEditor(
                             .fillMaxWidth()
                             .height(lineHeightDp)
                             .padding(horizontal = 4.dp),
-                        //.background(
-                        /* if (currentEvaluatingLine == index)
-                             if (isSystemInDarkTheme()) Color(0xFF3F51B5) else Color(0xFFBBDEFB)
-                         else*? Color.Transparent
-                     ),*/
                         style = codeStyle.copy(
                             color = if (selectLine == index)
                                 if (isSystemInDarkTheme()) Color.LightGray else Color.Black
@@ -172,7 +169,9 @@ fun CodeEditor(
                     .onGloballyPositioned { coordinates ->
                         textFieldHeightPx = coordinates.size.height
                     }
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester).onFocusChanged {
+                        onFocused(it.isFocused)
+                    },
                 cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
                 onTextLayout = { textLayoutResult ->
                     lineHeightDp = textLayoutResult.multiParagraph.getLineHeight(0).dp

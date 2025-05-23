@@ -59,7 +59,8 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
-    val textSuggestions: List<Definition> = emptyList()
+    val textSuggestions: List<Definition> = emptyList(),
+    val isFocused: Boolean = false
 )
 
 enum class TextFieldType {
@@ -377,6 +378,14 @@ class IdeViewModel(
     fun onInputTextChanged(input: String) {
         _uiState.update {
             it.copy(input = input)
+        }
+    }
+
+    fun onCodeEditorFocused(isFocused: Boolean) {
+        _uiState.update {
+            it.copy(
+                isFocused = isFocused
+            )
         }
     }
 

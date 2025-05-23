@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
+    alias(libs.plugins.composeHotReload)
 }
 
 kotlin {
@@ -23,6 +24,9 @@ kotlin {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
     }
+
+    jvm("desktop")
+
 
 // For iOS targets, this is also where you should
 // configure native binary output. For more information, see:

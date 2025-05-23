@@ -7,14 +7,25 @@ import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
+import io.github.arashiyama11.dncl_ide.util.Platform
+import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val commonMainModule = module {
-    viewModelOf(::DrawerViewModel)
-    viewModelOf(::IdeViewModel)
+    if (currentPlatform == Platform.Android) {
+        viewModelOf(::DrawerViewModel)
+        viewModelOf(::IdeViewModel)
+    } else {
+        singleOf(::DrawerViewModel)
+        singleOf(::IdeViewModel)
+    }
+
+
+    singleOf(::DrawerViewModel)
+    singleOf(::IdeViewModel)
     singleOf(::SyntaxHighLighter)
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }

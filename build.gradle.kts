@@ -11,4 +11,5 @@ plugins {
     alias(libs.plugins.kotlinAndroid) apply false
     alias(libs.plugins.aboutlLibraries) apply false
     alias(libs.plugins.kotlinxSerialization) apply false
+    alias(libs.plugins.composeHotReload) apply false
 }

@@ -13,7 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.ui.DnclIdeTheme
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun EnvironmentDebugView(
@@ -65,4 +70,19 @@ fun EnvironmentDebugView(
             }
         }
     }
+}
+
+@Preview
+@Composable
+fun PreviewEnvironmentDebugView() = DnclIdeTheme {
+    EnvironmentDebugView(
+        environment = Environment().apply {
+            val astNode = AstNode.Program(emptyList())
+            runBlocking {
+                set("a", DnclObject.Int(0, astNode))
+                set("b", DnclObject.String("hello", astNode))
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }

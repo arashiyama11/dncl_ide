@@ -41,6 +41,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                 .weight(2f),
             fontSize = uiState.fontSize,
             currentEvaluatingLine = uiState.currentEvaluatingLine,
+            onFocused = { viewModel.onCodeEditorFocused(it) }
         )
 
         Row(
@@ -81,9 +82,8 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                     OutlinedTextField(
                         value = if (uiState.textFieldType == TextFieldType.INPUT) uiState.input else uiState.output,
                         onValueChange = { viewModel.onInputTextChanged(it) },
-                        modifier = Modifier.weight(1f, fill = true)
-                            .fillMaxSize(),
-                        textStyle = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f, fill = true).fillMaxSize(),
+                        textStyle = LocalCodeTypography.current.bodyLarge,
                         label = { Text(textFieldDesc) },
                         readOnly = uiState.textFieldType == TextFieldType.OUTPUT,
                     )
@@ -93,7 +93,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
             viewModel.IdeSideButtons(Modifier.fillMaxHeight())
         }
 
-        if (isImeVisible()) {
+        if (uiState.isFocused || isImeVisible()) {
             SuggestionListView(
                 uiState.textSuggestions,
                 modifier = Modifier.height(48.dp)

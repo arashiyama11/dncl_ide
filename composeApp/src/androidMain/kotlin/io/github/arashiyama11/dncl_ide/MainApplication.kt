@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide
 
 import android.app.Application
 import io.github.arashiyama11.dncl_ide.domain.domainModule
+import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger

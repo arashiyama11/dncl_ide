@@ -55,7 +55,10 @@ class SyntaxHighLighter {
                         append(text.substring(length, t.range.first))
                     }
 
-                    if (errorRange != null && errorRange.includes(t.range)) {
+                    if (errorRange != null && (!(t is Token.Indent && t.depth == 0) && errorRange.includes(
+                            t.range
+                        ))
+                    ) {
                         if (t !is Token.NewLine && t !is Token.EOF)
                             withStyle(if (isDarkTheme) darkStyles.errorStyle else lightStyles.errorStyle) {
                                 append(text.substring(t.range))

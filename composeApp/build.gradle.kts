@@ -1,3 +1,6 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.compose.reload.ComposeHotRun
+import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -8,6 +11,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.aboutlLibraries)
     alias(libs.plugins.kotlinxSerialization)
+    alias(libs.plugins.composeHotReload)
 }
 
 kotlin {
@@ -18,6 +22,8 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
+
+    jvm("desktop")
 
     listOf(
         iosX64(),
@@ -31,6 +37,14 @@ kotlin {
     }
 
     sourceSets {
+        val desktopMain by getting
+
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
+            implementation(compose.desktop.macos_arm64)
+            implementation(libs.kotlinx.coroutinesSwing)
+        }
+
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
@@ -105,3 +119,23 @@ dependencies {
     debugImplementation(compose.uiTooling)
 }
 
+
+compose.desktop {
+    application {
+        mainClass = "io.github.arashiyama11.dncl_ide.MainKt"
+
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "io.github.arashiyama11.dncl_ide"
+            packageVersion = "1.0.0"
+        }
+    }
+}
+
+composeCompiler {
+    featureFlags.add(ComposeFeatureFlag.OptimizeNonSkippingGroups)
+}
+
+tasks.withType<ComposeHotRun>().configureEach {
+    mainClass.set("io.github.arashiyama11.dncl_ide.MainKt")
+}

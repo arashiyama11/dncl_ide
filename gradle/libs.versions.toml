@@ -6,10 +6,9 @@ android-targetSdk = "35"
 androidx-activityCompose = "1.10.1"
 androidx-lifecycle = "2.8.4"
 androidx-test-junit = "1.2.1"
-compose-multiplatform = "1.8.0"
+compose-multiplatform = "1.8.1"
 kotlin = "2.1.21"
 kotlinStdlib = "2.1.21"
-kotlinxCoroutinesCore = "1.10.2"
 materialIconsCore = "1.7.3"
 multiplatformSettingsNoArg = "1.3.0"
 runner = "1.6.2"
@@ -21,7 +20,8 @@ kotlinx-io = "0.7.0"
 aboutlibrariesCore = "12.1.2"
 navigation-compose = "2.9.0-beta01"
 serialization-json = "1.8.1"
-kotlin-coroutines-test = "1.10.2"
+kotlin-coroutines = "1.10.2"
+compose-hot-reload = "1.0.0-alpha10"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -39,14 +39,15 @@ koin-core = { module = "io.insert-koin:koin-core" }
 koin-andriod = { module = "io.insert-koin:koin-android" }
 koin-compose = { module = "io.insert-koin:koin-compose" }
 koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel" }
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlin-coroutines" }
 kotlinx-io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 material-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "materialIconsCore" }
 multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettingsNoArg" }
 aboutlibraries-core = { module = "com.mikepenz:aboutlibraries-core", version.ref = "aboutlibrariesCore" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlin-coroutines-test" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlin-coroutines" }
+kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlin-coroutines" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -59,3 +60,4 @@ jetbrainsKotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrains
 kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 aboutlLibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutlibrariesCore" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }
