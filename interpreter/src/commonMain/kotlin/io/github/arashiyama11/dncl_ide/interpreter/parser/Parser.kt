@@ -67,8 +67,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
             is Token.Indent -> raise(
                 ParserError.IndentError(
-                    currentToken,
-                    "インデントスタック内: $indentStack"
+                    currentToken, indentStack
                 )
             )
 
@@ -177,7 +176,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         ) raise(
             ParserError.IndentError(
                 nextToken,
-                "${indentStack.lastOrNull()}より大きいインデントが必要です"
+                "インデントエラー\n予期しないインデント: ${nextToken.literal}\nインデントは ${indentStack.lastOrNull() ?: 0} より大きい必要があります"
             )
         )
         indentStack.add(startDepth)
@@ -199,7 +198,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
             if (!indentStack.contains(depth)) {
-                raise(ParserError.IndentError(nextToken, "インデントスタック内: $indentStack"))
+                raise(ParserError.IndentError(nextToken, indentStack))
             }
 
             if (depth < startDepth) {
@@ -294,8 +293,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         if ((currentToken as Token.Indent).depth != indentStack.lastOrNull()) {
             raise(
                 ParserError.IndentError(
-                    currentToken,
-                    "期待されるインデント: ${indentStack.lastOrNull()}"
+                    currentToken, indentStack.lastOrNull() ?: 0
                 )
             )
         }

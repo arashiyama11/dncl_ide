@@ -164,11 +164,17 @@ sealed interface Token {
         override val literal: kotlin.String = "ずつ減らしながら繰り返す"
     ) : ExpressionStopToken
 
-    data class Indent(
+    @ConsistentCopyVisibility
+    data class Indent private constructor(
         val depth: kotlin.Int,
         override val range: IntRange,
         override val literal: kotlin.String = "Indent(${depth})"
-    ) : Token
+    ) : Token {
+        companion object {
+            operator fun invoke(depth: kotlin.Int, range: IntRange) =
+                Indent(depth, if (depth == 0) range.first + 1..range.last + 1 else range)
+        }
+    }
 
     data class Comment(override val literal: kotlin.String, override val range: IntRange) : Token
 

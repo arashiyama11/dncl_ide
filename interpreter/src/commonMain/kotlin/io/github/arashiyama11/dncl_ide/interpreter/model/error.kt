@@ -61,8 +61,7 @@ ${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^"}
 
     data class UnExpectedEOF(
         override val index: Int,
-        override val errorRange: IntRange = index..index,
-        override val message: String
+        override val errorRange: IntRange = index..index, override val message: String
     ) : LexerError(message, index)
 }
 
@@ -130,9 +129,17 @@ ${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
     data class UnknownInfixOperator(override val failToken: Token) :
         ParserError("予期しないトークン（不明な中置演算子）: ${failToken.literal}", failToken)
 
-    data class IndentError(override val failToken: Token, val expected: String) :
-        ParserError("インデントエラー: ${failToken.literal} 期待される値: $expected", failToken) {
-        constructor(failToken: Token, expected: Int) : this(failToken, expected.toString())
+    data class IndentError(override val failToken: Token, override val message: String) :
+        ParserError(message, failToken) {
+        constructor(failToken: Token, indentStack: List<Int>) : this(
+            failToken,
+            "インデントエラー\n予期しないインデント: ${failToken.literal}\nインデントは ${if (indentStack.size == 1) "${indentStack.single()} である必要があります" else "$indentStack のいずれかである必要があります"}"
+        )
+
+        constructor(failToken: Token, expected: Int) : this(
+            failToken,
+            "インデントエラー\n予期しないインデント: ${failToken.literal}\nインデントは $expected である必要があります"
+        )
     }
 
 }
