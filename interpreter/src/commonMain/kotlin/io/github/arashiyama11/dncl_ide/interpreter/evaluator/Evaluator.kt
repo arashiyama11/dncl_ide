@@ -448,53 +448,35 @@ class Evaluator(
                 )
             }
 
-            is Token.LessThanOrEqual -> when {
-                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(
-                    left.value <= right.value,
-                    infixExpression
-                )
-
-                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(
-                    left.value <= right.value,
-                    infixExpression
-                )
-
-                else -> DnclObject.TypeError(
-                    message = "演算子「<=」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} <= ${right::class.simpleName} が実行されようとしました",
+            is Token.LessThanOrEqual -> {
+                if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    return@either DnclObject.Boolean(leftFloat <= rightFloat, infixExpression)
+                } else DnclObject.TypeError(
+                    message = "演算子「<=」は整数または小数の演算のみ可能です。\n${left::class.simpleName} <= ${right::class.simpleName} が実行されようとしました",
                     infixExpression
                 )
             }
 
-            is Token.GreaterThan -> when {
-                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(
-                    left.value > right.value,
-                    infixExpression
-                )
-
-                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(
-                    left.value > right.value,
-                    infixExpression
-                )
-
-                else -> DnclObject.TypeError(
-                    message = "演算子「>」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} > ${right::class.simpleName} が実行されようとしました",
+            is Token.GreaterThan -> {
+                if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    return@either DnclObject.Boolean(leftFloat > rightFloat, infixExpression)
+                } else DnclObject.TypeError(
+                    message = "演算子「>」は整数または小数の演算のみ可能です。\n${left::class.simpleName} > ${right::class.simpleName} が実行されようとしました",
                     infixExpression
                 )
             }
 
-            is Token.GreaterThanOrEqual -> when {
-                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Boolean(
-                    left.value >= right.value,
-                    infixExpression
-                )
-
-                left is DnclObject.Float && right is DnclObject.Float -> DnclObject.Boolean(
-                    left.value >= right.value,
-                    infixExpression
-                )
-
-                else -> DnclObject.TypeError(
-                    message = "演算子「>=」は整数、小数の同じ型同士の演算のみ可能です。\n${left::class.simpleName} >= ${right::class.simpleName} が実行されようとしました",
+            is Token.GreaterThanOrEqual -> {
+                if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    return@either DnclObject.Boolean(leftFloat >= rightFloat, infixExpression)
+                } else DnclObject.TypeError(
+                    message = "演算子「>=」は整数または小数の演算のみ可能です。\n${left::class.simpleName} >= ${right::class.simpleName} が実行されようとしました",
                     infixExpression
                 )
             }
