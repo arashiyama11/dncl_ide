@@ -137,13 +137,14 @@ sealed interface AstNode {
     data class FunctionStatement(
         val name: String,
         val parameters: List<String>,
-        val block: BlockStatement
+        val block: BlockStatement,
+        override val range: IntRange
     ) : Statement {
         override val literal: String
             get() = "function ${name}(${parameters.joinToString(separator = ", ") { it }}) ${block.literal}"
 
-        override val range: IntRange
-            get() = block.range
+        /*override val range: IntRange
+            get() = block.range.first - 1..block.range.last + 1*/
     }
 
     data class BlockStatement(val statements: List<Statement>) : Statement {

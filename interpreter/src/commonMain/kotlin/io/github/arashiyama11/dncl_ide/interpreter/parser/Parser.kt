@@ -277,6 +277,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     @EnsuredEndOfLine
     private fun parseFunctionStatement(): Either<DnclError, AstNode.FunctionStatement> = either {
+        val start = currentToken
         nextToken().bind()
         val name = (currentToken as? Token.Identifier)
             ?: currentToken as? Token.Japanese ?: raise(ParserError.UnExpectedToken(currentToken))
@@ -299,12 +300,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             )
         }
         expectNextToken<Token.Define>().bind()
+        val end = currentToken
         nextToken().bind()
         requireEndOfLine().bind()
         AstNode.FunctionStatement(
             name.literal,
             params.map { (it as AstNode.Identifier).value },
-            block
+            block, start.range.first..end.range.last
         )
     }
 
