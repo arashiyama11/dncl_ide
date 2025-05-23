@@ -77,8 +77,7 @@ class SuggestionUseCase() {
             words.sortedWith(
                 compByWord.thenBy {
                     if (it.position == null) return@thenBy Int.MAX_VALUE
-                    if (position > it.position) code.length * 5 else
-                        position - it.position
+                    if (position > it.position) -it.position else code.length * 5
                 }
             )
         } else words.sortedBy {
