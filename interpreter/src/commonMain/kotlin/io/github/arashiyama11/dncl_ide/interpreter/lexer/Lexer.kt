@@ -281,15 +281,36 @@ class Lexer(private val input: String) : ILexer {
 
     private fun readString(end: Char): Either<LexerError, Token> {
         val pos = position + 1
+        val stringBuilder = StringBuilder()
+        var inEscape = false
         do {
             readChar()
             if (ch == END_OF_FILE) return LexerError.UnExpectedEOF(
                 pos - 1,
                 message = "文字列が閉じていません"
             ).left()
-        } while (ch != end)
+
+            if (inEscape) {
+                when (ch) {
+                    'n' -> stringBuilder.append('\n')
+                    't' -> stringBuilder.append('\t')
+                    'r' -> stringBuilder.append('\r')
+                    '\\' -> stringBuilder.append('\\')
+                    '"' -> stringBuilder.append('"')
+                    '「' -> stringBuilder.append('「')
+                    '」' -> stringBuilder.append('」')
+                    // 他のエスケープシーケンスも必要に応じて追加
+                    else -> stringBuilder.append(ch) // 不明なエスケープシーケンスはそのまま追加
+                }
+                inEscape = false
+            } else if (ch == '\\') {
+                inEscape = true
+            } else if (ch != end) {
+                stringBuilder.append(ch)
+            }
+        } while (ch != end || inEscape) // エスケープシーケンスの途中で終わらないように修正
         readChar()
-        return Token.String(input.substring(pos, position - 1), pos - 1 until position).right()
+        return Token.String(stringBuilder.toString(), pos - 1 until position).right()
     }
 
     override fun iterator(): Iterator<Either<LexerError, Token>> =
