@@ -96,6 +96,7 @@ D = quick_sort(Data)
 
 
     fun testEval(evaluator: Evaluator, program: String, expected: String) {
+        stdout = ""
         runBlocking {
             evaluator.evalProgram(program.toProgram(), Environment(builtInEnv)).leftOrNull()
                 ?.let { fail(it.toString()) }
@@ -171,6 +172,57 @@ D = quick_sort(Data)
 8   89
 9   97
 """
+        )
+    }
+
+    @Test
+    fun testBooleanLiteral() {
+        // 日本語リテラル
+        testEval(evaluator, "表示する(真)", "真\n")
+        testEval(evaluator, "表示する(偽)", "偽\n")
+        // 英語リテラル
+        testEval(evaluator, "表示する(true)", "真\n")
+        testEval(evaluator, "表示する(false)", "偽\n")
+
+        // 変数への代入
+        testEval(evaluator, "a = 真\n表示する(a)", "真\n")
+        testEval(evaluator, "b = 偽\n表示する(b)", "偽\n")
+        testEval(evaluator, "c = true\n表示する(c)", "真\n")
+        testEval(evaluator, "d = false\n表示する(d)", "偽\n")
+
+        // 配列に含める
+        testEval(
+            evaluator,
+            "arr = [真, 偽, true, false]\n表示する(arr)",
+            "[真, 偽, 真, 偽]\n"
+        )
+
+        // 比較演算の結果
+        testEval(evaluator, "表示する(1 == 1)", "真\n")
+        testEval(evaluator, "表示する(1 == 2)", "偽\n")
+        testEval(evaluator, "表示する(真 == true)", "真\n")
+        testEval(evaluator, "表示する(偽 == false)", "真\n")
+        testEval(evaluator, "表示する(真 == 偽)", "偽\n")
+        testEval(evaluator, "表示する(true != false)", "真\n")
+
+        // 関数引数として渡す
+        testEval(evaluator, "関数 f(x) を:\n 表示する(x) \nと定義する\nf(真)", "真\n")
+        testEval(evaluator, "関数 f(x) を:\n 表示する(x) \nと定義する\nf(偽)", "偽\n")
+        testEval(evaluator, "関数 f(x) を:\n 表示する(x) \nと定義する\nf(true)", "真\n")
+        testEval(evaluator, "関数 f(x) を:\n 表示する(x) \nと定義する\nf(false)", "偽\n")
+
+        // if文の条件
+        testEval(evaluator, "もし 真 ならば:\n 表示する(1) \nそうでなければ:\n 表示する(0)", "1\n")
+        testEval(evaluator, "もし 偽 ならば:\n 表示する(1) \nそうでなければ:\n 表示する(0)", "0\n")
+        testEval(
+            evaluator,
+            "もし true ならば:\n 表示する(1) \nそうでなければ:\n 表示する(0)",
+            "1\n"
+        )
+        testEval(
+            evaluator,
+            "もし false ならば:\n 表示する(1) \nそうでなければ:\n 表示する(0)",
+            "0\n"
         )
     }
 

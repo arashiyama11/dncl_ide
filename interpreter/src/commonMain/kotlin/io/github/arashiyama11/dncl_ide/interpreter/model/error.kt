@@ -1,10 +1,7 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
-import arrow.core.leftNel
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.reflect.KClass
-import kotlin.reflect.KClassifier
 
 sealed interface DnclError {
     val message: String?

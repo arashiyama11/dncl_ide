@@ -212,4 +212,9 @@ sealed interface AstNode {
             get() = function.range.first..(arguments.lastOrNull()?.range?.last?.plus(2)
                 ?: (function.range.last + 3))
     }
+
+    data class BooleanLiteral(val value: Boolean, override val range: IntRange) : Expression {
+        override val literal: String
+            get() = if (value) "真" else "偽"
+    }
 }

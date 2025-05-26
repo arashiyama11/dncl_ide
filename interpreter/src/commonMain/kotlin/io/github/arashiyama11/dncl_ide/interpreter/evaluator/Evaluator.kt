@@ -53,6 +53,7 @@ class Evaluator(
                     is AstNode.FloatLiteral -> DnclObject.Float(node.value, node)
                     is AstNode.IntLiteral -> DnclObject.Int(node.value, node)
                     is AstNode.StringLiteral -> DnclObject.String(node.value, node)
+                    is AstNode.BooleanLiteral -> DnclObject.Boolean(node.value, node)
                     is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node))
                     is AstNode.FunctionLiteral -> DnclObject.Function(
                         null,

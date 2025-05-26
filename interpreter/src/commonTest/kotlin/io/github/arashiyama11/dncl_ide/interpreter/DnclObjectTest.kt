@@ -36,11 +36,11 @@ class DnclObjectTest {
     @Test
     fun testBooleanObject() {
         val boolTrueObj = DnclObject.Boolean(true, dummyAstNode)
-        assertEquals("true", boolTrueObj.toString())
+        assertEquals("真", boolTrueObj.toString())
         assertEquals(true.hashCode(), boolTrueObj.hash())
 
         val boolFalseObj = DnclObject.Boolean(false, dummyAstNode)
-        assertEquals("false", boolFalseObj.toString())
+        assertEquals("偽", boolFalseObj.toString())
         assertEquals(false.hashCode(), boolFalseObj.hash())
     }
 

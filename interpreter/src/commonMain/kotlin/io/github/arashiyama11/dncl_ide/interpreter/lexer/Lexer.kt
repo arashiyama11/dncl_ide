@@ -234,6 +234,8 @@ class Lexer(private val input: String) : ILexer {
         return when (val literal = input.substring(pos, position)) {
             "and" -> Token.And(pos until position).right()
             "or" -> Token.Or(pos until position).right()
+            "true" -> Token.Boolean(true, pos until position).right()
+            "false" -> Token.Boolean(false, pos until position).right()
             else -> Token.Identifier(literal, pos until position).right()
         }
     }
@@ -256,11 +258,12 @@ class Lexer(private val input: String) : ILexer {
             "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo(pos until position).right()
             "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo(pos until position)
                 .right()
-
             "かつ" -> Token.And(pos until position).right()
             "または" -> Token.Or(pos until position).right()
             "関数" -> Token.Function(pos until position).right()
             "と定義する" -> Token.Define(pos until position).right()
+            "真" -> Token.Boolean(true, pos until position).right()
+            "偽" -> Token.Boolean(false, pos until position).right()
             else -> Token.Japanese(literal, pos until position).right()
         }
     }

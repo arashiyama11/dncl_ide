@@ -347,12 +347,16 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     private fun prefixParseFn(token: Token): Either<DnclError, AstNode.Expression> = either {
         when (token) {
+            is Token.Boolean -> {
+                val boolToken = (currentToken as? Token.Boolean)
+                    ?: raise(ParserError.UnExpectedToken(currentToken))
+                AstNode.BooleanLiteral(boolToken.value, boolToken.range)
+            }
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.Identifier(identifier.literal, identifier.range)
             }
-
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
                     ?: raise(ParserError.UnExpectedToken(currentToken))

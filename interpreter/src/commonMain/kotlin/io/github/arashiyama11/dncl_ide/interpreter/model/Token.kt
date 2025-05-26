@@ -183,4 +183,9 @@ sealed interface Token {
     data class Int(override val literal: kotlin.String, override val range: IntRange) : Token
     data class Float(override val literal: kotlin.String, override val range: IntRange) : Token
     data class String(override val literal: kotlin.String, override val range: IntRange) : Token
+
+    data class Boolean(val value: kotlin.Boolean, override val range: IntRange) : Token {
+        override val literal: kotlin.String
+            get() = if (value) if ((range.last - range.first + 1) == 1) "真" else "true" else if ((range.last - range.first + 1) == 1) "偽" else "false"
+    }
 }

@@ -23,7 +23,7 @@ sealed interface DnclObject {
     }
 
     data class Boolean(val value: kotlin.Boolean, override val astNode: AstNode) : DnclObject {
-        override fun toString() = value.toString()
+        override fun toString() = if (value) "真" else "偽"
         override fun hash() = value.hashCode()
     }
 
@@ -84,14 +84,7 @@ sealed interface DnclObject {
         Error(message, astNode)
 
     data class TypeError(override val message: kotlin.String, override val astNode: AstNode) :
-        Error(message, astNode) {
-        constructor(
-            expected: kotlin.String,
-            actual: kotlin.String,
-            astNode: AstNode,
-        ) : this("期待される型: $expected, 実際の型: $actual", astNode)
-
-    }
+        Error(message, astNode)
 
     data class UndefinedError(override val message: kotlin.String, override val astNode: AstNode) :
         Error(message, astNode)
