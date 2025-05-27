@@ -9,18 +9,23 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 
 object EvaluatorFactory {
+
     fun create(
         inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int,
+        inputLifecycleCallback: InputLifecycleCallback? = null,
         onEval: (suspend (AstNode, Environment) -> Unit)? = null,
     ): Evaluator {
         return Evaluator(
             onCallSystemCommand = { cmd ->
                 when (cmd) {
                     is SystemCommand.Input -> {
+                        inputLifecycleCallback?.onWaitingForInput()
                         val value = inputChannel.receive()
+                        inputLifecycleCallback?.onInputReceived()
                         DnclObject.String(value, cmd.astNode)
                     }
+
                     is SystemCommand.Unknown -> {
                         DnclObject.Null(cmd.astNode)
                     }

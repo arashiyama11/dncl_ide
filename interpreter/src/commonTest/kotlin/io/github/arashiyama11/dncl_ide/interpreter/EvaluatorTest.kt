@@ -40,13 +40,13 @@ class EvaluatorTest {
         stdout = ""
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("62")
-        evaluator =
-            EvaluatorFactory.create(inputChannel, 1) { astNode, _ -> DnclObject.Null(astNode) }
+        evaluator = EvaluatorFactory.create(inputChannel, 1, null) { _, _ -> }
+
 
         val inputChannel0 = Channel<String>(capacity = 1)
         inputChannel0.trySend("62")
-        evaluator0Origin =
-            EvaluatorFactory.create(inputChannel0, 0) { astNode, _ -> DnclObject.Null(astNode) }
+        evaluator0Origin = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
+
     }
 
     @Test
@@ -237,7 +237,8 @@ D = quick_sort(Data)
         val inputChannel = Channel<String>(capacity = 2)
         inputChannel.trySend("foo")
         inputChannel.trySend("bar")
-        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val evaluator = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
+
         val program = """
 a = 【外部からの入力】
 b = 【外部からの入力】
@@ -256,7 +257,8 @@ b = 【外部からの入力】
     fun testInputBranching() {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("yes")
-        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val evaluator = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
+
         val program = """
 a = 【外部からの入力】
 もし a == "yes" ならば:
@@ -276,7 +278,8 @@ a = 【外部からの入力】
     fun testInputEmptyString() {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("")
-        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val evaluator = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
+
         val program = """
 a = 【外部からの入力】
 表示する(a)
@@ -293,7 +296,7 @@ a = 【外部からの入力】
     fun testInputSpecialCharacters() {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("あいうえお!@#\$%")
-        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val evaluator = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
         val program = """
 a = 【外部からの入力】
 表示する(a)
@@ -311,7 +314,7 @@ a = 【外部からの入力】
         val inputChannel = Channel<String>(capacity = 2)
         inputChannel.trySend("3")
         inputChannel.trySend("5")
-        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val evaluator = EvaluatorFactory.create(inputChannel, 0, null) { _, _ -> }
         val program = """
 a = 【外部からの入力】
 b = 【外部からの入力】

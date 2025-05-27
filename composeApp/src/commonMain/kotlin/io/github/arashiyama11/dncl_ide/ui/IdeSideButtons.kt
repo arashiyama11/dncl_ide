@@ -268,7 +268,6 @@ fun IdeViewModel.IdeSideButtons(
                 Icon(
                     when (uiState.textFieldType) {
                         TextFieldType.OUTPUT -> Icons.Outlined.FileUpload
-                        TextFieldType.INPUT -> Icons.Outlined.BugReport
                         TextFieldType.DEBUG_OUTPUT -> Icons.Outlined.FileDownload
                     },
                     contentDescription = "Change IO",

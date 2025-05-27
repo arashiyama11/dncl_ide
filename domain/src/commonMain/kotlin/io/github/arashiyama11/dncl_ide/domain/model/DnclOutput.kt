@@ -22,4 +22,7 @@ sealed interface DnclOutput {
     value class EnvironmentUpdate(val environment: Environment) : DnclOutput
 
     object Clear : DnclOutput
+
+    @JvmInline
+    value class WaitingForInput(val isWaiting: Boolean) : DnclOutput
 }

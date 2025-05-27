@@ -46,7 +46,7 @@ data class IdeUiState(
     val dnclError: DnclError? = null,
     val annotatedString: AnnotatedString? = null,
     val output: String = "",
-    val input: String = "",
+    val currentInput: String = "",
     val isError: Boolean = false,
     val errorRange: IntRange? = null,
     val fontSize: Int = DEFAULT_FONT_SIZE,
@@ -56,6 +56,7 @@ data class IdeUiState(
     val isStepMode: Boolean = false,
     val isLineMode: Boolean = false,
     val isExecuting: Boolean = false,
+    val isWaitingForInput: Boolean = false,
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
@@ -64,7 +65,7 @@ data class IdeUiState(
 )
 
 enum class TextFieldType {
-    OUTPUT, INPUT, DEBUG_OUTPUT
+    OUTPUT, DEBUG_OUTPUT
 }
 
 class IdeViewModel(
@@ -83,10 +84,12 @@ class IdeViewModel(
             state.copy(
                 fontSize = settings.fontSize,
                 debugMode = settings.debugMode,
-                debugRunningMode = settings.debugRunningMode
+                debugRunningMode = settings.debugRunningMode,
+                isDarkTheme = state.isDarkTheme
             )
         }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
     private var executeJob: Job? = null
+    private var inputChannel: Channel<String>? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
     fun onPause() {
@@ -202,6 +205,8 @@ class IdeViewModel(
         }
 
         executeJob?.cancel()
+        inputChannel?.close()
+        inputChannel = Channel(Channel.UNLIMITED)
 
         executeJob = viewModelScope.launch {
             _uiState.update {
@@ -211,14 +216,15 @@ class IdeViewModel(
                     errorRange = null,
                     currentEvaluatingLine = null,
                     isExecuting = true,
-                    dnclError = null
+                    dnclError = null,
+                    isWaitingForInput = false
                 )
             }
             onTextChanged(uiState.value.codeTextFieldValue)
 
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
-                uiState.value.input,
+                inputChannel!!,
                 settingsUseCase.arrayOriginIndex.value
             ).collect { output ->
                 when (output) {
@@ -272,6 +278,12 @@ class IdeViewModel(
                             it.copy(
                                 currentEnvironment = output.environment.copy()
                             )
+                        }
+                    }
+
+                    is DnclOutput.WaitingForInput -> {
+                        _uiState.updateOnMain {
+                            it.copy(isWaitingForInput = output.isWaiting)
                         }
                     }
                 }
@@ -366,8 +378,7 @@ class IdeViewModel(
 
     fun onChangeIOButtonClicked() {
         val next = when (uiState.value.textFieldType) {
-            TextFieldType.OUTPUT -> TextFieldType.INPUT
-            TextFieldType.INPUT -> TextFieldType.DEBUG_OUTPUT
+            TextFieldType.OUTPUT -> if (uiState.value.debugMode) TextFieldType.DEBUG_OUTPUT else TextFieldType.OUTPUT
             TextFieldType.DEBUG_OUTPUT -> TextFieldType.OUTPUT
         }
         _uiState.update {
@@ -375,9 +386,21 @@ class IdeViewModel(
         }
     }
 
-    fun onInputTextChanged(input: String) {
+    fun onCurrentInputChanged(text: String) {
         _uiState.update {
-            it.copy(input = input)
+            it.copy(currentInput = text)
+        }
+    }
+
+    fun onSendInputClicked() {
+        val currentInputValue = uiState.value.currentInput
+        viewModelScope.launch {
+            inputChannel?.send(currentInputValue)
+            _uiState.update {
+                it.copy(
+                    currentInput = ""
+                )
+            }
         }
     }
 

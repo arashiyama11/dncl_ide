@@ -31,6 +31,8 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
+import kotlinx.coroutines.channels.SendChannel
 
 private enum class DebugStepRunMode {
     STEP, LINE
@@ -39,12 +41,21 @@ private enum class DebugStepRunMode {
 class ExecuteUseCase(
     private val fileRepository: FileRepository,
     private val settingsRepository: SettingsRepository
-) {
+) : InputLifecycleCallback {
     private val stepChannel = Channel<Unit>(Channel.CONFLATED)
     private val lineChannel = Channel<Unit>(Channel.CONFLATED)
     private var lastDebugStepRunMode: DebugStepRunMode? = null
 
     private var currentLineNumber: Int = -1
+    private var outputChannel: SendChannel<DnclOutput>? = null
+
+    override suspend fun onWaitingForInput() {
+        outputChannel?.send(DnclOutput.WaitingForInput(true))
+    }
+
+    override suspend fun onInputReceived() {
+        outputChannel?.send(DnclOutput.WaitingForInput(false))
+    }
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -67,7 +78,11 @@ class ExecuteUseCase(
         lineChannel.send(Unit)
     }
 
-    operator fun invoke(program: String, inputChannel: ReceiveChannel<String>, arrayOrigin: Int): Flow<DnclOutput> {
+    operator fun invoke(
+        program: String,
+        inputChannel: ReceiveChannel<String>,
+        arrayOrigin: Int
+    ): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(
@@ -83,7 +98,8 @@ class ExecuteUseCase(
                 )
             )
         }
-        return channelFlow {
+        return channelFlow<DnclOutput> {
+            outputChannel = channel
             withContext(Dispatchers.Default) {
                 val delayDuration = settingsRepository.onEvalDelay.value.toLong()
                 val evaluator = getEvaluator(
@@ -137,7 +153,8 @@ class ExecuteUseCase(
                                 delay(delayDuration)
                             }
                         }
-                    } else null
+                    } else null,
+                    inputLifecycleCallback = this@ExecuteUseCase
                 )
 
                 val globalEnv = Environment(
@@ -225,11 +242,14 @@ class ExecuteUseCase(
     private fun getEvaluator(
         inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int,
-        onEval: (suspend (AstNode, Environment) -> Unit)?
+        onEval: (suspend (AstNode, Environment) -> Unit)?,
+        inputLifecycleCallback: InputLifecycleCallback?
     ): Evaluator {
         return EvaluatorFactory.create(
             inputChannel,
-            arrayOrigin, onEval
+            arrayOrigin,
+            inputLifecycleCallback,
+            onEval,
         )
     }
 }
