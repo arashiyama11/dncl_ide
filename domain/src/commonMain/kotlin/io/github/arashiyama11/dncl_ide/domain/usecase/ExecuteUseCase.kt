@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -66,7 +67,7 @@ class ExecuteUseCase(
         lineChannel.send(Unit)
     }
 
-    operator fun invoke(program: String, input: String, arrayOrigin: Int): Flow<DnclOutput> {
+    operator fun invoke(program: String, inputChannel: ReceiveChannel<String>, arrayOrigin: Int): Flow<DnclOutput> {
         val parser = Parser(Lexer(program)).getOrElse { err ->
             return flowOf(
                 DnclOutput.Error(
@@ -86,7 +87,7 @@ class ExecuteUseCase(
             withContext(Dispatchers.Default) {
                 val delayDuration = settingsRepository.onEvalDelay.value.toLong()
                 val evaluator = getEvaluator(
-                    input,
+                    inputChannel,
                     arrayOrigin,
                     onEval = if (settingsRepository.debugMode.value) onEvalLambda@{ astNode, environment ->
                         val lineNumber = calculateLineNumber(astNode, program)
@@ -222,12 +223,12 @@ class ExecuteUseCase(
     }
 
     private fun getEvaluator(
-        input: String,
+        inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int,
         onEval: (suspend (AstNode, Environment) -> Unit)?
     ): Evaluator {
         return EvaluatorFactory.create(
-            input,
+            inputChannel,
             arrayOrigin, onEval
         )
     }

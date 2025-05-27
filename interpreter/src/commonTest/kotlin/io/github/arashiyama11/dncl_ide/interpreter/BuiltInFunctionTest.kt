@@ -6,6 +6,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -36,14 +38,15 @@ class BuiltInFunctionTest {
     fun setUp() {
         stdout = ""
         clearCalled = false
+        val inputChannel = Channel<String>(capacity = 1)
+        inputChannel.trySend("")
         evaluator =
             EvaluatorFactory.create(
-                input = "",
+                inputChannel = inputChannel,
                 arrayOrigin = 0,
             ) { astNode, _ ->
                 DnclObject.Null(astNode)
             }
-
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!

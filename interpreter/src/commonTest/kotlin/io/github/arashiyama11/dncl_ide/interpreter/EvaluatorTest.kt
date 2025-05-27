@@ -7,6 +7,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import kotlin.math.max
 import kotlin.test.BeforeTest
@@ -36,11 +38,15 @@ class EvaluatorTest {
     fun setUp() {
         stdin = nullObj
         stdout = ""
+        val inputChannel = Channel<String>(capacity = 1)
+        inputChannel.trySend("62")
         evaluator =
-            EvaluatorFactory.create("62", 1) { astNode, _ -> DnclObject.Null(astNode) }
+            EvaluatorFactory.create(inputChannel, 1) { astNode, _ -> DnclObject.Null(astNode) }
 
+        val inputChannel0 = Channel<String>(capacity = 1)
+        inputChannel0.trySend("62")
         evaluator0Origin =
-            EvaluatorFactory.create("62", 0) { astNode, _ -> DnclObject.Null(astNode) }
+            EvaluatorFactory.create(inputChannel0, 0) { astNode, _ -> DnclObject.Null(astNode) }
     }
 
     @Test
@@ -224,6 +230,100 @@ D = quick_sort(Data)
             "もし false ならば:\n 表示する(1) \nそうでなければ:\n 表示する(0)",
             "0\n"
         )
+    }
+
+    @Test
+    fun testMultipleInputs() {
+        val inputChannel = Channel<String>(capacity = 2)
+        inputChannel.trySend("foo")
+        inputChannel.trySend("bar")
+        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val program = """
+a = 【外部からの入力】
+b = 【外部からの入力】
+表示する(a)
+表示する(b)
+"""
+        val env = Environment(builtInEnv)
+        stdout = ""
+        runBlocking {
+            evaluator.evalProgram(program.toProgram(), env)
+        }
+        assertEquals("foo\nbar\n", stdout)
+    }
+
+    @Test
+    fun testInputBranching() {
+        val inputChannel = Channel<String>(capacity = 1)
+        inputChannel.trySend("yes")
+        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val program = """
+a = 【外部からの入力】
+もし a == "yes" ならば:
+  表示する("OK")
+そうでなければ:
+  表示する("NG")
+"""
+        val env = Environment(builtInEnv)
+        stdout = ""
+        runBlocking {
+            evaluator.evalProgram(program.toProgram(), env)
+        }
+        assertEquals("OK\n", stdout)
+    }
+
+    @Test
+    fun testInputEmptyString() {
+        val inputChannel = Channel<String>(capacity = 1)
+        inputChannel.trySend("")
+        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val program = """
+a = 【外部からの入力】
+表示する(a)
+"""
+        val env = Environment(builtInEnv)
+        stdout = ""
+        runBlocking {
+            evaluator.evalProgram(program.toProgram(), env)
+        }
+        assertEquals("\n", stdout)
+    }
+
+    @Test
+    fun testInputSpecialCharacters() {
+        val inputChannel = Channel<String>(capacity = 1)
+        inputChannel.trySend("あいうえお!@#\$%")
+        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val program = """
+a = 【外部からの入力】
+表示する(a)
+"""
+        val env = Environment(builtInEnv)
+        stdout = ""
+        runBlocking {
+            evaluator.evalProgram(program.toProgram(), env)
+        }
+        assertEquals("あいうえお!@#\$%\n", stdout)
+    }
+
+    @Test
+    fun testInputSum() {
+        val inputChannel = Channel<String>(capacity = 2)
+        inputChannel.trySend("3")
+        inputChannel.trySend("5")
+        val evaluator = EvaluatorFactory.create(inputChannel, 0) { _, _ -> }
+        val program = """
+a = 【外部からの入力】
+b = 【外部からの入力】
+c = 整数変換(a) + 整数変換(b)
+表示する(c)
+"""
+        val env = Environment(builtInEnv)
+        stdout = ""
+        runBlocking {
+            evaluator.evalProgram(program.toProgram(), env)
+        }
+        assertEquals("8\n", stdout)
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!

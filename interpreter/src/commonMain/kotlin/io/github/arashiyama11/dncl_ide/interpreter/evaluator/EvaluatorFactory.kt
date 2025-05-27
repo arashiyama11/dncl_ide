@@ -5,26 +5,29 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 
 object EvaluatorFactory {
     fun create(
-        input: String,
+        inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int,
         onEval: (suspend (AstNode, Environment) -> Unit)? = null,
     ): Evaluator {
         return Evaluator(
-            {
-                when (it) {
+            onCallSystemCommand = { cmd ->
+                when (cmd) {
                     is SystemCommand.Input -> {
-                        DnclObject.String(input, it.astNode)
+                        val value = inputChannel.receive()
+                        DnclObject.String(value, cmd.astNode)
                     }
-
                     is SystemCommand.Unknown -> {
-                        DnclObject.Null(it.astNode)
+                        DnclObject.Null(cmd.astNode)
                     }
                 }
-            }, arrayOrigin, onEval
+            },
+            arrayOrigin = arrayOrigin,
+            onEval = onEval
         )
     }
 

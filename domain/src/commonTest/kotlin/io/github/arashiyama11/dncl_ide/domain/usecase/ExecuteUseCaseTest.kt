@@ -12,6 +12,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.toList
@@ -25,12 +26,14 @@ class ExecuteUseCaseTest {
     private lateinit var fileRepository: MockFileRepository
     private lateinit var settingsRepository: MockSettingsRepository
     private lateinit var executeUseCase: ExecuteUseCase
+    private lateinit var inputChannel: Channel<String>
 
     @BeforeTest
     fun setup() {
         fileRepository = MockFileRepository()
         settingsRepository = MockSettingsRepository()
         executeUseCase = ExecuteUseCase(fileRepository, settingsRepository)
+        inputChannel = Channel(Channel.BUFFERED)
     }
 
     @Test
@@ -43,7 +46,7 @@ class ExecuteUseCaseTest {
             表示する(z)
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -55,7 +58,7 @@ class ExecuteUseCaseTest {
         // 不正な文字を含むプログラム
         val program = "x = @"
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // エラー出力の検証
         val errorOutput = outputs.filterIsInstance<DnclOutput.Error>().first()
@@ -73,7 +76,7 @@ class ExecuteUseCaseTest {
               表示する("小さい") # コロンが抜けている
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // エラー出力の検証
         val errorOutput = outputs.filterIsInstance<DnclOutput.Error>().first()
@@ -90,7 +93,7 @@ class ExecuteUseCaseTest {
             表示する(z)
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 実行時エラー出力の検証
         val runtimeError = outputs.filterIsInstance<DnclOutput.RuntimeError>().first()
@@ -116,7 +119,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する(z)
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 行評価と環境更新の出力を検証
         val lineEvaluations = outputs.filterIsInstance<DnclOutput.LineEvaluation>()
@@ -148,7 +151,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         settingsRepository.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
         settingsRepository.setOnEvalDelay(10) // 短い遅延時間を設定
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -163,9 +166,9 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する("あなたは", age, "歳です")
         """.trimIndent()
 
-        val input = "25" // 入力値
+        inputChannel.send("25")
 
-        val outputs = executeUseCase(program, input, 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -180,7 +183,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する(arr[0])
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -195,7 +198,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する(arr[1])
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 1).toList()
+        val outputs = executeUseCase(program, inputChannel, 1).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -229,7 +232,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する(result)
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
@@ -244,7 +247,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する("This should not be executed")
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // エラー出力の検証
         val runtimeError = outputs.filterIsInstance<DnclOutput.RuntimeError>().first()
@@ -290,7 +293,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             表示する(D)
         """.trimIndent()
 
-        val outputs = executeUseCase(program, "", 0).toList()
+        val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()

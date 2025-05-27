@@ -20,7 +20,7 @@ interface CallBuiltInFunctionScope {
 }
 
 class Evaluator(
-    private val onCallSystemCommand: (SystemCommand) -> DnclObject,
+    private val onCallSystemCommand: suspend (SystemCommand) -> DnclObject,
     private val arrayOrigin: Int = 0,
     private val onEval: (suspend (AstNode, Environment) -> Unit)? = null
 ) : IEvaluator {
@@ -440,8 +440,10 @@ class Evaluator(
 
             is Token.LessThan -> {
                 if ((left is DnclObject.Int || right is DnclObject.Float) && (left is DnclObject.Int || left is DnclObject.Float)) {
-                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
-                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat()
+                        ?: (right as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat()
+                        ?: (left as DnclObject.Float).value
                     return@either DnclObject.Boolean(leftFloat < rightFloat, infixExpression)
                 } else DnclObject.TypeError(
                     message = "演算子「<」は整数または小数の演算のみ可能です。\n${left::class.simpleName} < ${right::class.simpleName} が実行されようとしました",
@@ -451,8 +453,10 @@ class Evaluator(
 
             is Token.LessThanOrEqual -> {
                 if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
-                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
-                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat()
+                        ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat()
+                        ?: (right as DnclObject.Float).value
                     return@either DnclObject.Boolean(leftFloat <= rightFloat, infixExpression)
                 } else DnclObject.TypeError(
                     message = "演算子「<=」は整数または小数の演算のみ可能です。\n${left::class.simpleName} <= ${right::class.simpleName} が実行されようとしました",
@@ -462,8 +466,10 @@ class Evaluator(
 
             is Token.GreaterThan -> {
                 if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
-                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
-                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat()
+                        ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat()
+                        ?: (right as DnclObject.Float).value
                     return@either DnclObject.Boolean(leftFloat > rightFloat, infixExpression)
                 } else DnclObject.TypeError(
                     message = "演算子「>」は整数または小数の演算のみ可能です。\n${left::class.simpleName} > ${right::class.simpleName} が実行されようとしました",
@@ -473,8 +479,10 @@ class Evaluator(
 
             is Token.GreaterThanOrEqual -> {
                 if ((left is DnclObject.Int || left is DnclObject.Float) && (right is DnclObject.Int || right is DnclObject.Float)) {
-                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat() ?: (left as DnclObject.Float).value
-                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat() ?: (right as DnclObject.Float).value
+                    val leftFloat = (left as? DnclObject.Int)?.value?.toFloat()
+                        ?: (left as DnclObject.Float).value
+                    val rightFloat = (right as? DnclObject.Int)?.value?.toFloat()
+                        ?: (right as DnclObject.Float).value
                     return@either DnclObject.Boolean(leftFloat >= rightFloat, infixExpression)
                 } else DnclObject.TypeError(
                     message = "演算子「>=」は整数または小数の演算のみ可能です。\n${left::class.simpleName} >= ${right::class.simpleName} が実行されようとしました",

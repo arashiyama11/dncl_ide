@@ -5,6 +5,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
@@ -18,7 +19,8 @@ class IntegrationErrorTest {
             val ast =
                 parser.parseProgram().fold(ifLeft = { return@run it.explain(program) }) { it }
 
-            val evaluator = EvaluatorFactory.create("", 0)
+            val evaluator =
+                EvaluatorFactory.create(Channel<String>(capacity = 1).apply { trySend("") }, 0)
             runBlocking {
                 evaluator.evalProgram(ast)
             }.fold(ifLeft = { return@run it.explain(program) }) {
