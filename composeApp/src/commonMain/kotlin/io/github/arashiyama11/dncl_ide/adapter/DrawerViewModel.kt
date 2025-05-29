@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
@@ -15,6 +16,7 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ON_EVAL_DELAY
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -46,6 +48,7 @@ data class DrawerUiState(
 
 class DrawerViewModel(
     private val fileUseCase: FileUseCase,
+    private val notebookFileUseCase: NotebookFileUseCase,
     private val fileNameValidationUseCase: FileNameValidationUseCase,
     private val settingsUseCase: SettingsUseCase
 ) : ViewModel() {
@@ -93,9 +96,9 @@ class DrawerViewModel(
         settingsUseCase.setFontSize(fontSize)
     }
 
-    fun onFileSelected(programFile: ProgramFile) {
+    fun onFileSelected(path: EntryPath) {
         viewModelScope.launch {
-            fileUseCase.selectFile(programFile.path)
+            fileUseCase.selectFile(path)
         }
     }
 
@@ -180,11 +183,14 @@ class DrawerViewModel(
             try {
                 val path = _uiState.value.inputtingEntryPath ?: _uiState.value.rootFolder!!.path
                 if (_uiState.value.creatingType == CreatingType.FILE) {
-                    fileUseCase.createFile(
+                    val fileName = FileName(newFileName)
+                    if (fileName.isNotebookFile()) {
+                        notebookFileUseCase.createNotebookFile(path, fileName)
+                    } else fileUseCase.createFile(
                         path,
                         FileName(newFileName)
                     )
-                    fileUseCase.selectFile(path + FileName(newFileName))
+                    fileUseCase.selectFile(path + fileName)
                 } else {
                     fileUseCase.createFolder(
                         path,

@@ -12,7 +12,6 @@ import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 
 class FileUseCase(private val fileRepository: FileRepository) {
     val selectedEntryPath = fileRepository.selectedEntryPath
-
     suspend fun getEntryByPath(entryPath: EntryPath): Entry? {
         return fileRepository.getEntryByPath(entryPath)
     }

@@ -37,6 +37,7 @@ import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -91,6 +92,12 @@ fun DrawerContent(
                             )
 
                             is ProgramFile -> FileItem(
+                                entry,
+                                0,
+                                drawerViewModel::onFileSelected
+                            )
+
+                            is NotebookFile -> NotebookFileItem(
                                 entry,
                                 0,
                                 drawerViewModel::onFileSelected
@@ -282,7 +289,7 @@ fun DrawerContent(
 fun FileItem(
     file: ProgramFile,
     depth: Int,
-    onClick: (ProgramFile) -> Unit
+    onClick: (EntryPath) -> Unit
 ) {
     NavigationDrawerItem(
         label = { Text(text = file.name.value) },
@@ -294,7 +301,28 @@ fun FileItem(
             )
         },
         onClick = {
-            onClick(file)
+            onClick(file.path)
+        }, modifier = Modifier.padding(start = 16.dp * depth)
+    )
+}
+
+@Composable
+fun NotebookFileItem(
+    file: NotebookFile,
+    depth: Int = 0,
+    onClick: (EntryPath) -> Unit
+) {
+    NavigationDrawerItem(
+        label = { Text(text = file.name.value) },
+        selected = false,
+        icon = {
+            Icon(
+                Icons.AutoMirrored.Outlined.InsertDriveFile,
+                contentDescription = null
+            )
+        },
+        onClick = {
+            onClick(file.path)
         }, modifier = Modifier.padding(start = 16.dp * depth)
     )
 }
@@ -307,7 +335,7 @@ fun FolderItem(
     focusRequester: FocusRequester,
     creatingType: CreatingType?,
     onInputtingEntryNameChanged: (String) -> Unit,
-    onFileClick: (ProgramFile) -> Unit,
+    onFileClick: (EntryPath) -> Unit,
     onFolderClick: (Folder) -> Unit
 ) {
     var isShowFiles by remember { mutableStateOf(true) }
@@ -348,6 +376,7 @@ fun FolderItem(
                         )
 
                         is ProgramFile -> FileItem(entry, depth + 1, onFileClick)
+                        is NotebookFile -> NotebookFileItem(entry, depth + 1, onFileClick)
                     }
                 }
                 if (inputtingEntryPath != null && inputtingEntryPath.toString() == folder.path.toString()) {

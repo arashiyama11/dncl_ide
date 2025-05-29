@@ -12,11 +12,14 @@ import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
+import io.github.arashiyama11.dncl_ide.domain.model.Folder
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
@@ -72,8 +75,9 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
+    private val notebookFileUseCase: NotebookFileUseCase,
     private val settingsUseCase: SettingsUseCase,
-    private val suggestionUseCase: SuggestionUseCase
+    private val suggestionUseCase: SuggestionUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(IdeUiState())
     val uiState =
@@ -113,17 +117,32 @@ class IdeViewModel(
             fileUseCase.selectedEntryPath.collect { entryPath ->
                 if (entryPath != null) {
                     val programFile = fileUseCase.getEntryByPath(entryPath)
-                    if (programFile is ProgramFile) {
-                        if (prePath != null) saveFile(prePath)
+                    when (programFile) {
+                        is ProgramFile -> {
+                            if (prePath != null) saveFile(prePath)
 
-                        onTextChanged(
-                            TextFieldValue(
-                                fileUseCase.getFileContent(programFile).value,
-                                TextRange(fileUseCase.getCursorPosition(programFile).value)
+                            onTextChanged(
+                                TextFieldValue(
+                                    fileUseCase.getFileContent(programFile).value,
+                                    TextRange(fileUseCase.getCursorPosition(programFile).value)
+                                )
                             )
-                        )
-                    } else {
-                        errorChannel.send("ファイルが開けませんでした")
+                        }
+
+                        is NotebookFile -> {
+                            /*errorChannel.send("ノートブックファイルは直接編集できません")
+                            with(notebookFileUseCase) {
+                                onTextChanged(
+                                    TextFieldValue(
+                                        notebookFileUseCase.getNotebookFileContent(programFile)
+                                            .toFileContent().value,
+                                        TextRange(0)
+                                    )
+                                )
+                            }*/
+                        }
+
+                        else -> errorChannel.send("ファイルが開けませんでした")
                     }
                 }
                 prePath = entryPath
@@ -288,9 +307,7 @@ class IdeViewModel(
                     }
                 }
             }
-            withContext(Dispatchers.IO) {
-                delay(50)
-            }
+            delay(50)
             _uiState.updateOnMain { it.copy(currentEvaluatingLine = null, isExecuting = false) }
             onTextChanged(uiState.value.codeTextFieldValue)
         }
@@ -417,15 +434,24 @@ class IdeViewModel(
             errorChannel.send("ファイルが選択されていません")
             return
         }
-        val entry = fileUseCase.getEntryByPath(path)
-        if (entry is ProgramFile) {
-            fileUseCase.saveFile(
-                entry,
-                FileContent(uiState.value.codeTextFieldValue.text),
-                CursorPosition(uiState.value.codeTextFieldValue.selection.start)
-            )
-        } else {
-            errorChannel.send("ファイルを保存できませんでした")
+        when (val entry = fileUseCase.getEntryByPath(path)) {
+            is NotebookFile -> {
+                /* notebookFileUseCase.saveNotebookFile(
+                     entry,
+                     FileContent(uiState.value.codeTextFieldValue.text),
+                     CursorPosition(uiState.value.codeTextFieldValue.selection.start)
+                 )*/
+            }
+
+            is ProgramFile -> {
+                fileUseCase.saveFile(
+                    entry,
+                    FileContent(uiState.value.codeTextFieldValue.text),
+                    CursorPosition(uiState.value.codeTextFieldValue.selection.start)
+                )
+            }
+
+            else -> errorChannel.send("ファイルを保存できませんでした")
         }
     }
 

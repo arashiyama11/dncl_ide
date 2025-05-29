@@ -16,3 +16,8 @@ data class ProgramFile(
     override val name: FileName,
     override val path: EntryPath,
 ) : Entry
+
+data class NotebookFile(
+    override val name: FileName,
+    override val path: EntryPath,
+) : Entry

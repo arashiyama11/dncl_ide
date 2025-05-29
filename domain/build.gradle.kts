@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -66,6 +67,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.arrow.core)
                 implementation(libs.koin.core)
+                implementation(libs.kotlinx.serialization.json)
                 implementation(project.dependencies.platform(libs.koin.bom))
 
                 implementation(project(":interpreter"))

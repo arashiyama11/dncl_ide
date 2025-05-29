@@ -7,6 +7,10 @@ data class EntryPath(
         return value.joinToString("/") { it.value }
     }
 
+    fun isNotebookFile(): Boolean {
+        return value.lastOrNull()?.isNotebookFile() ?: false
+    }
+
     fun parent(): EntryPath? {
         return if (value.size > 1) {
             EntryPath(value.dropLast(1))

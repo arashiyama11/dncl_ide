@@ -9,6 +9,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
@@ -83,8 +84,14 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
                 }
 
                 false -> {
-                    ProgramFile(
-                        name = FileName(entryPath.value.last().value),
+                    val name = entryPath.value.last().value
+                    if (name.endsWith(".dnclnb")) {
+                        NotebookFile(
+                            name = FileName(name),
+                            path = entryPath,
+                        )
+                    } else ProgramFile(
+                        name = FileName(name),
                         path = entryPath,
                     )
                 }
@@ -98,6 +105,25 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
     ) = withContext(Dispatchers.IO) {
         SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
             it.writeString(fileContent.value)
+        }
+    }
+
+    override suspend fun saveFile(
+        entryPath: EntryPath,
+        fileContent: FileContent,
+        cursorPosition: CursorPosition
+    ) {
+        SystemFileSystem.sink(entryPath.toPath()).buffered().use {
+            it.writeString(fileContent.value)
+        }
+    }
+
+    override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
+        return withContext(Dispatchers.IO) {
+            FileContent(
+                SystemFileSystem.source(notebookFile.path.toPath()).buffered()
+                    .use { it.readString() }
+            )
         }
     }
 

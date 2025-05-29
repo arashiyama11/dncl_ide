@@ -36,6 +36,10 @@ kotlin {
         }
     }
 
+    compilerOptions {
+        freeCompilerArgs.add("-Xcontext-receivers")
+    }
+
     sourceSets {
         val desktopMain by getting
 

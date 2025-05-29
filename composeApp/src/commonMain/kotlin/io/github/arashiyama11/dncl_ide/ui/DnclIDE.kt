@@ -117,7 +117,9 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                     )
                 }
             }
-            viewModel.IdeSideButtons(Modifier.fillMaxHeight())
+            with(viewModel) {
+                IdeSideButtons(Modifier.fillMaxHeight())
+            }
         }
 
         AnimatedVisibility(uiState.isFocused) {

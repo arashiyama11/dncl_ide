@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide
 
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
@@ -18,9 +19,11 @@ val commonMainModule = module {
     if (currentPlatform == Platform.Android) {
         viewModelOf(::DrawerViewModel)
         viewModelOf(::IdeViewModel)
+        viewModelOf(::NotebookViewModel)
     } else {
         singleOf(::DrawerViewModel)
         singleOf(::IdeViewModel)
+        singleOf(::NotebookViewModel)
     }
 
 

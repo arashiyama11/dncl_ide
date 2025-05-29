@@ -39,15 +39,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -56,9 +60,13 @@ fun App() {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val drawerViewModel = koinViewModel<DrawerViewModel>()
         val ideViewModel = koinViewModel<IdeViewModel>()
+        val notebookViewModel = koinViewModel<NotebookViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
         val isDarkThemeStateFlow = rememberDarkThemeStateFlow()
         val navController = rememberNavController()
+        val fileRepository = koinInject<FileRepository>()
+        val selectedFile by fileRepository.selectedEntryPath.collectAsStateWithLifecycle()
+
 
         LaunchedEffect(Unit) {
             ideViewModel.onStart(isDarkThemeStateFlow)
@@ -71,6 +79,10 @@ fun App() {
             for (err in drawerViewModel.errorChannel) {
                 snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
             }
+        }
+
+        LaunchedEffect(Unit) {
+            notebookViewModel.onStart()
         }
 
 
@@ -149,7 +161,9 @@ fun App() {
 
                 NavHost(navController, startDestination = Destination.App) {
                     composable<Destination.App> {
-                        DnclIDE(
+                        if (selectedFile?.isNotebookFile() == true) {
+                            NotebookScreen(modifier = Modifier.padding(padding))
+                        } else DnclIDE(
                             modifier = Modifier.padding(padding), ideViewModel
                         )
                     }
