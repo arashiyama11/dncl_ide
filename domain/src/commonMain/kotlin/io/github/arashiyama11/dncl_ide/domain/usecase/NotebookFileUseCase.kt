@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
+import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
@@ -10,6 +11,11 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Metadata
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.json.Json
 
 class NotebookFileUseCase(private val fileRepository: FileRepository) {
@@ -22,6 +28,23 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     fun FileContent.toNotebook(): Notebook = json.decodeFromString(value)
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
+
+    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment) {
+        val cell = notebook.cells.find { it.id == cellId }
+            ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
+
+        if (cell.type != CellType.CODE) {
+            throw IllegalArgumentException("Only code cells can be executed.")
+        }
+
+        val program =
+            Parser(Lexer(cell.source.joinToString("\n"))).getOrElse { return }.parseProgram()
+                .getOrElse { return }
+        val evaluator = EvaluatorFactory.create(
+            Channel(), 0, null, null
+        )
+        evaluator.evalProgram(program, env)
+    }
 
     suspend fun createNotebookFile(
         parentPath: EntryPath,
@@ -58,7 +81,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         fileRepository.saveFile(notebookFile.path, fileContent, cursorPosition)
     }
 
-    suspend fun getNotebookFileContent(notebookFile: NotebookFile): Notebook {
+    suspend fun getNotebook(notebookFile: NotebookFile): Notebook {
         return fileRepository.getNotebookFileContent(notebookFile).toNotebook()
     }
 

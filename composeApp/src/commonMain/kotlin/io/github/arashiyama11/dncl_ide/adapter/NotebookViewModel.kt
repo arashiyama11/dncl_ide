@@ -9,20 +9,30 @@ import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
+import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 data class NotebookUiState(
@@ -77,35 +87,74 @@ class NotebookViewModel(
 
     var notebookFile: NotebookFile? = null
         private set
+    var selectCellId: String? = null
+
+    private lateinit var environment: Environment
 
     fun onStart() {
         fileUseCase.selectedEntryPath.onEach {
-            if (it?.isNotebookFile() == true) {
-                val notebook = fileUseCase.getEntryByPath(it)
-                if (notebook is NotebookFile) {
-                    notebookFileUseCase.getNotebookFileContent(notebook)
-                    this.notebookFile = notebook
-                    _uiState.update {
-                        it.copy(
-                            notebook = notebookFileUseCase.getNotebookFileContent(notebook)
-                        )
-                    }
-                    uiState.value.notebook?.cells.orEmpty().forEach { cell ->
-                        onUpdateCodeCell(
-                            cell.id,
-                            TextFieldValue(
-                                text = cell.source.joinToString("\n"),
-                                selection = TextRange(0)
+            coroutineScope {
+                if (it?.isNotebookFile() == true) {
+                    val notebookFile = fileUseCase.getEntryByPath(it)
+                    if (notebookFile is NotebookFile) {
+                        notebookFileUseCase.getNotebook(notebookFile)
+                        this@NotebookViewModel.notebookFile = notebookFile
+                        val notebook = notebookFileUseCase.getNotebook(notebookFile)
+                        _uiState.update {
+                            it.copy(
+                                notebook = notebook
                             )
-                        )
-                    }
+                        }
+                        awaitAll(*notebook.cells.map { cell ->
+                            async {
+                                onUpdateCodeCell(
+                                    cell.id,
+                                    TextFieldValue(
+                                        text = cell.source.joinToString("\n"),
+                                        selection = TextRange(0)
+                                    )
+                                ).join()
+                            }
+                        }.toTypedArray())
 
-                    _uiState.update { it.copy(loading = false) }
-                } else {
-                    errorChannel.send("ノートブックを開くことができません: $notebook")
-                }
-            } else errorChannel.send("選択されたファイルはノートブックではありません: $it")
+                        _uiState.update { it.copy(loading = false) }
+                    } else {
+                        errorChannel.send("ノートブックを開くことができません: $notebookFile")
+                    }
+                } else errorChannel.send("選択されたファイルはノートブックではありません: $it")
+            }
         }.launchIn(viewModelScope)
+
+        viewModelScope.launch {
+            environment = Environment(
+                EvaluatorFactory.createBuiltInFunctionEnvironment(
+                    onStdout = {
+                        println("stdout: $it")
+                        val newNotebook = uiState.value.notebook!!.copy(
+                            cells = uiState.value.notebook!!.cells.map { cell ->
+                                if (cell.id == selectCellId) {
+                                    cell.copy(
+                                        outputs = cell.outputs!! + Output(
+                                            outputType = "stream",
+                                            name = "stdout",
+                                            text = listOf(it)
+                                        ),
+                                        executionCount = (cell.executionCount ?: 0) + 1
+                                    )
+                                } else {
+                                    cell
+                                }
+                            }
+                        )
+
+                        println("newNotebook: $newNotebook")
+                        _uiState.update { it.copy(notebook = newNotebook) }
+
+                    }, onClear = {
+                        clearCellOutput(selectCellId!!)
+                    }, onImport = { DnclObject.Null(AstNode.Program(emptyList())) }
+                ))
+        }
     }
 
     // New functions for cell operations
@@ -128,7 +177,36 @@ class NotebookViewModel(
      * Execute the cell with the given ID
      */
     fun executeCell(cellId: String) {
-        // Implementation will be added later
+        println("Executing cell with ID: $cellId")
+        selectCellId = cellId
+        viewModelScope.launch {
+            clearCellOutput(cellId).join()
+            delay(50) //await clear
+            notebookFileUseCase.executeCell(
+                uiState.value.notebook!!, cellId, environment
+            )
+        }
+    }
+
+    fun clearCellOutput(cellId: String): Job {
+        return viewModelScope.launch {
+            val notebook = _uiState.value.notebook ?: return@launch
+            val updatedCells = notebook.cells.map { cell ->
+                if (cell.id == cellId) {
+                    cell.copy(outputs = emptyList(), executionCount = 0)
+                } else {
+                    cell
+                }
+            }
+            val updatedNotebook = notebook.copy(cells = updatedCells)
+            println("Cleared outputs for cell: $cellId, $updatedNotebook")
+            _uiState.update { it.copy(notebook = updatedNotebook) }
+            /*notebookFileUseCase.saveNotebookFile(
+                notebookFile!!, with(notebookFileUseCase) {
+                    updatedNotebook.toFileContent()
+                }, cursorPosition = CursorPosition(0)
+            )*/
+        }
     }
 
     /**
@@ -179,8 +257,8 @@ class NotebookViewModel(
     fun onUpdateCodeCell(
         cellId: String,
         textFieldValue: TextFieldValue
-    ) {
-        viewModelScope.launch(Dispatchers.Default) {
+    ): Job {
+        return viewModelScope.launch(Dispatchers.Default) {
             val newTextFieldValue =
                 autoIndent(
                     uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
