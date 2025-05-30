@@ -315,11 +315,6 @@ class NotebookViewModel(
             }
             val updatedNotebook = notebook.copy(cells = updatedCells)
             _uiState.update { it.copy(notebook = updatedNotebook) }
-            /*notebookFileUseCase.saveNotebookFile(
-                notebookFile!!, with(notebookFileUseCase) {
-                    updatedNotebook.toFileContent()
-                }, cursorPosition = CursorPosition(0)
-            )*/
         }
     }
 
@@ -360,33 +355,10 @@ class NotebookViewModel(
     }
 
     /**
-     * Update the content of the cell with the given ID
-     */
-    fun updateCellContent(cellId: String, newContent: List<String>) {
-        viewModelScope.launch {
-            val notebook = _uiState.value.notebook ?: return@launch
-            val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
-                notebook,
-                cellId,
-                notebook.cells.firstOrNull { it.id == cellId }?.copy(source = newContent)
-                    ?: return@launch
-            )
-            _uiState.update { it.copy(notebook = updatedNotebook) }
-        }
-    }
-
-    /**
      * Select the cell with the given ID
      */
     fun selectCell(cellId: String) {
         _uiState.update { it.copy(selectedCellId = cellId) }
-    }
-
-    /**
-     * Clear the outputs of the cell with the given ID
-     */
-    fun clearCellOutputs(cellId: String) {
-        // Implementation will be added later
     }
 
     /**
@@ -444,29 +416,28 @@ class NotebookViewModel(
         textFieldValue: TextFieldValue
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
-            val newTextFieldValue =
-                autoIndent(
-                    uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
-                    textFieldValue
-                )
-
+            val file = notebookFile ?: return@launch
+            // インデント調整
+            val newTextFieldValue = autoIndent(
+                uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
+                textFieldValue
+            )
             val notebook = _uiState.value.notebook ?: return@launch
             val newText = newTextFieldValue.text
-
+            // シンタックスハイライト用処理
             val lexer = Lexer(newText)
-
-            val (annotatedStr, error) = syntaxHighLighter.highlightWithParsedData(
+            val (annotatedStr, _) = syntaxHighLighter.highlightWithParsedData(
                 newText, true, null, lexer.toList()
             )
-
-            val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
+            // セル更新と保存をユースケースに委譲
+            val updatedNotebook = notebookFileUseCase.updateCellAndSave(
+                file,
                 notebook,
-                cellId,
-                notebook.cells.firstOrNull { it.id == cellId }?.copy(source = newText.split("\n"))
-                    ?: return@launch
-            )
-
-
+                cellId
+            ) { oldCell ->
+                oldCell.copy(source = newText.split("\n"))
+            }
+            // UIステートの更新
             _uiState.update {
                 it.copy(
                     notebook = updatedNotebook,
@@ -476,11 +447,6 @@ class NotebookViewModel(
                     ))
                 )
             }
-            notebookFileUseCase.saveNotebookFile(
-                notebookFile!!, with(notebookFileUseCase) {
-                    updatedNotebook.toFileContent()
-                }, cursorPosition = CursorPosition(0)
-            )
         }
     }
 
@@ -489,21 +455,18 @@ class NotebookViewModel(
         newSource: List<String>
     ) {
         viewModelScope.launch {
+            val file = notebookFile ?: return@launch
             val notebook = _uiState.value.notebook ?: return@launch
-            val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
+            // セル更新と保存をユースケースに委譲
+            val updatedNotebook = notebookFileUseCase.updateCellAndSave(
+                file,
                 notebook,
-                cellId,
-                notebook.cells.firstOrNull { it.id == cellId }?.copy(source = newSource)
-                    ?: return@launch
-            )
-
-
+                cellId
+            ) { oldCell ->
+                oldCell.copy(source = newSource)
+            }
+            // UIステートの更新
             _uiState.update { it.copy(notebook = updatedNotebook) }
-            notebookFileUseCase.saveNotebookFile(
-                notebookFile!!, with(notebookFileUseCase) {
-                    updatedNotebook.toFileContent()
-                }, cursorPosition = CursorPosition(0)
-            )
         }
     }
 
@@ -562,7 +525,6 @@ class NotebookViewModel(
     @OptIn(ExperimentalUuidApi::class)
     fun generateCellId(): String {
         // KMP-safe unique ID: timestamp + random
-        return "cell-" + Uuid.random().toString() + "-" + Random.nextInt(100000, 999999)
-            .toString()
+        return "cell-" + Uuid.random().toString()
     }
 }

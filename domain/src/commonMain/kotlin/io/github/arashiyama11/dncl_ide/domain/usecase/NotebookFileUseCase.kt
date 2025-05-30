@@ -129,4 +129,33 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     suspend fun getNotebookFileContent(notebookFile: NotebookFile): Notebook {
         return getNotebook(notebookFile)
     }
+
+    /**
+     * セルを更新し、ファイルに保存する
+     * @param notebookFile 対象のノートブックファイル情報
+     * @param notebook 現在のNotebookオブジェクト
+     * @param cellId 更新対象セルID
+     * @param updateBlock 古いCellから新しいCellを生成するラムダ
+     * @return 更新後のNotebookオブジェクト
+     */
+    suspend fun updateCellAndSave(
+        notebookFile: io.github.arashiyama11.dncl_ide.domain.model.NotebookFile,
+        notebook: Notebook,
+        cellId: String,
+        updateBlock: (Cell) -> Cell
+    ): Notebook {
+        // セルの新規作成
+        val oldCell = notebook.cells.firstOrNull { it.id == cellId }
+            ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
+        val newCell = updateBlock(oldCell)
+        // ノートブックを更新
+        val updatedNotebook = modifyNotebookCell(notebook, cellId, newCell)
+        // ファイルに保存
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
 }
