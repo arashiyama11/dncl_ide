@@ -47,6 +47,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
@@ -81,14 +82,14 @@ fun NotebookScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            if (uiState.notebook == null) {
+            if (uiState.notebook == null || uiState.loading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
                 NotebookContent(
                     notebook = uiState.notebook!!,
                     selectedCellId = uiState.selectedCellId,
                     onAction = notebookViewModel::handleAction,
-                    highLightMap = uiState.highLightMap
+                    codeCellStateMap = uiState.codeCellStateMap
                 )
             }
         }
@@ -133,7 +134,7 @@ fun NotebookContent(
     notebook: Notebook,
     selectedCellId: String?,
     onAction: (NotebookAction) -> Unit,
-    highLightMap: Map<String, AnnotatedString>
+    codeCellStateMap: Map<String, CodeCellState>,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Notebook toolbar
@@ -150,7 +151,7 @@ fun NotebookContent(
                     cell = cell,
                     isSelected = cell.id == selectedCellId,
                     onAction = onAction,
-                    highLightMap = highLightMap
+                    codeCellStateMap = codeCellStateMap
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -187,7 +188,7 @@ fun CellComponent(
     cell: Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
-    highLightMap: Map<String, AnnotatedString>
+    codeCellStateMap: Map<String, CodeCellState>,
 ) {
     val borderColor = if (isSelected)
         MaterialTheme.colorScheme.primary
@@ -250,7 +251,7 @@ fun CellComponent(
 
         // Cell content
         when (cell.type) {
-            CellType.CODE -> CodeCellContent(cell, onAction, highLightMap[cell.id])
+            CellType.CODE -> CodeCellContent(cell, onAction, codeCellStateMap[cell.id]!!)
             CellType.MARKDOWN -> MarkdownCellContent(cell, onAction)
         }
     }
@@ -260,18 +261,12 @@ fun CellComponent(
 fun CodeCellContent(
     cell: Cell,
     onAction: (NotebookAction) -> Unit,
-    annotatedString: AnnotatedString?
+    codeCellState: CodeCellState
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-
-        var selection by remember { mutableStateOf(TextRange(0)) }
-        var state =
-            remember(selection) { TextFieldValue(cell.source.joinToString("\n"), selection) }
-
         CodeEditor(
-            codeText = state, annotatedString, Modifier, 14, {
-                selection = it.selection
-                onAction(NotebookAction.UpdateCodeCell(cell.id, it.text.lines()))
+            codeText = codeCellState.textFieldValue, codeCellState.annotatedString, Modifier, 14, {
+                onAction(NotebookAction.UpdateCodeCell(cell.id, it))
             }, verticalScroll = false
         )
 

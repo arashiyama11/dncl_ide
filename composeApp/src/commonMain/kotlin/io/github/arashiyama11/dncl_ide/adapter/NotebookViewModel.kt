@@ -1,6 +1,8 @@
 package io.github.arashiyama11.dncl_ide.adapter
 
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
@@ -12,6 +14,9 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
@@ -23,7 +28,13 @@ import kotlinx.coroutines.launch
 data class NotebookUiState(
     val notebook: Notebook? = null,
     val selectedCellId: String? = null,
-    val highLightMap: Map<String, AnnotatedString> = emptyMap()
+    val codeCellStateMap: Map<String, CodeCellState> = emptyMap(),
+    val loading: Boolean = true
+)
+
+data class CodeCellState(
+    val textFieldValue: TextFieldValue,
+    val annotatedString: AnnotatedString
 )
 
 
@@ -34,7 +45,9 @@ sealed interface NotebookAction {
     data object ExecuteAllCells : NotebookAction
     data class AddCellAfter(val cellId: String?, val cellType: CellType) : NotebookAction
     data class ChangeCellType(val cellId: String, val cellType: CellType) : NotebookAction
-    data class UpdateCodeCell(val cellId: String, val source: List<String>) : NotebookAction
+    data class UpdateCodeCell(val cellId: String, val textFieldValue: TextFieldValue) :
+        NotebookAction
+
     data class UpdateMarkdownCell(val cellId: String, val source: List<String>) : NotebookAction
 }
 
@@ -60,12 +73,13 @@ class NotebookViewModel(
         initialValue = NotebookUiState()
     )
 
+    val errorChannel = Channel<String>()
+
     var notebookFile: NotebookFile? = null
         private set
 
     fun onStart() {
         fileUseCase.selectedEntryPath.onEach {
-            println("Selected entry path: $it")
             if (it?.isNotebookFile() == true) {
                 val notebook = fileUseCase.getEntryByPath(it)
                 if (notebook is NotebookFile) {
@@ -76,10 +90,21 @@ class NotebookViewModel(
                             notebook = notebookFileUseCase.getNotebookFileContent(notebook)
                         )
                     }
+                    uiState.value.notebook?.cells.orEmpty().forEach { cell ->
+                        onUpdateCodeCell(
+                            cell.id,
+                            TextFieldValue(
+                                text = cell.source.joinToString("\n"),
+                                selection = TextRange(0)
+                            )
+                        )
+                    }
+
+                    _uiState.update { it.copy(loading = false) }
                 } else {
-                    println("Selected entry is not a NotebookFile: $notebook")
+                    errorChannel.send("ノートブックを開くことができません: $notebook")
                 }
-            } else println("Selected entry path is not a notebook file: $it")
+            } else errorChannel.send("選択されたファイルはノートブックではありません: $it")
         }.launchIn(viewModelScope)
     }
 
@@ -153,11 +178,17 @@ class NotebookViewModel(
 
     fun onUpdateCodeCell(
         cellId: String,
-        newSource: List<String>
+        textFieldValue: TextFieldValue
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
+            val newTextFieldValue =
+                autoIndent(
+                    uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
+                    textFieldValue
+                )
+
             val notebook = _uiState.value.notebook ?: return@launch
-            val newText = newSource.joinToString("\n")
+            val newText = newTextFieldValue.text
 
             val lexer = Lexer(newText)
 
@@ -168,7 +199,7 @@ class NotebookViewModel(
             val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
                 notebook,
                 cellId,
-                notebook.cells.firstOrNull { it.id == cellId }?.copy(source = newSource)
+                notebook.cells.firstOrNull { it.id == cellId }?.copy(source = newText.split("\n"))
                     ?: return@launch
             )
 
@@ -176,7 +207,10 @@ class NotebookViewModel(
             _uiState.update {
                 it.copy(
                     notebook = updatedNotebook,
-                    highLightMap = it.highLightMap + (cellId to annotatedStr)
+                    codeCellStateMap = it.codeCellStateMap + (cellId to CodeCellState(
+                        textFieldValue = newTextFieldValue,
+                        annotatedString = annotatedStr
+                    ))
                 )
             }
             notebookFileUseCase.saveNotebookFile(
@@ -201,7 +235,7 @@ class NotebookViewModel(
             )
 
 
-            _uiState.update { it.copy(notebook = updatedNotebook, highLightMap = it.highLightMap) }
+            _uiState.update { it.copy(notebook = updatedNotebook) }
             notebookFileUseCase.saveNotebookFile(
                 notebookFile!!, with(notebookFileUseCase) {
                     updatedNotebook.toFileContent()
@@ -218,11 +252,46 @@ class NotebookViewModel(
             is NotebookAction.ExecuteAllCells -> executeAllCells()
             is NotebookAction.AddCellAfter -> addCellAfter(action.cellId, action.cellType)
             is NotebookAction.ChangeCellType -> changeCellType(action.cellId, action.cellType)
-            is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(action.cellId, action.source)
+            is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(
+                action.cellId,
+                action.textFieldValue
+            )
+
             is NotebookAction.UpdateMarkdownCell -> onUpdateMarkdownCell(
                 action.cellId,
                 action.source
             )
+        }
+    }
+
+    private fun autoIndent(
+        oldTextFiledValue: TextFieldValue,
+        newTextFiledValue: TextFieldValue
+    ): TextFieldValue {
+        if (oldTextFiledValue.text.length != newTextFiledValue.text.length - 1) return newTextFiledValue
+        if (newTextFiledValue.text.getOrNull(newTextFiledValue.selection.end - 1) != '\n') return newTextFiledValue
+        try {
+            val cursorPos = newTextFiledValue.selection.start
+            val textBeforeCursor = newTextFiledValue.text.substring(0, cursorPos - 1)
+            val currentLine = textBeforeCursor.substringAfterLast("\n", textBeforeCursor)
+            val indent = currentLine.takeWhile { it == ' ' || it == '\t' || it == '　' }
+            val insertion = if (currentLine.lastOrNull() == ':') "$indent  " else indent
+            val newText =
+                newTextFiledValue.text.substring(
+                    0,
+                    cursorPos
+                ) + insertion + newTextFiledValue.text.substring(
+                    cursorPos
+                )
+            val newCursorPos = cursorPos + insertion.length
+
+            return TextFieldValue(
+                text = newText,
+                selection = TextRange(newCursorPos)
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return newTextFiledValue
         }
     }
 }

@@ -83,6 +83,9 @@ fun App() {
 
         LaunchedEffect(Unit) {
             notebookViewModel.onStart()
+            for (err in notebookViewModel.errorChannel) {
+                snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
+            }
         }
 
 

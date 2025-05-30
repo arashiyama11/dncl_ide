@@ -390,7 +390,6 @@ class IdeViewModel(
             e.printStackTrace()
             return newTextFiledValue
         }
-
     }
 
     fun onChangeIOButtonClicked() {
