@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -34,7 +33,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,12 +41,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mikepenz.markdown.compose.Markdown
+import com.mikepenz.markdown.model.MarkdownColors
+import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
@@ -261,7 +264,7 @@ fun CellComponent(
         // Cell content
         when (cell.type) {
             CellType.CODE -> CodeCellContent(cell, onAction, codeCellStateMap[cell.id]!!)
-            CellType.MARKDOWN -> MarkdownCellContent(cell, onAction)
+            CellType.MARKDOWN -> MarkdownCellContent(cell, isSelected, onAction)
         }
     }
 }
@@ -272,11 +275,20 @@ fun CodeCellContent(
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().clickable {
+        onAction(NotebookAction.SelectCell(cell.id))
+    }) {
         CodeEditor(
-            codeText = codeCellState.textFieldValue, codeCellState.annotatedString, Modifier, 14, {
-                onAction(NotebookAction.UpdateCodeCell(cell.id, it))
-            }, verticalScroll = false
+            codeText = codeCellState.textFieldValue, codeCellState.annotatedString,
+            Modifier.clickable {
+                onAction(NotebookAction.SelectCell(cell.id))
+            },
+            14,
+            { onAction(NotebookAction.UpdateCodeCell(cell.id, it)) },
+            verticalScroll = false,
+            onFocused = {
+                onAction(NotebookAction.SelectCell(cell.id))
+            }
         )
 
         cell.outputs?.forEach { output ->
@@ -286,22 +298,38 @@ fun CodeCellContent(
 }
 
 @Composable
-fun MarkdownCellContent(cell: Cell, onAction: (NotebookAction) -> Unit) {
+fun MarkdownCellContent(cell: Cell, isSelected: Boolean, onAction: (NotebookAction) -> Unit) {
     var selection by remember { mutableStateOf(TextRange(0)) }
-    OutlinedTextField(
-        value = TextFieldValue(cell.source.joinToString("\n"), selection = selection),
-        onValueChange = { newText ->
-            selection = newText.selection
-            // Update the cell source when the text changes
-            onAction(NotebookAction.UpdateMarkdownCell(cell.id, newText.text.lines()))
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
-        singleLine = false,
-        maxLines = Int.MAX_VALUE,
-    )
+
+    Box(modifier = Modifier.clickable {
+        onAction(NotebookAction.SelectCell(cell.id))
+    }) {
+        if (isSelected) {
+            OutlinedTextField(
+                value = TextFieldValue(cell.source.joinToString("\n"), selection = selection),
+                onValueChange = { newText ->
+                    selection = newText.selection
+                    onAction(NotebookAction.UpdateMarkdownCell(cell.id, newText.text.lines()))
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                singleLine = false,
+                maxLines = Int.MAX_VALUE,
+            )
+        } else {
+            Markdown(
+                content = cell.source.joinToString("\n"),
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                colors = rememberMarkdownColors(),
+                typography = rememberMarkdownTypography()
+            )
+
+        }
+    }
+
+
 }
 
 @Composable
@@ -348,3 +376,45 @@ fun OutputDisplay(output: Output) {
     }
 }
 
+
+@Composable
+fun rememberMarkdownColors(): MarkdownColors {
+    return object : MarkdownColors {
+        override val text: Color = MaterialTheme.colorScheme.onBackground
+        override val codeText: Color = MaterialTheme.colorScheme.onSurface
+        override val inlineCodeText: Color = MaterialTheme.colorScheme.onSurfaceVariant
+        override val linkText: Color = MaterialTheme.colorScheme.primary
+        override val codeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
+        override val inlineCodeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
+        override val dividerColor: Color = MaterialTheme.colorScheme.outline
+        override val tableText: Color = MaterialTheme.colorScheme.onSurface
+        override val tableBackground: Color = MaterialTheme.colorScheme.surface
+    }
+}
+
+@Composable
+fun rememberMarkdownTypography(): MarkdownTypography {
+    return object : MarkdownTypography {
+        override val text: TextStyle = MaterialTheme.typography.bodyLarge
+        override val code: TextStyle =
+            MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+        override val inlineCode: TextStyle =
+            MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+        override val h1: TextStyle = MaterialTheme.typography.headlineLarge
+        override val h2: TextStyle = MaterialTheme.typography.headlineMedium
+        override val h3: TextStyle = MaterialTheme.typography.headlineSmall
+        override val h4: TextStyle = MaterialTheme.typography.titleLarge
+        override val h5: TextStyle = MaterialTheme.typography.titleMedium
+        override val h6: TextStyle = MaterialTheme.typography.titleSmall
+        override val quote: TextStyle =
+            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary)
+        override val paragraph: TextStyle = MaterialTheme.typography.bodyLarge
+        override val ordered: TextStyle = MaterialTheme.typography.bodyLarge
+        override val bullet: TextStyle = MaterialTheme.typography.bodyLarge
+        override val list: TextStyle = MaterialTheme.typography.bodyLarge
+        override val link: TextStyle =
+            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
+        override val textLink: TextLinkStyles = TextLinkStyles()
+        override val table: TextStyle = MaterialTheme.typography.bodyMedium
+    }
+}

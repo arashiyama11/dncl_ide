@@ -58,6 +58,7 @@ fun CodeEditor(
     currentEvaluatingLine: Int? = null,
     onFocused: (Boolean) -> Unit = {},
     verticalScroll: Boolean = true,
+    fieldModifier: Modifier = Modifier
 ) {
     val fontSizeDouble =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0

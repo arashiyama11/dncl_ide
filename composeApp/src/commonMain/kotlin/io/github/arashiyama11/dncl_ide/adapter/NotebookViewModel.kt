@@ -42,7 +42,8 @@ data class NotebookUiState(
     val notebook: Notebook? = null,
     val selectedCellId: String? = null,
     val codeCellStateMap: Map<String, CodeCellState> = emptyMap(),
-    val loading: Boolean = true
+    val loading: Boolean = true,
+    val focusedCellId: String? = null
 )
 
 data class CodeCellState(
@@ -137,7 +138,19 @@ class NotebookViewModel(
                         val newNotebook = uiState.value.notebook!!.copy(
                             cells = uiState.value.notebook!!.cells.map { cell ->
                                 if (cell.id == selectCellId) {
-                                    cell.copy(
+                                    if (cell.outputs?.lastOrNull()?.name == "stdout") {
+                                        val newOut =
+                                            cell.outputs!!.dropLast(1) + cell.outputs!!.last()
+                                                .run {
+                                                    copy(
+                                                        text = text.orEmpty() + it
+                                                    )
+                                                }
+                                        cell.copy(
+                                            outputs = newOut,
+                                            executionCount = (cell.executionCount ?: 0) + 1
+                                        )
+                                    } else cell.copy(
                                         outputs = cell.outputs!! + Output(
                                             outputType = "stream",
                                             name = "stdout",

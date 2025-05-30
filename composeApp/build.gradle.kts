@@ -79,7 +79,8 @@ kotlin {
             implementation(libs.material.icons.core)
             implementation(libs.aboutlibraries.core)
             implementation(libs.kotlinx.serialization.json)
-
+            implementation(libs.markdown.renderer)
+            implementation(libs.markdown.renderer.m3)
 
             implementation(project(":domain"))
             implementation(project(":interpreter"))
