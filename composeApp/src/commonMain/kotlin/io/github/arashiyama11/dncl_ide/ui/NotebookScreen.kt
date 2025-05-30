@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -137,8 +138,11 @@ fun NotebookContent(
     codeCellStateMap: Map<String, CodeCellState>,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Notebook toolbar
-        NotebookToolbar(onExecuteAllCells = { onAction(NotebookAction.ExecuteAllCells) })
+        // Notebook toolbar with cancel capability
+        NotebookToolbar(
+            onExecuteAllCells = { onAction(NotebookAction.ExecuteAllCells) },
+            onCancelExecution = { onAction(NotebookAction.CancelExecution) }
+        )
 
         // Cells
         LazyColumn(
@@ -160,7 +164,10 @@ fun NotebookContent(
 }
 
 @Composable
-fun NotebookToolbar(onExecuteAllCells: () -> Unit) {
+fun NotebookToolbar(
+    onExecuteAllCells: () -> Unit,
+    onCancelExecution: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp
@@ -176,7 +183,9 @@ fun NotebookToolbar(onExecuteAllCells: () -> Unit) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Run All")
             }
-            // Additional toolbar items can be added here
+            IconButton(onClick = onCancelExecution) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
+            }
             Spacer(modifier = Modifier.weight(1f))
         }
     }

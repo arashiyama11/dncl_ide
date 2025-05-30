@@ -56,6 +56,7 @@ sealed interface NotebookAction {
     data class ExecuteCell(val cellId: String) : NotebookAction
     data class DeleteCell(val cellId: String) : NotebookAction
     data object ExecuteAllCells : NotebookAction
+    data object CancelExecution : NotebookAction
     data class AddCellAfter(val cellId: String?, val cellType: CellType) : NotebookAction
     data class ChangeCellType(val cellId: String, val cellType: CellType) : NotebookAction
     data class UpdateCodeCell(val cellId: String, val textFieldValue: TextFieldValue) :
@@ -300,7 +301,6 @@ class NotebookViewModel(
                 }
             }
             val updatedNotebook = notebook.copy(cells = updatedCells)
-            println("Cleared outputs for cell: $cellId, $updatedNotebook")
             _uiState.update { it.copy(notebook = updatedNotebook) }
             /*notebookFileUseCase.saveNotebookFile(
                 notebookFile!!, with(notebookFileUseCase) {
@@ -314,8 +314,10 @@ class NotebookViewModel(
      * Execute all cells in the notebook
      */
     fun executeAllCells() {
-        viewModelScope.launch {
-            executeJob?.cancel()
+        // Cancel any ongoing execution
+        executeJob?.cancel()
+        // Launch new execution job
+        executeJob = viewModelScope.launch {
             val notebook = _uiState.value.notebook ?: return@launch
 
             // すべてのセルの出力をクリア
@@ -498,6 +500,7 @@ class NotebookViewModel(
             is NotebookAction.ExecuteCell -> executeCell(action.cellId)
             is NotebookAction.DeleteCell -> deleteCell(action.cellId)
             is NotebookAction.ExecuteAllCells -> executeAllCells()
+            is NotebookAction.CancelExecution -> executeJob?.cancel()
             is NotebookAction.AddCellAfter -> addCellAfter(action.cellId, action.cellType)
             is NotebookAction.ChangeCellType -> changeCellType(action.cellId, action.cellType)
             is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(
