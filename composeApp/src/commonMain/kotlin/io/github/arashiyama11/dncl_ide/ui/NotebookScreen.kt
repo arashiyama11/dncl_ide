@@ -47,6 +47,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
@@ -62,8 +63,7 @@ fun NotebookScreen(
     modifier: Modifier = Modifier,
     notebookViewModel: NotebookViewModel = koinViewModel()
 ) {
-    val uiState by notebookViewModel.uiState.collectAsState()
-
+    val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
     Scaffold(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {

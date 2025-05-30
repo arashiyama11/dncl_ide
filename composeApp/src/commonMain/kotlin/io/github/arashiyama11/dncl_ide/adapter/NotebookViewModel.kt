@@ -27,6 +27,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -81,15 +82,16 @@ class NotebookViewModel(
         )
     }.stateIn(
         viewModelScope,
-        started = kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Lazily,
         initialValue = NotebookUiState()
     )
 
     val errorChannel = Channel<String>()
 
-    var notebookFile: NotebookFile? = null
-        private set
-    var selectCellId: String? = null
+    private var notebookFile: NotebookFile? = null
+    private var selectCellId: String? = null
+    private var executeJob: Job? = null
+
 
     private lateinit var environment: Environment
 
@@ -131,7 +133,6 @@ class NotebookViewModel(
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = {
-                        println("stdout: $it")
                         val newNotebook = uiState.value.notebook!!.copy(
                             cells = uiState.value.notebook!!.cells.map { cell ->
                                 if (cell.id == selectCellId) {
@@ -149,7 +150,6 @@ class NotebookViewModel(
                             }
                         )
 
-                        println("newNotebook: $newNotebook")
                         _uiState.update { it.copy(notebook = newNotebook) }
 
                     }, onClear = {
@@ -278,9 +278,9 @@ class NotebookViewModel(
      * Execute the cell with the given ID
      */
     fun executeCell(cellId: String) {
-        println("Executing cell with ID: $cellId")
         selectCellId = cellId
-        viewModelScope.launch {
+        executeJob?.cancel()
+        executeJob = viewModelScope.launch {
             clearCellOutput(cellId).join()
             delay(50) //await clear
             notebookFileUseCase.executeCell(
@@ -315,6 +315,7 @@ class NotebookViewModel(
      */
     fun executeAllCells() {
         viewModelScope.launch {
+            executeJob?.cancel()
             val notebook = _uiState.value.notebook ?: return@launch
 
             // すべてのセルの出力をクリア

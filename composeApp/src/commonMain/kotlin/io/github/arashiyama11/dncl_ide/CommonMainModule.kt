@@ -19,16 +19,12 @@ val commonMainModule = module {
     if (currentPlatform == Platform.Android) {
         viewModelOf(::DrawerViewModel)
         viewModelOf(::IdeViewModel)
-        viewModelOf(::NotebookViewModel)
     } else {
         singleOf(::DrawerViewModel)
         singleOf(::IdeViewModel)
-        singleOf(::NotebookViewModel)
     }
 
-
-    singleOf(::DrawerViewModel)
-    singleOf(::IdeViewModel)
+    singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
