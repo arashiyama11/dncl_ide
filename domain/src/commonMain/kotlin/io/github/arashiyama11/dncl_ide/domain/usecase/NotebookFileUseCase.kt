@@ -158,4 +158,101 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         )
         return updatedNotebook
     }
+
+    /**
+     * 新しいセルを指定位置に挿入し、ファイルに保存する
+     */
+    suspend fun insertCellAndSave(
+        notebookFile: NotebookFile,
+        notebook: Notebook,
+        newCell: Cell,
+        afterCellId: String? = null
+    ): Notebook {
+        val cells = notebook.cells.toMutableList()
+        val insertIndex = afterCellId?.let { id ->
+            val idx = cells.indexOfFirst { it.id == id }
+            if (idx != -1) idx + 1 else cells.size
+        } ?: 0
+        if (insertIndex in 0..cells.size) {
+            cells.add(insertIndex, newCell)
+        } else {
+            cells.add(newCell)
+        }
+        val updatedNotebook = notebook.copy(cells = cells)
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
+
+    /**
+     * 指定セルを削除し、ファイルに保存する
+     */
+    suspend fun deleteCellAndSave(
+        notebookFile: NotebookFile,
+        notebook: Notebook,
+        cellId: String
+    ): Notebook {
+        val updatedCells = notebook.cells.filterNot { it.id == cellId }
+        val updatedNotebook = notebook.copy(cells = updatedCells)
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
+
+    /**
+     * セルのタイプを変更してファイルに保存する
+     */
+    suspend fun changeCellTypeAndSave(
+        notebookFile: NotebookFile,
+        notebook: Notebook,
+        cellId: String,
+        newType: CellType
+    ): Notebook {
+        val cell = notebook.cells.firstOrNull { it.id == cellId }
+            ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
+        val updatedCell = createCell(
+            id = cellId,
+            type = newType,
+            source = cell.source,
+            executionCount = if (newType == CellType.CODE) 0 else null,
+            outputs = if (newType == CellType.CODE) emptyList() else null
+        )
+        val updatedNotebook = modifyNotebookCell(notebook, cellId, updatedCell)
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
+
+    /**
+     * 指定セルの出力をクリアしてファイルに保存する
+     */
+    suspend fun clearCellOutputAndSave(
+        notebookFile: NotebookFile,
+        notebook: Notebook,
+        cellId: String
+    ): Notebook {
+        val updatedCells = notebook.cells.map { cell ->
+            if (cell.id == cellId) {
+                cell.copy(outputs = emptyList(), executionCount = 0)
+            } else {
+                cell
+            }
+        }
+        val updatedNotebook = notebook.copy(cells = updatedCells)
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
 }
