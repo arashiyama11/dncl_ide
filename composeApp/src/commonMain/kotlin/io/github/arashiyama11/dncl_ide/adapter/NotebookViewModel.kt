@@ -32,8 +32,10 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlin.random.Random
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 data class NotebookUiState(
     val notebook: Notebook? = null,
@@ -157,20 +159,119 @@ class NotebookViewModel(
         }
     }
 
-    // New functions for cell operations
-
     /**
      * Add a new cell of the specified type after the cell with the given ID
      */
     fun addCellAfter(afterCellId: String?, cellType: CellType) {
-        // Implementation will be added later
+        viewModelScope.launch {
+            val notebook = _uiState.value.notebook ?: return@launch
+            val cellId = generateCellId()
+
+            // デフォルトの内容を設定
+            val defaultSource = when (cellType) {
+                CellType.CODE -> listOf("")
+                CellType.MARKDOWN -> listOf("## 新しいセル")
+            }
+
+            // 新しいセルを挿入する位置を決定
+            val cells = notebook.cells.toMutableList()
+            val insertIndex = if (afterCellId != null) {
+                cells.indexOfFirst { it.id == afterCellId } + 1
+            } else {
+                0 // afterCellIdがnullの場合は先頭に挿入
+            }
+
+            // 新しいセルの作成
+            val newCell = notebookFileUseCase.createCell(
+                id = cellId,
+                type = cellType,
+                source = defaultSource,
+                executionCount = 0,
+                outputs = emptyList()
+            )
+
+            // セルを挿入
+            if (insertIndex in cells.indices) {
+                cells.add(insertIndex, newCell)
+            } else {
+                cells.add(newCell)
+            }
+
+            // ノートブックを更新
+            val updatedNotebook = notebook.copy(cells = cells)
+            _uiState.update {
+                it.copy(
+                    notebook = updatedNotebook,
+                    selectedCellId = cellId
+                )
+            }
+
+            // 新しいセルがコードセルの場合は、初期化
+            if (cellType == CellType.CODE) {
+                onUpdateCodeCell(
+                    cellId,
+                    TextFieldValue(
+                        text = defaultSource.joinToString("\n"),
+                        selection = TextRange(0)
+                    )
+                )
+            }
+
+            // ノートブックを保存
+            notebookFileUseCase.saveNotebookFile(
+                notebookFile!!,
+                with(notebookFileUseCase) {
+                    updatedNotebook.toFileContent()
+                },
+                cursorPosition = CursorPosition(0)
+            )
+        }
     }
 
     /**
      * Delete the cell with the given ID
      */
     fun deleteCell(cellId: String) {
-        // Implementation will be added later
+        viewModelScope.launch {
+            val notebook = _uiState.value.notebook ?: return@launch
+
+            // 削除するセルの位置を特定
+            val cells = notebook.cells
+            val cellIndex = cells.indexOfFirst { it.id == cellId }
+            if (cellIndex == -1) return@launch  // セルが見つからない場合
+
+            // 削除後に選択するセルを決定
+            val nextSelectedCellId = when {
+                cells.size <= 1 -> null  // これが最後のセルならnull
+                cellIndex > 0 -> cells[cellIndex - 1].id  // 前のセル
+                else -> cells[1].id  // 後ろのセル
+            }
+
+            // セルを削除
+            val updatedCells = cells.filterNot { it.id == cellId }
+            val updatedNotebook = notebook.copy(cells = updatedCells)
+
+            // CodeCellStateMapから削除
+            val updatedCellStateMap = _uiState.value.codeCellStateMap.toMutableMap()
+            updatedCellStateMap.remove(cellId)
+
+            _uiState.update {
+                it.copy(
+                    notebook = updatedNotebook,
+                    selectedCellId = nextSelectedCellId,
+                    codeCellStateMap = updatedCellStateMap
+                )
+            }
+
+            // ノートブックを保存
+            notebookFileUseCase.saveNotebookFile(
+                notebookFile!!,
+                with(notebookFileUseCase) {
+                    updatedNotebook.toFileContent()
+                },
+                cursorPosition = CursorPosition(0)
+            )
+        }
     }
 
     /**
@@ -213,14 +314,39 @@ class NotebookViewModel(
      * Execute all cells in the notebook
      */
     fun executeAllCells() {
-        // Implementation will be added later
+        viewModelScope.launch {
+            val notebook = _uiState.value.notebook ?: return@launch
+
+            // すべてのセルの出力をクリア
+            val clearedNotebook = notebook.copy(
+                cells = notebook.cells.map { cell ->
+                    cell.copy(outputs = emptyList(), executionCount = 0)
+                }
+            )
+
+            _uiState.update { it.copy(notebook = clearedNotebook) }
+
+            // 各セルを順番に実行
+            for (cell in clearedNotebook.cells) {
+                if (cell.type == CellType.CODE) {
+                    selectCellId = cell.id
+                    // コードセルの実行
+                    delay(100) // UIの更新を待つ
+                    notebookFileUseCase.executeCell(
+                        _uiState.value.notebook!!,
+                        cell.id,
+                        environment
+                    )
+                    delay(200) // 実行完了を少し待つ
+                }
+            }
+        }
     }
 
     /**
      * Update the content of the cell with the given ID
      */
     fun updateCellContent(cellId: String, newContent: List<String>) {
-        // Implementation will be added later
         viewModelScope.launch {
             val notebook = _uiState.value.notebook ?: return@launch
             val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
@@ -251,7 +377,50 @@ class NotebookViewModel(
      * Change the type of the cell with the given ID
      */
     fun changeCellType(cellId: String, newType: CellType) {
-        // Implementation will be added later
+        viewModelScope.launch {
+            val notebook = _uiState.value.notebook ?: return@launch
+            val cell = notebook.cells.firstOrNull { it.id == cellId } ?: return@launch
+
+            if (cell.type == newType) return@launch // 既に同じタイプならば何もしない
+
+            // セルのタイプを変更した新しいセル
+            val updatedCell = notebookFileUseCase.createCell(
+                id = cellId,
+                type = newType,
+                source = cell.source,
+                executionCount = if (newType == CellType.CODE) 0 else null,
+                outputs = if (newType == CellType.CODE) emptyList() else null
+            )
+
+            // ノートブックを更新
+            val updatedNotebook = notebookFileUseCase.modifyNotebookCell(
+                notebook,
+                cellId,
+                updatedCell
+            )
+
+            _uiState.update { it.copy(notebook = updatedNotebook) }
+
+            // コードセルに変更した場合は、CodeCellStateを初期化
+            if (newType == CellType.CODE) {
+                onUpdateCodeCell(
+                    cellId,
+                    TextFieldValue(
+                        text = cell.source.joinToString("\n"),
+                        selection = TextRange(0)
+                    )
+                )
+            }
+
+            // ノートブックを保存
+            notebookFileUseCase.saveNotebookFile(
+                notebookFile!!,
+                with(notebookFileUseCase) {
+                    updatedNotebook.toFileContent()
+                },
+                cursorPosition = CursorPosition(0)
+            )
+        }
     }
 
     fun onUpdateCodeCell(
@@ -371,5 +540,12 @@ class NotebookViewModel(
             e.printStackTrace()
             return newTextFiledValue
         }
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    fun generateCellId(): String {
+        // KMP-safe unique ID: timestamp + random
+        return "cell-" + Uuid.random().toString() + "-" + Random.nextInt(100000, 999999)
+            .toString()
     }
 }

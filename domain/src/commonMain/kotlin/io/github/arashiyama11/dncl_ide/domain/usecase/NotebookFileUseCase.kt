@@ -10,6 +10,7 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Metadata
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
+import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
@@ -94,5 +95,38 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             if (cell.id == cellId) newCell else cell
         }
         return notebook.copy(cells = updatedCells)
+    }
+
+    /**
+     * 新しいセルを作成する
+     *
+     * @param id セルの一意識別子
+     * @param type セルの種類 (CODE または MARKDOWN)
+     * @param source セルのソースコード（行ごとのリスト）
+     * @param executionCount 実行回数（コードセルの場合のみ使用）
+     * @param outputs セルの出力（コードセルの場合のみ使用）
+     * @return 新しいCellオブジェクト
+     */
+    fun createCell(
+        id: String,
+        type: CellType,
+        source: List<String>,
+        executionCount: Int? = if (type == CellType.CODE) 0 else null,
+        outputs: List<Output>? = if (type == CellType.CODE) emptyList() else null
+    ): Cell {
+        return Cell(
+            id = id,
+            type = type,
+            source = source,
+            executionCount = executionCount,
+            outputs = outputs
+        )
+    }
+
+    /**
+     * ノートブックファイルからノートブックコンテンツを取得する（getNotebookのエイリアス）
+     */
+    suspend fun getNotebookFileContent(notebookFile: NotebookFile): Notebook {
+        return getNotebook(notebookFile)
     }
 }
