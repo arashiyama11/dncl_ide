@@ -134,38 +134,23 @@ class NotebookViewModel(
         viewModelScope.launch {
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
-                    onStdout = {
-                        val newNotebook = uiState.value.notebook!!.copy(
-                            cells = uiState.value.notebook!!.cells.map { cell ->
-                                if (cell.id == selectCellId) {
-                                    if (cell.outputs?.lastOrNull()?.name == "stdout") {
-                                        val newOut =
-                                            cell.outputs!!.dropLast(1) + cell.outputs!!.last()
-                                                .run {
-                                                    copy(
-                                                        text = text.orEmpty() + it
-                                                    )
-                                                }
-                                        cell.copy(
-                                            outputs = newOut,
-                                            executionCount = (cell.executionCount ?: 0) + 1
-                                        )
-                                    } else cell.copy(
-                                        outputs = cell.outputs!! + Output(
-                                            outputType = "stream",
-                                            name = "stdout",
-                                            text = listOf(it)
-                                        ),
-                                        executionCount = (cell.executionCount ?: 0) + 1
-                                    )
-                                } else {
-                                    cell
-                                }
-                            }
-                        )
-
-                        _uiState.update { it.copy(notebook = newNotebook) }
-
+                    onStdout = { outputStr ->
+                        this@NotebookViewModel.viewModelScope.launch {
+                            val file = notebookFile ?: return@launch
+                            val notebook = uiState.value.notebook ?: return@launch
+                            val newOutput = Output(
+                                outputType = "stream",
+                                name = "stdout",
+                                text = listOf(outputStr)
+                            )
+                            val updatedNotebook = notebookFileUseCase.appendOutputAndSave(
+                                file,
+                                notebook,
+                                selectCellId ?: return@launch,
+                                newOutput
+                            )
+                            _uiState.update { it.copy(notebook = updatedNotebook) }
+                        }
                     }, onClear = {
                         clearCellOutput(selectCellId!!)
                     }, onImport = { DnclObject.Null(AstNode.Program(emptyList())) }

@@ -139,7 +139,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
      * @return 更新後のNotebookオブジェクト
      */
     suspend fun updateCellAndSave(
-        notebookFile: io.github.arashiyama11.dncl_ide.domain.model.NotebookFile,
+        notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String,
         updateBlock: (Cell) -> Cell
@@ -248,6 +248,38 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             }
         }
         val updatedNotebook = notebook.copy(cells = updatedCells)
+        saveNotebookFile(
+            notebookFile,
+            updatedNotebook.toFileContent(),
+            CursorPosition(0)
+        )
+        return updatedNotebook
+    }
+
+
+    suspend fun appendOutputAndSave(
+        notebookFile: NotebookFile,
+        notebook: Notebook,
+        cellId: String,
+        newOutput: Output
+    ): Notebook {
+        val oldCell = notebook.cells.firstOrNull { it.id == cellId }
+            ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
+        val prevOutputs = oldCell.outputs ?: emptyList()
+        val mergedOutputs =
+            if (prevOutputs.isNotEmpty() && prevOutputs.last().outputType == newOutput.outputType) {
+                val last = prevOutputs.last()
+                val mergedText = (last.text ?: emptyList()) + (newOutput.text ?: emptyList())
+                val mergedOutput = last.copy(text = mergedText)
+                prevOutputs.dropLast(1) + mergedOutput
+            } else {
+                prevOutputs + newOutput
+            }
+        val updatedCell = oldCell.copy(
+            outputs = mergedOutputs,
+            executionCount = (oldCell.executionCount ?: 0) + 1
+        )
+        val updatedNotebook = modifyNotebookCell(notebook, cellId, updatedCell)
         saveNotebookFile(
             notebookFile,
             updatedNotebook.toFileContent(),
