@@ -30,7 +30,7 @@ fun main() {
     }
 
     application {
-        Window(
+        /*Window(
             onCloseRequest = ::exitApplication,
             title = "Smart Phone Size",
             state = rememberWindowState(size = DpSize(360.dp, 800.dp)),
@@ -44,7 +44,7 @@ fun main() {
             state = rememberWindowState(size = DpSize(512.dp, 683.dp)),
         ) {
             App()
-        }
+        }*/
 
         Window(
             onCloseRequest = ::exitApplication,

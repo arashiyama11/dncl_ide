@@ -56,7 +56,8 @@ fun CodeEditor(
     fontSize: Int,
     onCodeChange: (TextFieldValue) -> Unit,
     currentEvaluatingLine: Int? = null,
-    onFocused: (Boolean) -> Unit = {}
+    onFocused: (Boolean) -> Unit = {},
+    verticalScroll: Boolean = true,
 ) {
     val fontSizeDouble =
         fontSize.toDouble() + if (fontSize % 8 == 0 || fontSize % 8 == 3 || fontSize % 8 == 5) 0.2 else 0.0
@@ -111,7 +112,11 @@ fun CodeEditor(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .apply {
+                    if (verticalScroll) {
+                        verticalScroll(rememberScrollState())
+                    }
+                }
                 .background(MaterialTheme.colorScheme.background)
                 .padding(8.dp)
         ) {
