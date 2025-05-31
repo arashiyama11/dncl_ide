@@ -84,6 +84,8 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 Output(
                     outputType = "error",
                     text = listOf(output.value),
+                    evalue = output.value,
+                    ename = output::class.simpleName,
                 )
             }
 

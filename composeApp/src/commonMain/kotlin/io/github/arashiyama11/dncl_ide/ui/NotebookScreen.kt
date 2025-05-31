@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,10 +56,12 @@ import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
+import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -93,7 +96,8 @@ fun NotebookScreen(
                     notebook = uiState.notebook!!,
                     selectedCellId = uiState.selectedCellId,
                     onAction = notebookViewModel::handleAction,
-                    codeCellStateMap = uiState.codeCellStateMap
+                    codeCellStateMap = uiState.codeCellStateMap,
+                    cellSuggestionsMap = uiState.cellSuggestionsMap
                 )
             }
         }
@@ -139,6 +143,7 @@ fun NotebookContent(
     selectedCellId: String?,
     onAction: (NotebookAction) -> Unit,
     codeCellStateMap: Map<String, CodeCellState>,
+    cellSuggestionsMap: Map<String, List<Definition>>
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Notebook toolbar with cancel capability
@@ -158,7 +163,8 @@ fun NotebookContent(
                     cell = cell,
                     isSelected = cell.id == selectedCellId,
                     onAction = onAction,
-                    codeCellStateMap = codeCellStateMap
+                    codeCellStateMap = codeCellStateMap,
+                    suggestions = cellSuggestionsMap[cell.id] ?: emptyList()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -201,6 +207,7 @@ fun CellComponent(
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     codeCellStateMap: Map<String, CodeCellState>,
+    suggestions: List<Definition> = emptyList()
 ) {
     val borderColor = if (isSelected)
         MaterialTheme.colorScheme.primary
@@ -263,7 +270,13 @@ fun CellComponent(
 
         // Cell content
         when (cell.type) {
-            CellType.CODE -> CodeCellContent(cell, onAction, codeCellStateMap[cell.id]!!)
+            CellType.CODE -> CodeCellContent(
+                cell,
+                onAction,
+                codeCellStateMap[cell.id]!!,
+                suggestions
+            )
+
             CellType.MARKDOWN -> MarkdownCellContent(cell, isSelected, onAction)
         }
     }
@@ -273,13 +286,15 @@ fun CellComponent(
 fun CodeCellContent(
     cell: Cell,
     onAction: (NotebookAction) -> Unit,
-    codeCellState: CodeCellState
+    codeCellState: CodeCellState,
+    suggestions: List<Definition> = emptyList()
 ) {
     Column(modifier = Modifier.fillMaxWidth().clickable {
         onAction(NotebookAction.SelectCell(cell.id))
     }) {
         CodeEditor(
-            codeText = codeCellState.textFieldValue, codeCellState.annotatedString,
+            codeText = codeCellState.textFieldValue,
+            codeCellState.annotatedString,
             Modifier.clickable {
                 onAction(NotebookAction.SelectCell(cell.id))
             },
@@ -291,6 +306,46 @@ fun CodeCellContent(
             }
         )
 
+        // Display suggestions if available
+        if (suggestions.isNotEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                SuggestionListView(
+                    textSuggestions = suggestions,
+                    onConfirmTextSuggestion = { suggestion ->
+                        // Get the current cursor position
+                        val currentText = codeCellState.textFieldValue.text
+                        val cursorPos = codeCellState.textFieldValue.selection.end
+
+                        // Find the word being typed
+                        var startPos = cursorPos
+                        while (startPos > 0 &&
+                            (currentText[startPos - 1].isLetterOrDigit() ||
+                                    currentText[startPos - 1] == '_')
+                        ) {
+                            startPos--
+                        }
+
+                        // Replace the word with suggestion
+                        val beforeCursor = currentText.substring(0, startPos)
+                        val afterCursor = currentText.substring(cursorPos)
+                        val newText = beforeCursor + suggestion + afterCursor
+                        val newCursorPos = startPos + suggestion.length
+
+                        // Update the text field with the suggestion
+                        onAction(
+                            NotebookAction.UpdateCodeCell(
+                                cell.id,
+                                TextFieldValue(
+                                    text = newText,
+                                    selection = TextRange(newCursorPos)
+                                )
+                            )
+                        )
+                    }
+                )
+            }
+        }
+
         cell.outputs?.forEach { output ->
             OutputDisplay(output)
         }
@@ -299,33 +354,37 @@ fun CodeCellContent(
 
 @Composable
 fun MarkdownCellContent(cell: Cell, isSelected: Boolean, onAction: (NotebookAction) -> Unit) {
-    var selection by remember { mutableStateOf(TextRange(0)) }
+    var text by remember(cell.id) {
+        mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
+    }
 
-    Box(modifier = Modifier.clickable {
-        onAction(NotebookAction.SelectCell(cell.id))
-    }) {
+    LaunchedEffect(text.text) {
+        onAction(NotebookAction.UpdateMarkdownCell(cell.id, text.text.lines()))
+    }
+
+    Box(
+        modifier = Modifier.clickable { onAction(NotebookAction.SelectCell(cell.id)) }
+    ) {
         if (isSelected) {
             OutlinedTextField(
-                value = TextFieldValue(cell.source.joinToString("\n"), selection = selection),
-                onValueChange = { newText ->
-                    selection = newText.selection
-                    onAction(NotebookAction.UpdateMarkdownCell(cell.id, newText.text.lines()))
-                },
+                value = text,
+                onValueChange = { newValue -> text = newValue },   // ← ここで保持している Value を更新するだけ
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                 singleLine = false,
-                maxLines = Int.MAX_VALUE,
+                maxLines = Int.MAX_VALUE
             )
         } else {
             Markdown(
                 content = cell.source.joinToString("\n"),
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 colors = rememberMarkdownColors(),
                 typography = rememberMarkdownTypography()
             )
-
         }
     }
 

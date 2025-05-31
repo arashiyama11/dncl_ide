@@ -5,7 +5,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
+import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
@@ -14,6 +16,7 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
@@ -45,7 +48,8 @@ data class NotebookUiState(
     val selectedCellId: String? = null,
     val codeCellStateMap: Map<String, CodeCellState> = emptyMap(),
     val loading: Boolean = true,
-    val focusedCellId: String? = null
+    val focusedCellId: String? = null,
+    val cellSuggestionsMap: Map<String, List<Definition>> = emptyMap()
 )
 
 data class CodeCellState(
@@ -73,7 +77,8 @@ class NotebookViewModel(
     private val fileUseCase: FileUseCase,
     private val notebookFileUseCase: NotebookFileUseCase,
     private val settingsUseCase: SettingsUseCase,
-    private val syntaxHighLighter: SyntaxHighLighter
+    private val syntaxHighLighter: SyntaxHighLighter,
+    private val suggestionUseCase: SuggestionUseCase
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotebookUiState())
     val uiState = combine(
@@ -180,7 +185,7 @@ class NotebookViewModel(
             // 新しいセルIDとデフォルトソースを生成
             val cellId = generateCellId()
             val defaultSource =
-                if (cellType == CellType.CODE) listOf("") else listOf("## 新しいセル")
+                if (cellType == CellType.CODE) listOf("1+2") else listOf("## 新しいセル")
             val newCell = notebookFileUseCase.createCell(
                 id = cellId,
                 type = cellType,
@@ -195,6 +200,24 @@ class NotebookViewModel(
                 newCell,
                 afterCellId
             )
+
+            when (cellType) {
+                CellType.CODE -> {
+                    onUpdateCodeCell(
+                        cellId,
+                        TextFieldValue(
+                            text = newCell.source.joinToString("\n"),
+                            selection = TextRange(0)
+                        )
+                    )
+                }
+
+                CellType.MARKDOWN -> {
+
+                }
+            }
+
+
             // UIステートの更新
             _uiState.update {
                 it.copy(notebook = updatedNotebook, selectedCellId = cellId)
@@ -343,8 +366,6 @@ class NotebookViewModel(
                 newType
             )
             // UIステート更新
-            _uiState.update { it.copy(notebook = updatedNotebook) }
-            // コードセルに変更した場合は、CodeCellStateを初期化
             if (newType == CellType.CODE) {
                 onUpdateCodeCell(
                     cellId,
@@ -372,9 +393,38 @@ class NotebookViewModel(
             val newText = newTextFieldValue.text
             // シンタックスハイライト用処理
             val lexer = Lexer(newText)
+            val tokens = lexer.toList()
             val (annotatedStr, _) = syntaxHighLighter.highlightWithParsedData(
-                newText, true, null, lexer.toList()
+                newText, true, null, tokens
             )
+
+            // Generate suggestions using SuggestionUseCase
+            var suggestions = emptyList<Definition>()
+            if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
+                val parser = kotlin.runCatching {
+                    io.github.arashiyama11.dncl_ide.interpreter.parser.Parser(Lexer(newText))
+                }.getOrNull()
+
+                if (parser != null) {
+                    val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
+                    suggestions = if (parsedProgram.isRight()) {
+                        // Use parsed data for better suggestions
+                        suggestionUseCase.suggestWithParsedData(
+                            newText,
+                            newTextFieldValue.selection.end,
+                            tokens,
+                            parsedProgram.getOrNull()!!
+                        )
+                    } else {
+                        // Fallback when parsing fails
+                        suggestionUseCase.suggestWhenFailingParse(
+                            newText,
+                            newTextFieldValue.selection.end
+                        )
+                    }
+                }
+            }
+
             // セル更新と保存をユースケースに委譲
             val updatedNotebook = notebookFileUseCase.updateCellAndSave(
                 file,
@@ -390,7 +440,8 @@ class NotebookViewModel(
                     codeCellStateMap = it.codeCellStateMap + (cellId to CodeCellState(
                         textFieldValue = newTextFieldValue,
                         annotatedString = annotatedStr
-                    ))
+                    )),
+                    cellSuggestionsMap = it.cellSuggestionsMap + (cellId to suggestions)
                 )
             }
         }
