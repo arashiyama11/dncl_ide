@@ -104,6 +104,7 @@ class FileNameValidationUseCaseTest {
 }
 
 class MockFileRepository : FileRepository {
+    override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
     override val selectedEntryPath: StateFlow<EntryPath?> = MutableStateFlow(null)
     var mockGetEntryByPath: (EntryPath) -> io.github.arashiyama11.dncl_ide.domain.model.Entry? =
         { null }

@@ -332,6 +332,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     private class MockFileRepository : FileRepository {
+        override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
         override val selectedEntryPath: StateFlow<EntryPath?> =
             MutableStateFlow(null)
 

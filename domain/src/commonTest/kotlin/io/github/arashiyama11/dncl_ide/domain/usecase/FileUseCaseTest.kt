@@ -151,6 +151,7 @@ class FileUseCaseTest {
     }
 
     private class MockFileRepository : FileRepository {
+        override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
         val selectedEntryPathFlow = MutableStateFlow<EntryPath?>(null)
         override val selectedEntryPath: StateFlow<EntryPath?> = selectedEntryPathFlow
         var mockGetRootFolder: () -> Folder = {
