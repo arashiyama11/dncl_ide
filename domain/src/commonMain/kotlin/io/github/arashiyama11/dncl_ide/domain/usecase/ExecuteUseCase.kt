@@ -204,7 +204,15 @@ class ExecuteUseCase(
                     str.dropLast(1).map { FolderName(it) } + FileName(
                         str.last()
                     )
-                ))
+                )).apply { if (this != null) return@withTimeoutOrNull this }
+
+            fileRepository.getEntryByPath(
+                fileRepository.rootPath + EntryPath(
+                    str.dropLast(1).map { FolderName(it) } + FileName(
+                        str.last()
+                    )
+                )
+            )
         }
 
         return if (file is ProgramFile) {

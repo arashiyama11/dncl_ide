@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
@@ -348,6 +349,18 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             fileContent: FileContent,
             cursorPosition: CursorPosition
         ) {
+        }
+
+        override suspend fun saveFile(
+            entryPath: EntryPath,
+            fileContent: FileContent,
+            cursorPosition: CursorPosition
+        ) {
+
+        }
+
+        override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
+            return FileContent("")
         }
 
         override suspend fun createFolder(path: EntryPath) {}

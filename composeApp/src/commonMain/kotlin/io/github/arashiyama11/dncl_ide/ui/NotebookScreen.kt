@@ -357,13 +357,12 @@ fun OutputDisplay(output: Output) {
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                output.traceback?.forEach { line ->
-                    Text(
-                        text = line,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+
+                Text(
+                    text = output.evalue.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             else -> {

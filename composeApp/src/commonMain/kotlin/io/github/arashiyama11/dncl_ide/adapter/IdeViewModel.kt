@@ -75,7 +75,6 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
-    private val notebookFileUseCase: NotebookFileUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
 ) : ViewModel() {

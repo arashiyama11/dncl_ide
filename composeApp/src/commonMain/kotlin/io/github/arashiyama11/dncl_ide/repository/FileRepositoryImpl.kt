@@ -30,7 +30,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
     private val _selectedEntryPath: MutableStateFlow<EntryPath?> = MutableStateFlow(null)
     override val selectedEntryPath: StateFlow<EntryPath?> = _selectedEntryPath
 
-    private val rootPath: EntryPath = rootPathProvider()
+    override val rootPath: EntryPath = rootPathProvider()
 
     private val setting = Settings()
 
@@ -69,6 +69,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
 
     override suspend fun getEntryByPath(entryPath: EntryPath): Entry? =
         withContext(Dispatchers.IO) {
+            println("getEntryByPath: $entryPath")
             if (!SystemFileSystem.exists(entryPath.toPath())) return@withContext null
             when (SystemFileSystem.metadataOrNull(entryPath.toPath())?.isDirectory) {
                 null -> null

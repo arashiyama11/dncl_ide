@@ -6,6 +6,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -169,6 +170,18 @@ class FileUseCaseTest {
             fileContent: FileContent,
             cursorPosition: CursorPosition
         ) = mockSaveFile(programFile, fileContent, cursorPosition)
+
+        override suspend fun saveFile(
+            entryPath: EntryPath,
+            fileContent: FileContent,
+            cursorPosition: CursorPosition
+        ) {
+        }
+
+
+        override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
+            return mockGetFileContent(ProgramFile(notebookFile.name, notebookFile.path))
+        }
 
         override suspend fun createFolder(path: EntryPath) = mockCreateFolder(path)
         override suspend fun selectFile(entryPath: EntryPath) = mockSelectFile(entryPath)

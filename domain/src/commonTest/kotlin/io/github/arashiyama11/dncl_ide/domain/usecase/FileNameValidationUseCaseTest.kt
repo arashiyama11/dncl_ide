@@ -1,9 +1,12 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
+import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
+import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.model.ValidationError
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
@@ -114,6 +117,17 @@ class MockFileRepository : FileRepository {
         fileContent: io.github.arashiyama11.dncl_ide.domain.model.FileContent,
         cursorPosition: io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
     ) {
+    }
+
+    override suspend fun saveFile(
+        entryPath: EntryPath,
+        fileContent: FileContent,
+        cursorPosition: CursorPosition
+    ) {
+    }
+
+    override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
+        return FileContent("")
     }
 
     override suspend fun createFolder(path: EntryPath) {}

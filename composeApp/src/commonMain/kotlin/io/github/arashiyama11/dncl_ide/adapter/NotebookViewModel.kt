@@ -6,6 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
+import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
@@ -18,6 +19,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -127,7 +129,7 @@ class NotebookViewModel(
                     } else {
                         errorChannel.send("ノートブックを開くことができません: $notebookFile")
                     }
-                } else errorChannel.send("選択されたファイルはノートブックではありません: $it")
+                }
             }
         }.launchIn(viewModelScope)
 
@@ -153,7 +155,17 @@ class NotebookViewModel(
                         }
                     }, onClear = {
                         clearCellOutput(selectCellId!!)
-                    }, onImport = { DnclObject.Null(AstNode.Program(emptyList())) }
+                    }, onImport = { importPath ->
+                        // IMPORT 処理をユースケースに委譲
+                        println("Importing from: $importPath")
+                        with(notebookFileUseCase) {
+                            importAndExecute(
+                                notebookFile!!,
+                                importPath,
+                                environment
+                            )
+                        }.also { println("Import completed") }
+                    }
                 ))
         }
     }
@@ -233,9 +245,28 @@ class NotebookViewModel(
         executeJob = viewModelScope.launch {
             clearCellOutput(cellId).join()
             delay(50) //await clear
-            notebookFileUseCase.executeCell(
+            val output = notebookFileUseCase.executeCell(
                 uiState.value.notebook!!, cellId, environment
             )
+
+            val file = notebookFile ?: return@launch
+            val notebook = _uiState.value.notebook ?: return@launch
+
+            notebookFileUseCase.appendOutputAndSave(
+                file,
+                notebook,
+                cellId,
+                output ?: return@launch
+            ).also { updatedNotebook ->
+                // UIステートの更新
+                _uiState.update {
+                    it.copy(
+                        notebook = updatedNotebook,
+                        selectedCellId = cellId,
+                        focusedCellId = cellId
+                    )
+                }
+            }
         }
     }
 

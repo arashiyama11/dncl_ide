@@ -113,10 +113,10 @@ fun CodeEditor(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .apply {
+                .run {
                     if (verticalScroll) {
                         verticalScroll(rememberScrollState())
-                    }
+                    } else this
                 }
                 .background(MaterialTheme.colorScheme.background)
                 .padding(8.dp)

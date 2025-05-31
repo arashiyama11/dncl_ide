@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
+import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
@@ -18,6 +19,13 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.json.Json
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import kotlinx.coroutines.withTimeoutOrNull
+import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import kotlin.collections.plus
 
 class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
@@ -30,7 +38,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
 
-    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment) {
+    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output? {
         val cell = notebook.cells.find { it.id == cellId }
             ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
 
@@ -38,13 +46,58 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             throw IllegalArgumentException("Only code cells can be executed.")
         }
 
-        val program =
-            Parser(Lexer(cell.source.joinToString("\n"))).getOrElse { return }.parseProgram()
-                .getOrElse { return }
-        val evaluator = EvaluatorFactory.create(
-            Channel(), 0, null, null
-        )
-        evaluator.evalProgram(program, env)
+        val code = cell.source.joinToString("\n")
+
+        val output = run {
+
+
+            val program =
+                Parser(Lexer(code)).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                    .parseProgram()
+                    .getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+            val evaluator = EvaluatorFactory.create(
+                Channel(), 0, null, null
+            )
+            evaluator.evalProgram(program, env).fold(
+                ifLeft = {
+                    DnclOutput.Error(it.explain(code))
+                }
+            ) {
+                if (it is DnclObject.Error) {
+                    DnclOutput.RuntimeError(it)
+                } else {
+                    DnclOutput.Stdout(it.toString())
+                }
+            }
+        }
+
+        return when (output) {
+            is DnclOutput.Stdout -> {
+                Output(
+                    outputType = "stream",
+                    name = "stdout",
+                    text = listOf(output.value)
+                )
+            }
+
+            is DnclOutput.Error -> {
+                Output(
+                    outputType = "error",
+                    text = listOf(output.value),
+                )
+            }
+
+            is DnclOutput.RuntimeError -> {
+                Output(
+                    outputType = "error",
+                    text = listOf(output.value.explain(code)),
+                    evalue = output.value.explain(code),
+                    ename = "RuntimeError",
+                )
+            }
+
+            else -> null
+        }
     }
 
     suspend fun createNotebookFile(
@@ -286,5 +339,69 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             CursorPosition(0)
         )
         return updatedNotebook
+    }
+
+    suspend fun CallBuiltInFunctionScope.importAndExecute(
+        notebookFile: NotebookFile,
+        importPath: String,
+        env: Environment
+    ): DnclObject {
+        // パスを分割してEntryPathを生成
+        val parts = importPath.split("/")
+        val entryPath = EntryPath(
+            parts.dropLast(1).map { FolderName(it) } + FileName(parts.last())
+        )
+        // ファイル取得 (タイムアウト付き)
+        val entry = withTimeoutOrNull(100) {
+            fileRepository.getEntryByPath(
+                EntryPath(
+                    parts.dropLast(1).map { FolderName(it) } + FileName(
+                        parts.last()
+                    )
+                )).apply { if (this != null) return@withTimeoutOrNull this }
+
+            fileRepository.getEntryByPath(
+                fileRepository.rootPath + EntryPath(
+                    parts.dropLast(1).map { FolderName(it) } + FileName(
+                        parts.last()
+                    )
+                )
+            )
+        }
+        return if (entry is ProgramFile) {
+            val content = fileRepository.getFileContent(entry).value
+            val parser = Parser(Lexer(content)).getOrElse { err ->
+                return DnclObject.RuntimeError(
+                    err.explain(content),
+                    astNode
+                )
+            }
+            val prog = parser.parseProgram().getOrElse { err ->
+                return DnclObject.RuntimeError(
+                    err.explain(content),
+                    astNode
+                )
+            }
+            // 新規Evaluatorで同じ環境に対して実行
+            val evaluator = EvaluatorFactory.create(
+                Channel(), 0, null, null
+            )
+            evaluator.evalProgram(prog, env).fold(
+                ifLeft = { lhs ->
+                    DnclObject.RuntimeError(
+                        lhs.message.orEmpty(),
+                        astNode
+                    )
+                },
+                ifRight = {
+                    DnclObject.Null(astNode)
+                }
+            )
+        } else {
+            DnclObject.RuntimeError(
+                "ファイル:$importPath が見つかりません",
+                astNode
+            )
+        }
     }
 }
