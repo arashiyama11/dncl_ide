@@ -6,9 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
-import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
-import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
@@ -19,10 +17,8 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
-import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,7 +35,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -365,6 +360,13 @@ class NotebookViewModel(
                 cellId,
                 newType
             )
+            _uiState.update {
+                it.copy(
+                    notebook = updatedNotebook,
+                    selectedCellId = cellId,
+                    focusedCellId = cellId
+                )
+            }
             // UIステート更新
             if (newType == CellType.CODE) {
                 onUpdateCodeCell(
@@ -401,27 +403,23 @@ class NotebookViewModel(
             // Generate suggestions using SuggestionUseCase
             var suggestions = emptyList<Definition>()
             if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
-                val parser = kotlin.runCatching {
-                    io.github.arashiyama11.dncl_ide.interpreter.parser.Parser(Lexer(newText))
-                }.getOrNull()
+                val parser = Parser(Lexer(newText))
 
-                if (parser != null) {
-                    val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
-                    suggestions = if (parsedProgram.isRight()) {
-                        // Use parsed data for better suggestions
-                        suggestionUseCase.suggestWithParsedData(
-                            newText,
-                            newTextFieldValue.selection.end,
-                            tokens,
-                            parsedProgram.getOrNull()!!
-                        )
-                    } else {
-                        // Fallback when parsing fails
-                        suggestionUseCase.suggestWhenFailingParse(
-                            newText,
-                            newTextFieldValue.selection.end
-                        )
-                    }
+                val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
+                suggestions = if (parsedProgram.isRight()) {
+                    // Use parsed data for better suggestions
+                    suggestionUseCase.suggestWithParsedData(
+                        newText,
+                        newTextFieldValue.selection.end,
+                        tokens,
+                        parsedProgram.getOrNull()!!
+                    )
+                } else {
+                    // Fallback when parsing fails
+                    suggestionUseCase.suggestWhenFailingParse(
+                        newText,
+                        newTextFieldValue.selection.end
+                    )
                 }
             }
 
@@ -434,13 +432,25 @@ class NotebookViewModel(
                 oldCell.copy(source = newText.split("\n"))
             }
             // UIステートの更新
+
             _uiState.update {
+                val newMap =
+                    if (it.codeCellStateMap.contains(cellId)) it.codeCellStateMap.mapValues {
+                        if (it.key == cellId) {
+                            CodeCellState(
+                                textFieldValue = newTextFieldValue,
+                                annotatedString = annotatedStr
+                            )
+                        } else it.value
+                    } else {
+                        it.codeCellStateMap + (cellId to CodeCellState(
+                            textFieldValue = newTextFieldValue,
+                            annotatedString = annotatedStr
+                        ))
+                    }
                 it.copy(
                     notebook = updatedNotebook,
-                    codeCellStateMap = it.codeCellStateMap + (cellId to CodeCellState(
-                        textFieldValue = newTextFieldValue,
-                        annotatedString = annotatedStr
-                    )),
+                    codeCellStateMap = newMap,
                     cellSuggestionsMap = it.cellSuggestionsMap + (cellId to suggestions)
                 )
             }
@@ -509,7 +519,7 @@ class NotebookViewModel(
                 )
             val newCursorPos = cursorPos + insertion.length
 
-            return TextFieldValue(
+            return newTextFiledValue.copy(
                 text = newText,
                 selection = TextRange(newCursorPos)
             )

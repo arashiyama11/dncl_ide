@@ -289,57 +289,67 @@ fun CodeCellContent(
     codeCellState: CodeCellState,
     suggestions: List<Definition> = emptyList()
 ) {
+    var localTfv by remember(cell.id) {
+        mutableStateOf(codeCellState.textFieldValue)
+    }
+
+    LaunchedEffect(codeCellState.textFieldValue, cell.id) {
+        if (localTfv != codeCellState.textFieldValue) {
+            localTfv = codeCellState.textFieldValue
+        }
+    }
+
+    LaunchedEffect(localTfv, cell.id) {
+        if (codeCellState.textFieldValue != localTfv) {
+            onAction(NotebookAction.UpdateCodeCell(cell.id, localTfv))
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth().clickable {
         onAction(NotebookAction.SelectCell(cell.id))
     }) {
         CodeEditor(
-            codeText = codeCellState.textFieldValue,
+            codeText = localTfv,
             codeCellState.annotatedString,
             Modifier.clickable {
                 onAction(NotebookAction.SelectCell(cell.id))
             },
             14,
-            { onAction(NotebookAction.UpdateCodeCell(cell.id, it)) },
+            { newTextFieldValue ->
+                localTfv = newTextFieldValue
+            },
             verticalScroll = false,
             onFocused = {
                 onAction(NotebookAction.SelectCell(cell.id))
             }
         )
 
-        // Display suggestions if available
         if (suggestions.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 SuggestionListView(
                     textSuggestions = suggestions,
                     onConfirmTextSuggestion = { suggestion ->
-                        // Get the current cursor position
-                        val currentText = codeCellState.textFieldValue.text
-                        val cursorPos = codeCellState.textFieldValue.selection.end
+                        val currentText = localTfv.text
+                        val cursorPos = localTfv.selection.end
 
-                        // Find the word being typed
                         var startPos = cursorPos
-                        while (startPos > 0 &&
-                            (currentText[startPos - 1].isLetterOrDigit() ||
-                                    currentText[startPos - 1] == '_')
-                        ) {
-                            startPos--
+                        while (startPos > 0) {
+                            val char = currentText.getOrNull(startPos - 1)
+                            if (char != null && (char.isLetterOrDigit() || char == '_')) {
+                                startPos--
+                            } else {
+                                break
+                            }
                         }
 
-                        // Replace the word with suggestion
                         val beforeCursor = currentText.substring(0, startPos)
                         val afterCursor = currentText.substring(cursorPos)
                         val newText = beforeCursor + suggestion + afterCursor
                         val newCursorPos = startPos + suggestion.length
 
-                        // Update the text field with the suggestion
-                        onAction(
-                            NotebookAction.UpdateCodeCell(
-                                cell.id,
-                                TextFieldValue(
-                                    text = newText,
-                                    selection = TextRange(newCursorPos)
-                                )
-                            )
+                        localTfv = TextFieldValue(
+                            text = newText,
+                            selection = TextRange(newCursorPos)
                         )
                     }
                 )
