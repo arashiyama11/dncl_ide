@@ -115,7 +115,7 @@ class Evaluator(
             condition =
                 eval(whileStmt.condition, env).bind().onReturnValueOrError { return@either it }
         }
-        DnclObject.Null(whileStmt)
+        DnclObject.Nothing(whileStmt)
     }
 
     private suspend fun evalForStatement(
@@ -165,7 +165,7 @@ class Evaluator(
                 )
             }
         }
-        DnclObject.Null(forStmt)
+        DnclObject.Nothing(forStmt)
     }
 
     private suspend fun evalAssignStatement(
@@ -176,7 +176,7 @@ class Evaluator(
             when (id) {
                 is AstNode.Identifier -> env.set(
                     id.value,
-                    eval(value, env).bind().onReturnValueOrError { return@either it })
+                    eval(value, env).bind().onReturnValueOrError { return@either it }).bind()
 
                 is AstNode.IndexExpression -> {
                     val array = eval(id.left, env).bind().onReturnValueOrError { return@either it }
@@ -200,7 +200,7 @@ class Evaluator(
                 }
             }
         }
-        DnclObject.Null(assignStmt)
+        DnclObject.Nothing(assignStmt)
     }
 
     private suspend fun evalExpressionStatement(
@@ -218,9 +218,9 @@ class Evaluator(
             functionStmt.block,
             env.createChildEnvironment(), functionStmt
         )
-        env.set(functionStmt.name, fn)
-        fn.env.set(functionStmt.name, fn)
-        DnclObject.Null(functionStmt)
+        env.set(functionStmt.name, fn).bind()
+        fn.env.set(functionStmt.name, fn).bind()
+        DnclObject.Nothing(functionStmt)
     }
 
     private suspend fun evalIndexExpression(

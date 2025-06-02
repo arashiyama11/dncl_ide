@@ -14,6 +14,7 @@ import kotlin.math.max
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class EvaluatorTest {
@@ -360,4 +361,101 @@ ${" ".repeat(spaces)}${"^".repeat(max(1, error.astNode.range.last - error.astNod
         val code = char.code
         return (code in 0x0020..0x007E) || (code in 0xFF61..0xFF9F)
     }
+
+    // Helper function to evaluate code and get Either<DnclError, DnclObject>
+    private fun evaluateEither(code: String): io.github.arashiyama11.dncl_ide.interpreter.model.Either<DnclError, DnclObject> {
+        val program = code.toProgram()
+        val env = Environment(builtInEnv)
+        return runBlocking {
+            evaluator.evalProgram(program, env)
+        }
+    }
+
+    // Helper function to evaluate code, failing on error, and returning the DnclObject
+    private fun evaluateSuccessful(code: String): DnclObject {
+        val result = evaluateEither(code)
+        if (result.isLeft()) {
+            fail("Evaluation expected to be successful, but failed: ${result.leftOrNull()?.message} (Error Type: ${result.leftOrNull()?.let { it::class.simpleName }})")
+        }
+        return result.getOrNull()!!
+    }
+
+    @Test
+    fun testStatementsEvaluatingToNothing() {
+        // Test while loop
+        val whileResult = evaluateSuccessful("while (false) {}")
+        assertTrue(whileResult is DnclObject.Nothing, "While loop should return Nothing. Got: ${whileResult::class.simpleName}")
+
+        // Test for loop
+        val forResult = evaluateSuccessful("for (i = 1 to 0 step 1) {}") // Loop that doesn't execute
+        assertTrue(forResult is DnclObject.Nothing, "For loop should return Nothing. Got: ${forResult::class.simpleName}")
+
+        // Test assignment statement
+        val assignResult = evaluateSuccessful("x = 10")
+        assertTrue(assignResult is DnclObject.Nothing, "Assignment statement should return Nothing. Got: ${assignResult::class.simpleName}")
+
+        // Test function declaration statement
+        val funcDeclResult = evaluateSuccessful("関数 foo() を: と定義する") // Minimal valid function declaration
+        assertTrue(funcDeclResult is DnclObject.Nothing, "Function declaration statement should return Nothing. Got: ${funcDeclResult::class.simpleName}")
+    }
+
+    @Test
+    fun testCannotAssignNothingError() {
+        // Test assigning result of a while loop
+        val assignWhileResult = evaluateEither("a = while (false) {}")
+        assertTrue(assignWhileResult.isLeft(), "Assignment of while loop result should be an error. Got: $assignWhileResult")
+        assignWhileResult.onLeft { error ->
+            assertTrue(error is DnclObject.CannotAssignNothingError, "Error should be CannotAssignNothingError. Got: ${error::class.simpleName}")
+            assertEquals("変数「a」にNothingを代入することはできません", error.message)
+        }
+
+        // Test assigning result of a for loop
+        val assignForResult = evaluateEither("b = for (i = 1 to 0 step 1) {}")
+        assertTrue(assignForResult.isLeft(), "Assignment of for loop result should be an error. Got: $assignForResult")
+        assignForResult.onLeft { error ->
+            assertTrue(error is DnclObject.CannotAssignNothingError, "Error should be CannotAssignNothingError. Got: ${error::class.simpleName}")
+            assertEquals("変数「b」にNothingを代入することはできません", error.message)
+        }
+
+        // Test assigning result of an assignment statement
+        // Note: DNCL might not support direct assignment of assignment statement results like `c = (x = 10)`.
+        // If `x = 10` itself is an expression that evaluates to Nothing, then `c = (x=10)` would be `c = Nothing`.
+        // Let's assume the parser supports `c = (x=10)` as assigning the result of `x=10`.
+        // If not, this specific test case might need adjustment based on actual parsing behavior.
+        // The current evaluator returns Nothing for an AssignStatement, so this should work.
+        val assignAssignResult = evaluateEither("c = (x = 10)")
+        assertTrue(assignAssignResult.isLeft(), "Assignment of assignment statement result should be an error. Got: $assignAssignResult")
+        assignAssignResult.onLeft { error ->
+            assertTrue(error is DnclObject.CannotAssignNothingError, "Error should be CannotAssignNothingError. Got: ${error::class.simpleName}")
+            assertEquals("変数「c」にNothingを代入することはできません", error.message)
+        }
+
+
+        // Test assigning result of a function declaration
+        val assignFuncDeclResult = evaluateEither("e = 関数 foo() を: と定義する")
+        assertTrue(assignFuncDeclResult.isLeft(), "Assignment of function declaration result should be an error. Got: $assignFuncDeclResult")
+        assignFuncDeclResult.onLeft { error ->
+            assertTrue(error is DnclObject.CannotAssignNothingError, "Error should be CannotAssignNothingError. Got: ${error::class.simpleName}")
+            assertEquals("変数「e」にNothingを代入することはできません", error.message)
+        }
+    }
+
+    @Test
+    fun testAssignNullIsAllowed() {
+        // An if statement without an else, where the condition is false, evaluates to DnclObject.Null
+        val assignNullResult = evaluateEither("nullableVar = もし (偽) ならば: 1 と定義する") // "もし (偽) ならば: 1" results in Null
+        assertTrue(assignNullResult.isRight(), "Assignment of Null should be successful. Got error: ${assignNullResult.leftOrNull()?.message}")
+
+        // Optionally, check the variable in the environment
+        val env = Environment(builtInEnv)
+        val program = "nullableVar = もし (偽) ならば: 1 と定義する".toProgram()
+        runBlocking {
+            evaluator.evalProgram(program, env).leftOrNull()?.let {
+                fail("Evaluation failed for null assignment check: ${it.message}")
+            }
+        }
+        val valueInEnv = env.get("nullableVar")
+        assertTrue(valueInEnv is DnclObject.Null, "Variable 'nullableVar' should hold Null. Got: ${valueInEnv?.let{it::class.simpleName}}")
+    }
+
 }
