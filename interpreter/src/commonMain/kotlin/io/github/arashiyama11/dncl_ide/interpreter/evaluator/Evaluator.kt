@@ -115,7 +115,7 @@ class Evaluator(
             condition =
                 eval(whileStmt.condition, env).bind().onReturnValueOrError { return@either it }
         }
-        DnclObject.Null(whileStmt)
+        DnclObject.Nothing(whileStmt)
     }
 
     private suspend fun evalForStatement(
@@ -128,7 +128,7 @@ class Evaluator(
         val step = eval(forStmt.step, env).bind().onReturnValueOrError { return@either it }
         val stepType = forStmt.stepType
         val block = forStmt.block
-        env.set(loopCounter, start)
+        env.set(loopCounter, start).onLeft { return@either it }
         if (start !is DnclObject.Int) return@either DnclObject.TypeError(
             message = "繰り返し文の開始値は整数である必要があります。\n開始値として ${start::class.simpleName} が使用されようとしました",
             start.astNode
@@ -154,7 +154,7 @@ class Evaluator(
                 env.set(
                     loopCounter,
                     DnclObject.Int(loopCounterValue.value + step.value, loopCounterValue.astNode)
-                )
+                ).onLeft { return@either it }
             } else {
                 if (loopCounterValue !is DnclObject.Int) break
                 if (loopCounterValue.value < end.value) break
@@ -162,10 +162,10 @@ class Evaluator(
                 env.set(
                     loopCounter,
                     DnclObject.Int(loopCounterValue.value - step.value, loopCounterValue.astNode)
-                )
+                ).onLeft { return@either it }
             }
         }
-        DnclObject.Null(forStmt)
+        DnclObject.Nothing(forStmt)
     }
 
     private suspend fun evalAssignStatement(
@@ -177,6 +177,7 @@ class Evaluator(
                 is AstNode.Identifier -> env.set(
                     id.value,
                     eval(value, env).bind().onReturnValueOrError { return@either it })
+                    .onLeft { return@either it }
 
                 is AstNode.IndexExpression -> {
                     val array = eval(id.left, env).bind().onReturnValueOrError { return@either it }
@@ -200,7 +201,7 @@ class Evaluator(
                 }
             }
         }
-        DnclObject.Null(assignStmt)
+        DnclObject.Nothing(assignStmt)
     }
 
     private suspend fun evalExpressionStatement(
@@ -218,9 +219,9 @@ class Evaluator(
             functionStmt.block,
             env.createChildEnvironment(), functionStmt
         )
-        env.set(functionStmt.name, fn)
-        fn.env.set(functionStmt.name, fn)
-        DnclObject.Null(functionStmt)
+        env.set(functionStmt.name, fn).onLeft { return@either it }
+        fn.env.set(functionStmt.name, fn).onLeft { return@either it }
+        DnclObject.Nothing(functionStmt)
     }
 
     private suspend fun evalIndexExpression(

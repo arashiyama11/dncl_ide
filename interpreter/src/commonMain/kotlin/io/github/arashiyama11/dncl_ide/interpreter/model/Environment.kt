@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
+import arrow.core.Either
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -15,8 +16,22 @@ class Environment(private val outer: Environment? = null) {
         return store[string] ?: outer?.get(string)
     }
 
-    suspend fun set(string: String, obj: DnclObject) = mutex.withLock {
-        store[string] = obj
+    suspend fun set(
+        string: String,
+        obj: DnclObject
+    ): Either<DnclObject.CannotAssignNothingError, Unit> {
+        if (obj is DnclObject.Nothing) {
+            return Either.Left(
+                DnclObject.CannotAssignNothingError(
+                    "変数「${string}」にNothingを代入することはできません",
+                    obj.astNode
+                )
+            )
+        }
+        mutex.withLock {
+            store[string] = obj
+        }
+        return Either.Right(Unit)
     }
 
     fun createChildEnvironment(): Environment {

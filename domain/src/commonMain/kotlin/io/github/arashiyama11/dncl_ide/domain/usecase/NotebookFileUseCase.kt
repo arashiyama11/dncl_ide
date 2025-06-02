@@ -50,7 +50,6 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
         val output = run {
 
-
             val program =
                 Parser(Lexer(code)).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
                     .parseProgram()
@@ -65,6 +64,8 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             ) {
                 if (it is DnclObject.Error) {
                     DnclOutput.RuntimeError(it)
+                } else if (it is DnclObject.Nothing) {
+                    null
                 } else {
                     DnclOutput.Stdout(it.toString())
                 }
@@ -350,9 +351,6 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     ): DnclObject {
         // パスを分割してEntryPathを生成
         val parts = importPath.split("/")
-        val entryPath = EntryPath(
-            parts.dropLast(1).map { FolderName(it) } + FileName(parts.last())
-        )
         // ファイル取得 (タイムアウト付き)
         val entry = withTimeoutOrNull(100) {
             fileRepository.getEntryByPath(

@@ -3,17 +3,18 @@ package io.github.arashiyama11.dncl_ide.interpreter
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
 import kotlin.math.max
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class EvaluatorTest {
@@ -359,5 +360,39 @@ ${" ".repeat(spaces)}${"^".repeat(max(1, error.astNode.range.last - error.astNod
     private fun isHalfWidth(char: Char): Boolean {
         val code = char.code
         return (code in 0x0020..0x007E) || (code in 0xFF61..0xFF9F)
+    }
+
+    @Test
+    fun testNothing() {
+        val program = """
+関数 f() を:
+  1
+と定義する""".toProgram()
+
+        runBlocking {
+            println(evaluator.evalProgram(program).getOrNull() is DnclObject.Nothing)
+        }
+    }
+
+    @Test
+    fun testAssignNothing() {
+        val program = """a = nothing()""".toProgram()
+        val env = Environment(builtInEnv)
+
+
+        val f = DnclObject.BuiltInFunction(
+            AllBuiltInFunction.CEIL, AstNode.SystemLiteral("", 0..0),
+        ) {
+            return@BuiltInFunction DnclObject.Nothing(AstNode.SystemLiteral("", 0..0))
+        }
+
+
+        runBlocking {
+            builtInEnv.set("nothing", f)
+            assertTrue(
+                evaluator.evalProgram(program, env)
+                    .getOrNull() is DnclObject.CannotAssignNothingError
+            )
+        }
     }
 }

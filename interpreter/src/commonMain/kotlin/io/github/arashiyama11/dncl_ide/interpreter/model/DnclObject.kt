@@ -60,6 +60,11 @@ sealed interface DnclObject {
         override fun hash() = 0
     }
 
+    data class Nothing(override val astNode: AstNode) : DnclObject {
+        override fun toString() = "Nothing"
+        override fun hash() = -1
+    }
+
     data class ReturnValue(val value: DnclObject, override val astNode: AstNode) : DnclObject {
         override fun toString() = value.toString()
 
@@ -88,6 +93,11 @@ sealed interface DnclObject {
 
     data class UndefinedError(override val message: kotlin.String, override val astNode: AstNode) :
         Error(message, astNode)
+
+    data class CannotAssignNothingError(
+        override val message: kotlin.String,
+        override val astNode: AstNode
+    ) : Error(message, astNode)
 
     data class IndexOutOfRangeError(
         val index: kotlin.Int,
