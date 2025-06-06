@@ -45,11 +45,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
@@ -61,6 +63,11 @@ import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+
+val showFabDist = setOf(
+    Destination.SelectFileScreen::class.qualifiedName,
+    Destination.SelectNotebookScreen::class.qualifiedName,
+)
 
 @Composable
 fun App() {
@@ -98,12 +105,14 @@ fun App() {
         }
 
 
-
+        var bottomAppBarHeight by remember { mutableStateOf(0) }
 
         Scaffold(snackbarHost = {
             SnackbarHost(snackbarHostState)
         }, bottomBar = {
-            BottomAppBar(modifier = Modifier.wrapContentHeight()) {
+            BottomAppBar(modifier = Modifier.wrapContentHeight().onGloballyPositioned {
+                bottomAppBarHeight = it.size.height
+            }) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -135,9 +144,17 @@ fun App() {
                 }
             }
         }, floatingActionButton = {
-            if (drawerState.isOpen || drawerState.isAnimationRunning) {
+            val bse by navController.currentBackStackEntryAsState()
+            val dist = bse?.destination
+
+
+            println("Current destination: ${dist?.route} ${dist?.route == Destination.SelectFileScreen::class.qualifiedName}")
+            if (dist?.route in showFabDist) {
                 var isShowDetails by remember { mutableStateOf(false) }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(bottom = bottomAppBarHeight.dp + 12.dp)
+                ) {
                     AnimatedVisibility(isShowDetails) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             SmallFloatingActionButton(
@@ -182,75 +199,63 @@ fun App() {
                 }
             }
         }, floatingActionButtonPosition = FabPosition.EndOverlay) { contentPadding ->
-            ModalNavigationDrawer(modifier = Modifier.fillMaxSize(), drawerContent = {
-                Column(modifier = Modifier.fillMaxHeight()) {
-                    DrawerContent(
-                        Modifier.weight(1f, fill = true).verticalScroll(rememberScrollState()), {
-                            navController.navigate(
-                                Destination.LicensesScreen
-                            )
-                        },
-                        drawerViewModel
+            val padding = if (isImeVisible()) {
+                PaddingValues(
+                    start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
+                    top = contentPadding.calculateTopPadding(),
+                    end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
+                    bottom = 4.dp
+                )
+            } else {
+                contentPadding
+            }
+
+            NavHost(navController, startDestination = Destination.App) {
+                composable<Destination.App> {
+                    if (selectedFile?.isNotebookFile() == true) {
+                        NotebookScreen(modifier = Modifier.padding(padding))
+                    } else DnclIDE(
+                        modifier = Modifier.padding(padding), ideViewModel
                     )
                 }
-            }, drawerState = drawerState) {
-                val padding = if (isImeVisible()) {
-                    PaddingValues(
-                        start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
-                        top = contentPadding.calculateTopPadding(),
-                        end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
-                        bottom = 4.dp
-                    )
-                } else {
-                    contentPadding
+
+                composable<Destination.LicensesScreen> {
+                    LicencesScreen(
+                        onBack = { navController.popBackStack() }
+                    ) {
+                        navController.navigate(Destination.SingleLicenseScreen(it))
+                    }
                 }
 
-                NavHost(navController, startDestination = Destination.App) {
-                    composable<Destination.App> {
-                        if (selectedFile?.isNotebookFile() == true) {
-                            NotebookScreen(modifier = Modifier.padding(padding))
-                        } else DnclIDE(
-                            modifier = Modifier.padding(padding), ideViewModel
-                        )
+                composable<Destination.SingleLicenseScreen> {
+                    val license = it.toRoute<Destination.SingleLicenseScreen>()
+                    SingleLicenseScreen(license.content) {
+                        navController.popBackStack()
                     }
+                }
 
-                    composable<Destination.LicensesScreen> {
-                        LicencesScreen(
-                            onBack = { navController.popBackStack() }
-                        ) {
-                            navController.navigate(Destination.SingleLicenseScreen(it))
-                        }
-                    }
+                composable<Destination.SelectFileScreen> {
+                    SelectFileScreen()
+                }
 
-                    composable<Destination.SingleLicenseScreen> {
-                        val license = it.toRoute<Destination.SingleLicenseScreen>()
-                        SingleLicenseScreen(license.content) {
-                            navController.popBackStack()
-                        }
-                    }
+                composable<Destination.SelectNotebookScreen> {
+                    SelectNotebookScreen()
+                }
 
-                    composable<Destination.SelectFileScreen> {
-                        SelectFileScreen()
-                    }
+                composable<Destination.CodingScreen> {
+                    CodingScreen()
+                }
 
-                    composable<Destination.SelectNotebookScreen> {
-                        SelectNotebookScreen()
-                    }
-
-                    composable<Destination.CodingScreen> {
-                        CodingScreen()
-                    }
-
-                    composable<Destination.SettingsScreen> {
-                        SettingsScreen() {
-                            navController.navigate(Destination.LicensesScreen)
-                        }
+                composable<Destination.SettingsScreen> {
+                    SettingsScreen() {
+                        navController.navigate(Destination.LicensesScreen)
                     }
                 }
             }
         }
     }
 }
+
 
 object Destination {
     @Serializable

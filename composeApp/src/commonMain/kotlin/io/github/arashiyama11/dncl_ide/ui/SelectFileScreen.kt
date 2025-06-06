@@ -38,8 +38,6 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SelectFileScreen(
     viewModel: DrawerViewModel = koinViewModel(),
-    onCreateFile: () -> Unit = {},
-    onCreateFolder: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -58,19 +56,6 @@ fun SelectFileScreen(
                 "Files",
                 style = MaterialTheme.typography.headlineMedium
             )
-
-            // Add file/folder buttons
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
-            ) {
-                TextButton(onClick = onCreateFile) {
-                    Text("New File")
-                }
-                TextButton(onClick = onCreateFolder) {
-                    Text("New Folder")
-                }
-            }
         }
 
         // File/folder listing

@@ -57,19 +57,6 @@ fun SelectNotebookScreen(
                 "Notebooks",
                 style = MaterialTheme.typography.headlineMedium
             )
-
-            // Add notebook/folder buttons
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
-            ) {
-                TextButton(onClick = onCreateNotebook) {
-                    Text("New Notebook")
-                }
-                TextButton(onClick = onCreateFolder) {
-                    Text("New Folder")
-                }
-            }
         }
 
         // File/folder listing
