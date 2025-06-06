@@ -230,7 +230,7 @@ fun App() {
                     }
 
                     composable<Destination.SelectFileScreen> {
-                        SelectFileScreen({}) { }
+                        SelectFileScreen()
                     }
 
                     composable<Destination.SelectNotebookScreen> {
