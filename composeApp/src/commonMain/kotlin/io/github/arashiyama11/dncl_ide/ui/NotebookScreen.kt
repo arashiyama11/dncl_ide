@@ -68,7 +68,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun NotebookScreen(
     modifier: Modifier = Modifier,
-    notebookViewModel: NotebookViewModel = koinViewModel()
+    notebookViewModel: NotebookViewModel = koinViewModel(),
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
     Scaffold(

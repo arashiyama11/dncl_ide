@@ -46,8 +46,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -57,6 +59,7 @@ import androidx.navigation.toRoute
 import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
+import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
@@ -72,8 +75,9 @@ val showFabDist = setOf(
 @Composable
 fun App() {
     DnclIdeTheme {
-        val drawerState = rememberDrawerState(DrawerValue.Closed)
-        val drawerViewModel = koinViewModel<DrawerViewModel>()
+        //val drawerViewModel = koinViewModel<DrawerViewModel>()
+        val selectFileViewModel = koinViewModel<SelectFileScreenViewModel>()
+        val selectNotebookViewModel = koinViewModel<SelectFileScreenViewModel>()
         val ideViewModel = koinViewModel<IdeViewModel>()
         val notebookViewModel = koinViewModel<NotebookViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
@@ -90,13 +94,6 @@ fun App() {
             }
         }
 
-
-        LaunchedEffect(Unit) {
-            for (err in drawerViewModel.errorChannel) {
-                snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
-            }
-        }
-
         LaunchedEffect(Unit) {
             notebookViewModel.onStart()
             for (err in notebookViewModel.errorChannel) {
@@ -105,13 +102,14 @@ fun App() {
         }
 
 
-        var bottomAppBarHeight by remember { mutableStateOf(0) }
+        var bottomAppBarHeight by remember { mutableStateOf(0.dp) }
 
         Scaffold(snackbarHost = {
             SnackbarHost(snackbarHostState)
         }, bottomBar = {
+            val dense = LocalDensity.current
             BottomAppBar(modifier = Modifier.wrapContentHeight().onGloballyPositioned {
-                bottomAppBarHeight = it.size.height
+                bottomAppBarHeight = with(dense) { it.size.height.toDp() }
             }) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -147,19 +145,23 @@ fun App() {
             val bse by navController.currentBackStackEntryAsState()
             val dist = bse?.destination
 
-
-            println("Current destination: ${dist?.route} ${dist?.route == Destination.SelectFileScreen::class.qualifiedName}")
             if (dist?.route in showFabDist) {
+                val isNotebook =
+                    dist?.route == Destination.SelectNotebookScreen::class.qualifiedName
                 var isShowDetails by remember { mutableStateOf(false) }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = bottomAppBarHeight.dp + 12.dp)
+                    modifier = Modifier.padding(bottom = bottomAppBarHeight + 12.dp)
                 ) {
                     AnimatedVisibility(isShowDetails) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             SmallFloatingActionButton(
                                 onClick = {
-                                    drawerViewModel.onFileAddClicked()
+                                    if (isNotebook) {
+                                        selectNotebookViewModel.onFileAddClicked()
+                                    } else {
+                                        selectFileViewModel.onFileAddClicked()
+                                    }
                                 },
                                 containerColor = Color.White
                             ) {
@@ -173,7 +175,13 @@ fun App() {
                             Spacer(Modifier.height(16.dp))
 
                             SmallFloatingActionButton(
-                                onClick = { drawerViewModel.onFolderAddClicked() },
+                                onClick = {
+                                    if (isNotebook) {
+                                        selectNotebookViewModel.onFolderAddClicked()
+                                    } else {
+                                        selectFileViewModel.onFolderAddClicked()
+                                    }
+                                },
                                 containerColor = Color.White
                             ) {
 
@@ -235,11 +243,15 @@ fun App() {
                 }
 
                 composable<Destination.SelectFileScreen> {
-                    SelectFileScreen()
+                    SelectFileScreen() {
+                        navController.navigate(Destination.CodingScreen)
+                    }
                 }
 
                 composable<Destination.SelectNotebookScreen> {
-                    SelectNotebookScreen()
+                    SelectNotebookScreen() {
+                        navController.navigate(Destination.CodingScreen)
+                    }
                 }
 
                 composable<Destination.CodingScreen> {

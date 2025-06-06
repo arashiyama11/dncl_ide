@@ -37,8 +37,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SelectNotebookScreen(
     viewModel: SelectNotebookScreenViewModel = koinViewModel(),
-    onCreateNotebook: () -> Unit = { viewModel.onFileAddClicked() },
-    onCreateFolder: () -> Unit = { viewModel.onFolderAddClicked() }
+    navigateToCodeScreen: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -82,7 +81,10 @@ fun SelectNotebookScreen(
                         focusRequester = focusRequester,
                         creatingType = uiState.creatingType,
                         onInputtingEntryNameChanged = viewModel::onInputtingFileNameChanged,
-                        onFileClick = viewModel::onFileSelected,
+                        onFileClick = {
+                            viewModel.onFileSelected(it)
+                            navigateToCodeScreen()
+                        },
                         onFolderClick = viewModel::onFolderClicked,
                         isNotebookMode = true
                     )
@@ -93,7 +95,10 @@ fun SelectNotebookScreen(
                             NotebookFileItemCard(
                                 file = entry,
                                 depth = 0,
-                                onClick = viewModel::onFileSelected
+                                onClick = {
+                                    viewModel.onFileSelected(it)
+                                    navigateToCodeScreen()
+                                }
                             )
                         }
                     }
