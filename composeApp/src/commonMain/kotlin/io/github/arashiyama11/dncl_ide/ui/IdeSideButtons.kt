@@ -40,16 +40,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.NativeClipboard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.TapOrRepeatButton
-
+import kotlin.coroutines.coroutineContext
 
 @Composable
+context(i: IdeViewModel)
 fun IdeViewModel.IdeSideButtons(
     modifier: Modifier = Modifier
 ) {

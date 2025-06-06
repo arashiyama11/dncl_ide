@@ -30,7 +30,7 @@ fun main() {
     }
 
     application {
-        /*Window(
+        Window(
             onCloseRequest = ::exitApplication,
             title = "Smart Phone Size",
             state = rememberWindowState(size = DpSize(360.dp, 800.dp)),
@@ -38,7 +38,7 @@ fun main() {
             App()
         }
 
-        Window(
+        /*Window(
             onCloseRequest = ::exitApplication,
             title = "Tablet Size Portrait",
             state = rememberWindowState(size = DpSize(512.dp, 683.dp)),
@@ -46,12 +46,12 @@ fun main() {
             App()
         }*/
 
-        Window(
+        /*Window(
             onCloseRequest = ::exitApplication,
             title = "Tablet Size Landscape",
             state = rememberWindowState(size = DpSize(683.dp, 512.dp)),
         ) {
             App()
-        }
+        }*/
     }
 }

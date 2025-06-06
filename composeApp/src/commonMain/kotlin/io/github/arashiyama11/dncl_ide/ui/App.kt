@@ -1,8 +1,10 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -10,16 +12,22 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -75,6 +83,7 @@ fun App() {
             }
         }
 
+
         LaunchedEffect(Unit) {
             for (err in drawerViewModel.errorChannel) {
                 snackbarHostState.showSnackbar(err, "OK", false, SnackbarDuration.Indefinite)
@@ -89,8 +98,42 @@ fun App() {
         }
 
 
+
+
         Scaffold(snackbarHost = {
             SnackbarHost(snackbarHostState)
+        }, bottomBar = {
+            BottomAppBar(modifier = Modifier.wrapContentHeight()) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    IconButton(onClick = {
+                        navController.navigate(Destination.SelectFileScreen)
+                    }) {
+                        Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null)
+                    }
+
+                    IconButton(onClick = {
+                        navController.navigate(Destination.SelectNotebookScreen)
+                    }) {
+                        Icon(Icons.Outlined.FormatListNumbered, null)
+                    }
+
+                    IconButton(onClick = {
+                        navController.navigate(Destination.CodingScreen)
+                    }) {
+                        Icon(Icons.Outlined.Code, null)
+                    }
+
+
+                    IconButton(onClick = {
+                        navController.navigate(Destination.SettingsScreen)
+                    }) {
+                        Icon(Icons.Outlined.Settings, null)
+                    }
+                }
+            }
         }, floatingActionButton = {
             if (drawerState.isOpen || drawerState.isAnimationRunning) {
                 var isShowDetails by remember { mutableStateOf(false) }
@@ -185,6 +228,24 @@ fun App() {
                             navController.popBackStack()
                         }
                     }
+
+                    composable<Destination.SelectFileScreen> {
+                        SelectFileScreen({}) { }
+                    }
+
+                    composable<Destination.SelectNotebookScreen> {
+                        SelectNotebookScreen()
+                    }
+
+                    composable<Destination.CodingScreen> {
+                        CodingScreen()
+                    }
+
+                    composable<Destination.SettingsScreen> {
+                        SettingsScreen() {
+                            navController.navigate(Destination.LicensesScreen)
+                        }
+                    }
                 }
             }
         }
@@ -194,6 +255,18 @@ fun App() {
 object Destination {
     @Serializable
     object App
+
+    @Serializable
+    object SelectFileScreen
+
+    @Serializable
+    object SelectNotebookScreen
+
+    @Serializable
+    object CodingScreen
+
+    @Serializable
+    object SettingsScreen
 
     @Serializable
     object LicensesScreen
