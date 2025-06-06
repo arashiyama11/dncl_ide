@@ -27,10 +27,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/*
 enum class CreatingType {
     FILE,
     FOLDER
-}
+}*/
 
 data class DrawerUiState(
     val selectedEntryPath: EntryPath? = null,

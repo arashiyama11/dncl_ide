@@ -29,16 +29,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
-import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
+import io.github.arashiyama11.dncl_ide.adapter.SelectNotebookScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SelectNotebookScreen(
-    viewModel: DrawerViewModel = koinViewModel(),
-    onCreateNotebook: () -> Unit = {},
-    onCreateFolder: () -> Unit = {}
+    viewModel: SelectNotebookScreenViewModel = koinViewModel(),
+    onCreateNotebook: () -> Unit = { viewModel.onFileAddClicked() },
+    onCreateFolder: () -> Unit = { viewModel.onFolderAddClicked() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -117,7 +117,7 @@ fun SelectNotebookScreen(
                     ) {
                         Icon(
                             if (uiState.creatingType == CreatingType.FILE)
-                                Icons.AutoMirrored.Outlined.InsertDriveFile
+                                Icons.Outlined.Book // ノートブック用のアイコンに変更
                             else
                                 Icons.Outlined.Folder,
                             contentDescription = null
@@ -131,14 +131,14 @@ fun SelectNotebookScreen(
                                 .padding(start = 8.dp)
                                 .weight(1f),
                             placeholder = {
-                                Text(if (uiState.creatingType == CreatingType.FILE) "notebook.dnclnb" else "Folder Name")
+                                Text(if (uiState.creatingType == CreatingType.FILE) "ノートブック名" else "フォルダ名")
                             }
                         )
                     }
                 }
             }
         } else {
-            Text("Loading files...")
+            Text("Loading notebooks...")
         }
     }
 }

@@ -1,13 +1,17 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -26,9 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
-import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
+import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
@@ -37,7 +42,9 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SelectFileScreen(
-    viewModel: DrawerViewModel = koinViewModel(),
+    viewModel: SelectFileScreenViewModel = koinViewModel(),
+    onCreateFile: () -> Unit = { viewModel.onFileAddClicked() },
+    onCreateFolder: () -> Unit = { viewModel.onFolderAddClicked() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -86,13 +93,17 @@ fun SelectFileScreen(
                         isNotebookMode = false
                     )
 
-                    is ProgramFile -> FileItemCard(
-                        file = entry,
-                        depth = 0,
-                        onClick = viewModel::onFileSelected
-                    )
+                    is ProgramFile -> {
+                        if (!entry.name.isNotebookFile()) {
+                            FileItemCard(
+                                file = entry,
+                                depth = 0,
+                                onClick = viewModel::onFileSelected
+                            )
+                        }
+                    }
 
-                    else -> {} // Skip notebook files
+                    is NotebookFile -> {}
                 }
             }
 
@@ -146,6 +157,9 @@ fun FileItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp, horizontal = (depth * 16).dp)
+            .clickable {
+                onClick(file.path)
+            }
     ) {
         Row(
             modifier = Modifier
@@ -157,16 +171,12 @@ fun FileItemCard(
                 Icons.AutoMirrored.Outlined.InsertDriveFile,
                 contentDescription = null
             )
-            TextButton(
-                onClick = { onClick(file.path) },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = file.name.value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = file.name.value,
+                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -321,6 +331,7 @@ fun NotebookFileItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp, horizontal = (depth * 16).dp)
+            .clickable { onClick(entryPath) }
     ) {
         Row(
             modifier = Modifier
@@ -329,20 +340,16 @@ fun NotebookFileItemCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.AutoMirrored.Outlined.InsertDriveFile,
+                Icons.AutoMirrored.Outlined.List,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary // Different color for notebook files
+                tint = MaterialTheme.colorScheme.primary
             )
-            TextButton(
-                onClick = { onClick(entryPath) },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = fileName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = fileName.removeSuffix(".dnclnb"),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
