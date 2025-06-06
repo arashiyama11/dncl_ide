@@ -6,6 +6,9 @@ import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SelectNotebookScreenViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
+import io.github.arashiyama11.dncl_ide.common.AppScope
+import io.github.arashiyama11.dncl_ide.common.AppState
+import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
@@ -33,6 +36,8 @@ val commonMainModule = module {
         singleOf(::SelectNotebookScreenViewModel)
     }
 
+    singleOf(::AppScope)
+    singleOf(::AppStateStore)
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }

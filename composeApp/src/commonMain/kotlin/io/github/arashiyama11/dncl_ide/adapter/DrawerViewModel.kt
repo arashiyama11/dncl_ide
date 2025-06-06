@@ -3,13 +3,12 @@ package io.github.arashiyama11.dncl_ide.adapter
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
-import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
-import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
@@ -27,11 +26,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/*
-enum class CreatingType {
-    FILE,
-    FOLDER
-}*/
 
 data class DrawerUiState(
     val selectedEntryPath: EntryPath? = null,
@@ -51,21 +45,35 @@ class DrawerViewModel(
     private val fileUseCase: FileUseCase,
     private val notebookFileUseCase: NotebookFileUseCase,
     private val fileNameValidationUseCase: FileNameValidationUseCase,
-    private val settingsUseCase: SettingsUseCase
+    private val settingsUseCase: SettingsUseCase,
+    private val appStateStore: AppStateStore
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(DrawerUiState())
+    private val _localState = MutableStateFlow(
+        DrawerLocalState(
+            creatingType = null,
+            inputtingEntryPath = null,
+            inputtingFileName = null,
+            lastClickedFolder = null,
+            list1IndexSwitchEnabled = false
+        )
+    )
+
     val uiState = combine(
-        _uiState,
-        fileUseCase.selectedEntryPath,
-        settingsUseCase.settingsState
-    ) { state, filePath, settings ->
-        state.copy(
-            selectedEntryPath = filePath,
-            list1IndexSwitchEnabled = settings.arrayOriginIndex == 1,
-            fontSize = settings.fontSize,
-            debugRunningMode = settings.debugRunningMode,
-            debugModeEnabled = settings.debugMode,
-            onEvalDelay = settings.onEvalDelay
+        _localState,
+        appStateStore.state
+    ) { localState, appState ->
+        DrawerUiState(
+            selectedEntryPath = appState.selectedEntryPath,
+            rootFolder = appState.rootFolder,
+            creatingType = localState.creatingType,
+            inputtingEntryPath = localState.inputtingEntryPath,
+            inputtingFileName = localState.inputtingFileName,
+            lastClickedFolder = localState.lastClickedFolder,
+            list1IndexSwitchEnabled = localState.list1IndexSwitchEnabled,
+            fontSize = appState.fontSize,
+            onEvalDelay = appState.onEvalDelay,
+            debugModeEnabled = appState.debugModeEnabled,
+            debugRunningMode = appState.debugRunningMode
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, DrawerUiState())
 
@@ -73,21 +81,18 @@ class DrawerViewModel(
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
     fun onStart(focusRequester: FocusRequester) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(rootFolder = fileUseCase.getRootFolder()) }
-        }
         this.focusRequester = focusRequester
     }
 
     fun onDebugRunByButtonClicked() {
-        when (settingsUseCase.debugRunningMode.value) {
+        when (uiState.value.debugRunningMode) {
             DebugRunningMode.BUTTON -> settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
             DebugRunningMode.NON_BLOCKING -> settingsUseCase.setDebugRunningMode(DebugRunningMode.BUTTON)
         }
     }
 
     fun onDebugRunNonBlockingClicked() {
-        when (settingsUseCase.debugRunningMode.value) {
+        when (uiState.value.debugRunningMode) {
             DebugRunningMode.BUTTON -> settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
             DebugRunningMode.NON_BLOCKING -> settingsUseCase.setDebugRunningMode(DebugRunningMode.BUTTON)
         }
@@ -105,19 +110,37 @@ class DrawerViewModel(
 
     fun onFolderClicked(folder: Folder?) {
         viewModelScope.launch {
-            _uiState.update { it.copy(lastClickedFolder = folder) }
+            _localState.update { it.copy(lastClickedFolder = folder) }
         }
     }
 
     fun onFileAddClicked() {
-        _uiState.update {
+        _localState.update {
             it.copy(
                 creatingType = CreatingType.FILE,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
+                inputtingEntryPath = it.lastClickedFolder?.path
+                    ?: appStateStore.state.value.rootFolder!!.path,
                 inputtingFileName = ""
             )
         }
 
+        requestFocus()
+    }
+
+    fun onFolderAddClicked() {
+        _localState.update {
+            it.copy(
+                creatingType = CreatingType.FOLDER,
+                inputtingEntryPath = it.lastClickedFolder?.path
+                    ?: appStateStore.state.value.rootFolder!!.path,
+                inputtingFileName = ""
+            )
+        }
+
+        requestFocus()
+    }
+
+    private fun requestFocus() {
         viewModelScope.launch {
             repeat(3) {
                 try {
@@ -125,32 +148,49 @@ class DrawerViewModel(
                     focusRequester?.requestFocus()
                     return@launch
                 } catch (e: Exception) {
-                    //e.printStackTrace()
+                    // Ignore
                 }
             }
         }
     }
 
-    fun onFolderAddClicked() {
-        _uiState.update {
-            it.copy(
-                creatingType = CreatingType.FOLDER,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
-                inputtingFileName = ""
-            )
-        }
-
-
+    fun onFileAddConfirmed(newFileName: String) {
         viewModelScope.launch {
-            repeat(3) {
-                try {
-                    delay(100)
-                    focusRequester?.requestFocus()
-                    return@launch
-                } catch (e: Exception) {
-                    //e.printStackTrace()
-                }
+            val path =
+                _localState.value.inputtingEntryPath ?: appStateStore.state.value.rootFolder!!.path
+            fileNameValidationUseCase(path + FileName(newFileName)).mapLeft {
+                errorChannel.send(it.message)
+                return@launch
             }
+
+            try {
+                if (_localState.value.creatingType == CreatingType.FILE) {
+                    val fileNameObj = FileName(newFileName)
+                    if (fileNameObj.isNotebookFile()) {
+                        // ノートブックファイルの場合はノートブックファイルとして作成
+                        notebookFileUseCase.createNotebookFile(path, fileNameObj)
+                    } else {
+                        fileUseCase.createFile(path, fileNameObj)
+                    }
+                    fileUseCase.selectFile(path + fileNameObj)
+                } else {
+                    fileUseCase.createFolder(path, FolderName(newFileName))
+                }
+
+                refreshState()
+            } catch (e: Exception) {
+                errorChannel.send(e.message ?: "Error")
+            }
+        }
+    }
+
+    private fun refreshState() {
+        _localState.update {
+            it.copy(
+                creatingType = null,
+                inputtingEntryPath = null,
+                inputtingFileName = null
+            )
         }
     }
 
@@ -158,12 +198,15 @@ class DrawerViewModel(
         if (inputtingFileName.lastOrNull() == '\n') {
             if (inputtingFileName.length > 1)
                 return onFileAddConfirmed(inputtingFileName.dropLast(1))
-            else _uiState.update { it.copy(inputtingFileName = inputtingFileName.dropLast(1)) }
-        } else _uiState.update { it.copy(inputtingFileName = inputtingFileName) }
+            else _localState.update { it.copy(inputtingFileName = inputtingFileName.dropLast(1)) }
+        } else {
+            _localState.update { it.copy(inputtingFileName = inputtingFileName) }
+        }
     }
 
     fun onList1IndexSwitchClicked(enabled: Boolean) {
         settingsUseCase.setListFirstIndex(if (enabled) 1 else 0)
+        _localState.update { it.copy(list1IndexSwitchEnabled = enabled) }
     }
 
     fun onOnEvalDelayChanged(delay: Int) {
@@ -174,41 +217,11 @@ class DrawerViewModel(
         settingsUseCase.setDebugMode(enabled)
     }
 
-    private fun onFileAddConfirmed(newFileName: String) {
-        viewModelScope.launch {
-            val path = uiState.value.inputtingEntryPath ?: uiState.value.rootFolder!!.path
-            fileNameValidationUseCase(path + FileName(newFileName)).mapLeft {
-                errorChannel.send(it.message)
-                return@launch
-            }
-            try {
-                val path = _uiState.value.inputtingEntryPath ?: _uiState.value.rootFolder!!.path
-                if (_uiState.value.creatingType == CreatingType.FILE) {
-                    val fileName = FileName(newFileName)
-                    if (fileName.isNotebookFile()) {
-                        notebookFileUseCase.createNotebookFile(path, fileName)
-                    } else fileUseCase.createFile(
-                        path,
-                        FileName(newFileName)
-                    )
-                    fileUseCase.selectFile(path + fileName)
-                } else {
-                    fileUseCase.createFolder(
-                        path,
-                        FolderName(newFileName)
-                    )
-                }
-            } catch (e: Exception) {
-                errorChannel.send(e.message ?: "Error")
-            }
-            _uiState.update {
-                it.copy(
-                    creatingType = null,
-                    inputtingEntryPath = null,
-                    inputtingFileName = null,
-                    rootFolder = fileUseCase.getRootFolder(),
-                )
-            }
-        }
-    }
+    private data class DrawerLocalState(
+        val creatingType: CreatingType?,
+        val inputtingEntryPath: EntryPath?,
+        val inputtingFileName: String?,
+        val lastClickedFolder: Folder?,
+        val list1IndexSwitchEnabled: Boolean
+    )
 }

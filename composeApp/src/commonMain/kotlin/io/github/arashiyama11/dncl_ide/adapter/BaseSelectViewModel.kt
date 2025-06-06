@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
@@ -32,18 +33,24 @@ data class SelectUiState(
 
 abstract class BaseSelectViewModel(
     protected val fileUseCase: FileUseCase,
-    protected val fileNameValidationUseCase: FileNameValidationUseCase
+    protected val fileNameValidationUseCase: FileNameValidationUseCase,
+    protected val appStateStore: AppStateStore
 ) : ViewModel() {
-    protected val _uiState = MutableStateFlow(SelectUiState())
+    protected val _localState = MutableStateFlow(
+        SelectLocalState(
+            creatingType = null,
+            inputtingEntryPath = null,
+            inputtingFileName = null,
+            lastClickedFolder = null
+        )
+    )
+
     abstract val uiState: StateFlow<SelectUiState>
 
     protected var focusRequester: FocusRequester? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
 
     fun onStart(focusRequester: FocusRequester) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(rootFolder = fileUseCase.getRootFolder()) }
-        }
         this.focusRequester = focusRequester
     }
 
@@ -55,15 +62,16 @@ abstract class BaseSelectViewModel(
 
     fun onFolderClicked(folder: Folder?) {
         viewModelScope.launch {
-            _uiState.update { it.copy(lastClickedFolder = folder) }
+            _localState.update { it.copy(lastClickedFolder = folder) }
         }
     }
 
     open fun onFileAddClicked() {
-        _uiState.update {
+        val currentState = appStateStore.state.value
+        _localState.update {
             it.copy(
                 creatingType = CreatingType.FILE,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
+                inputtingEntryPath = it.lastClickedFolder?.path ?: currentState.rootFolder!!.path,
                 inputtingFileName = ""
             )
         }
@@ -72,10 +80,11 @@ abstract class BaseSelectViewModel(
     }
 
     fun onFolderAddClicked() {
-        _uiState.update {
+        val currentState = appStateStore.state.value
+        _localState.update {
             it.copy(
                 creatingType = CreatingType.FOLDER,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
+                inputtingEntryPath = it.lastClickedFolder?.path ?: currentState.rootFolder!!.path,
                 inputtingFileName = ""
             )
         }
@@ -97,44 +106,49 @@ abstract class BaseSelectViewModel(
         }
     }
 
+    protected fun refreshState() {
+        _localState.update {
+            it.copy(
+                creatingType = null,
+                inputtingEntryPath = null,
+                inputtingFileName = null
+            )
+        }
+    }
+
     open fun onInputtingFileNameChanged(inputtingFileName: String) {
         if (inputtingFileName.lastOrNull() == '\n') {
             if (inputtingFileName.length > 1)
                 return onFileAddConfirmed(inputtingFileName.dropLast(1))
-            else _uiState.update { it.copy(inputtingFileName = inputtingFileName.dropLast(1)) }
-        } else _uiState.update { it.copy(inputtingFileName = inputtingFileName) }
+            else _localState.update { it.copy(inputtingFileName = inputtingFileName.dropLast(1)) }
+        } else {
+            _localState.update { it.copy(inputtingFileName = inputtingFileName) }
+        }
     }
 
-    abstract fun onFileAddConfirmed(newFileName: String)
-
-    protected fun createFolder(path: EntryPath, folderName: FolderName) {
+    open fun onFileAddConfirmed(newFileName: String) {
         viewModelScope.launch {
-            try {
-                fileUseCase.createFolder(path, folderName)
-                _uiState.update {
-                    it.copy(
-                        creatingType = null,
-                        inputtingEntryPath = null,
-                        inputtingFileName = null,
-                        rootFolder = fileUseCase.getRootFolder(),
-                    )
+            val path =
+                _localState.value.inputtingEntryPath ?: appStateStore.state.value.rootFolder!!.path
+
+            if (_localState.value.creatingType == CreatingType.FILE) {
+                fileNameValidationUseCase(path + FileName(newFileName)).mapLeft {
+                    errorChannel.send(it.message)
+                    return@launch
                 }
-            } catch (e: Exception) {
-                errorChannel.send(e.message ?: "Error creating folder")
+                fileUseCase.createFile(path, FileName(newFileName))
+            } else {
+                fileUseCase.createFolder(path, FolderName(newFileName))
             }
+
+            refreshState()
         }
     }
 
-    protected fun refreshState() {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    creatingType = null,
-                    inputtingEntryPath = null,
-                    inputtingFileName = null,
-                    rootFolder = fileUseCase.getRootFolder(),
-                )
-            }
-        }
-    }
+    protected data class SelectLocalState(
+        val creatingType: CreatingType? = null,
+        val inputtingEntryPath: EntryPath? = null,
+        val inputtingFileName: String? = null,
+        val lastClickedFolder: Folder? = null
+    )
 }
