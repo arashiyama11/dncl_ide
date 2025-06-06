@@ -73,16 +73,6 @@ fun NotebookScreen(
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            AddCellFAB(onAddCell = { cellType ->
-                notebookViewModel.handleAction(
-                    NotebookAction.AddCellAfter(
-                        uiState.selectedCellId,
-                        cellType
-                    )
-                )
-            })
-        }
     ) { paddingValues ->
         Box(
             modifier = Modifier

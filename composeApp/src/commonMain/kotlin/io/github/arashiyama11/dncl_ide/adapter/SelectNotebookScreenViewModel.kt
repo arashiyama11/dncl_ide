@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 class SelectNotebookScreenViewModel(
     fileUseCase: FileUseCase,
     fileNameValidationUseCase: FileNameValidationUseCase,
-    private val notebookFileUseCase: NotebookFileUseCase
+    private val notebookFileUseCase: NotebookFileUseCase,
 ) : BaseSelectViewModel(fileUseCase, fileNameValidationUseCase) {
 
     override val uiState: StateFlow<SelectUiState> = _uiState.asStateFlow()
@@ -25,7 +25,7 @@ class SelectNotebookScreenViewModel(
             it.copy(
                 creatingType = CreatingType.FILE,
                 inputtingEntryPath = it.lastClickedFolder?.path ?: _uiState.value.rootFolder!!.path,
-                inputtingFileName = "" // 拡張子は表示しない
+                inputtingFileName = "", // 拡張子は表示しない
             )
         }
 

@@ -2,39 +2,39 @@ package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FormatListNumbered
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +60,7 @@ import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
+import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
@@ -71,6 +72,71 @@ val showFabDist = setOf(
     Destination.SelectFileScreen::class.qualifiedName,
     Destination.SelectNotebookScreen::class.qualifiedName,
 )
+
+@Composable
+fun AppFab(
+    currentRoute: String?,
+    notebookViewModel: NotebookViewModel = koinViewModel(),
+    selectFileViewModel: SelectFileScreenViewModel = koinViewModel(),
+    selectNotebookViewModel: SelectFileScreenViewModel = koinViewModel(),
+) {
+    val uiState by selectNotebookViewModel.uiState.collectAsStateWithLifecycle()
+    println("Current route: $currentRoute, Notebook selected: ${uiState.selectedEntryPath?.isNotebookFile()}")
+    when (currentRoute) {
+        Destination.SelectFileScreen::class.qualifiedName -> {
+            FloatingActionButton(onClick = { selectFileViewModel.onFileAddClicked() }) {
+                Icon(Icons.Outlined.Add, contentDescription = "New File")
+            }
+        }
+
+        Destination.SelectNotebookScreen::class.qualifiedName -> {
+            FloatingActionButton(onClick = { selectNotebookViewModel.onFileAddClicked() }) {
+                Icon(Icons.Outlined.Add, contentDescription = "New Notebook")
+            }
+        }
+
+        Destination.CodingScreen::class.qualifiedName -> {
+            if (uiState.selectedEntryPath?.isNotebookFile() == true) {
+                val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
+                var showDropdown by remember { mutableStateOf(false) }
+                Box {
+                    FloatingActionButton(onClick = { showDropdown = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Cell")
+                    }
+                    DropdownMenu(
+                        expanded = showDropdown,
+                        onDismissRequest = { showDropdown = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Add Code Cell") },
+                            onClick = {
+                                notebookViewModel.handleAction(
+                                    io.github.arashiyama11.dncl_ide.adapter.NotebookAction.AddCellAfter(
+                                        uiState.selectedCellId,
+                                        CellType.CODE
+                                    )
+                                )
+                                showDropdown = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Add Markdown Cell") },
+                            onClick = {
+                                notebookViewModel.handleAction(
+                                    io.github.arashiyama11.dncl_ide.adapter.NotebookAction.AddCellAfter(
+                                        uiState.selectedCellId,
+                                        CellType.MARKDOWN
+                                    )
+                                )
+                                showDropdown = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun App() {
@@ -144,7 +210,8 @@ fun App() {
         }, floatingActionButton = {
             val bse by navController.currentBackStackEntryAsState()
             val dist = bse?.destination
-
+            AppFab(dist?.route)
+            /*
             if (dist?.route in showFabDist) {
                 val isNotebook =
                     dist?.route == Destination.SelectNotebookScreen::class.qualifiedName
@@ -205,7 +272,7 @@ fun App() {
                         )
                     }
                 }
-            }
+            }*/
         }, floatingActionButtonPosition = FabPosition.EndOverlay) { contentPadding ->
             val padding = if (isImeVisible()) {
                 PaddingValues(

@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,7 +22,8 @@ data class SettingsUiState(
 )
 
 class SettingsScreenViewModel(
-    private val settingsUseCase: SettingsUseCase
+    private val settingsUseCase: SettingsUseCase,
+    private val fileRepository: FileRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> =
@@ -30,7 +32,7 @@ class SettingsScreenViewModel(
                 fontSize = settings.fontSize,
                 onEvalDelay = settings.onEvalDelay,
                 debugModeEnabled = settings.debugMode,
-                debugRunningMode = settings.debugRunningMode
+                debugRunningMode = settings.debugRunningMode,
             )
         }.stateIn(viewModelScope, SharingStarted.Lazily, SettingsUiState())
 
