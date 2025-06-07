@@ -60,6 +60,10 @@ class AppStateStore(
             _state.update { it.copy(selectedEntryPath = path) }
         }.launchIn(appScope)
 
+        jobs += fileRepository.rootFolder.onEach { folder ->
+            _state.update { it.copy(rootFolder = folder) }
+        }.launchIn(appScope)
+
         // 初期データ読み込み
         jobs += appScope.launch {
             val rootFolder = fileRepository.getRootFolder()

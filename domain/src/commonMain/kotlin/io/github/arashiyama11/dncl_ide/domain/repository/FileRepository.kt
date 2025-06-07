@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 interface FileRepository {
     val selectedEntryPath: StateFlow<EntryPath?>
     val rootPath: EntryPath
+
+    val rootFolder: StateFlow<Folder?>
     suspend fun getRootFolder(): Folder
     suspend fun getEntryByPath(entryPath: EntryPath): Entry?
     suspend fun saveFile(

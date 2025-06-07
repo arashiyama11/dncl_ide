@@ -33,6 +33,7 @@ class SelectFileScreenViewModel(
     }.stateIn(viewModelScope, SharingStarted.Lazily, SelectUiState())
 
     override fun onFileAddConfirmed(newFileName: String) {
+        println("File onFileAddConfirmed: $newFileName")
         viewModelScope.launch {
             val path =
                 _localState.value.inputtingEntryPath ?: appStateStore.state.value.rootFolder!!.path

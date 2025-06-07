@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
@@ -32,9 +33,14 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
 
     override val rootPath: EntryPath = rootPathProvider()
 
+    private val _rootFolder: MutableStateFlow<Folder?> = MutableStateFlow(null)
+    override val rootFolder: StateFlow<Folder?> = _rootFolder.asStateFlow()
+
+
     private val setting = Settings()
 
     init {
+        updateRootFolder()
         CoroutineScope(Dispatchers.IO).launch {
             val root = getEntryByPath(rootPath)
             if (root == null) {
@@ -63,13 +69,19 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
         }
     }
 
+
+    private fun updateRootFolder() {
+        CoroutineScope(Dispatchers.IO).launch {
+            _rootFolder.value = getRootFolder()
+        }
+    }
+
     override suspend fun getRootFolder(): Folder = withContext(Dispatchers.IO) {
         getEntryByPath(rootPath) as Folder
     }
 
     override suspend fun getEntryByPath(entryPath: EntryPath): Entry? =
         withContext(Dispatchers.IO) {
-            println("getEntryByPath: $entryPath")
             if (!SystemFileSystem.exists(entryPath.toPath())) return@withContext null
             when (SystemFileSystem.metadataOrNull(entryPath.toPath())?.isDirectory) {
                 null -> null
@@ -107,6 +119,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
         SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
             it.writeString(fileContent.value)
         }
+        updateRootFolder()
     }
 
     override suspend fun saveFile(
@@ -117,6 +130,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
         SystemFileSystem.sink(entryPath.toPath()).buffered().use {
             it.writeString(fileContent.value)
         }
+        updateRootFolder()
     }
 
     override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
@@ -129,7 +143,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
     }
 
     override suspend fun createFolder(path: EntryPath) = withContext(Dispatchers.IO) {
-        SystemFileSystem.createDirectories(path.toPath())
+        SystemFileSystem.createDirectories(path.toPath()).also { updateRootFolder() }
     }
 
     override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {

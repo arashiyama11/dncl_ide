@@ -36,6 +36,8 @@ class SelectNotebookScreenViewModel(
     }.stateIn(viewModelScope, SharingStarted.Lazily, SelectUiState())
 
     override fun onFileAddClicked() {
+        super.onFileAddClicked()
+        println("notebook onFileAddClicked")
         val currentState = appStateStore.state.value
         _localState.update {
             it.copy(
@@ -45,10 +47,13 @@ class SelectNotebookScreenViewModel(
             )
         }
 
+
+
         requestFocus()
     }
 
     override fun onFileAddConfirmed(newFileName: String) {
+        println("Notebook onFileAddConfirmed: $newFileName")
         viewModelScope.launch {
             // ファイル名に.dnclnbが含まれていない場合は自動的に追加する
             val fileName = if (!newFileName.endsWith(".dnclnb")) {

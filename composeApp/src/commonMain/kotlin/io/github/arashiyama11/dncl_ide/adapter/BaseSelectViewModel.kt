@@ -117,6 +117,7 @@ abstract class BaseSelectViewModel(
     }
 
     open fun onInputtingFileNameChanged(inputtingFileName: String) {
+        println("onInputtingFileNameChanged: $inputtingFileName")
         if (inputtingFileName.lastOrNull() == '\n') {
             if (inputtingFileName.length > 1)
                 return onFileAddConfirmed(inputtingFileName.dropLast(1))

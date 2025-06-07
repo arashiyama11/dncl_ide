@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +14,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Folder
@@ -28,6 +36,7 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -35,7 +44,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,19 +52,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import io.github.arashiyama11.dncl_ide.adapter.DrawerViewModel
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
@@ -64,14 +71,63 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
-val showFabDist = setOf(
-    Destination.SelectFileScreen::class.qualifiedName,
-    Destination.SelectNotebookScreen::class.qualifiedName,
-)
+@Composable
+fun FabsWith2Options(onFileAddClicked: () -> Unit, onFolderAddClicked: () -> Unit) {
+    var isShowDetails by remember { mutableStateOf(false) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AnimatedVisibility(isShowDetails) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        onFileAddClicked()
+                    },
+                    containerColor = Color.White
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.InsertDriveFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                SmallFloatingActionButton(
+                    onClick = {
+                        onFolderAddClicked()
+                    },
+                    containerColor = Color.White
+                ) {
+
+                    Icon(
+                        Icons.Outlined.Folder,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+        FloatingActionButton(
+            onClick = { isShowDetails = !isShowDetails },
+            containerColor = MaterialTheme.colorScheme.primary
+        ) {
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+
+}
 
 @Composable
 fun AppFab(
@@ -81,18 +137,23 @@ fun AppFab(
     selectNotebookViewModel: SelectFileScreenViewModel = koinViewModel(),
 ) {
     val uiState by selectNotebookViewModel.uiState.collectAsStateWithLifecycle()
-    println("Current route: $currentRoute, Notebook selected: ${uiState.selectedEntryPath?.isNotebookFile()}")
     when (currentRoute) {
         Destination.SelectFileScreen::class.qualifiedName -> {
-            FloatingActionButton(onClick = { selectFileViewModel.onFileAddClicked() }) {
-                Icon(Icons.Outlined.Add, contentDescription = "New File")
-            }
+            FabsWith2Options(
+                onFileAddClicked = { selectFileViewModel.onFileAddClicked() },
+                onFolderAddClicked = {
+                    selectFileViewModel.onFolderAddClicked()
+                }
+            )
         }
 
         Destination.SelectNotebookScreen::class.qualifiedName -> {
-            FloatingActionButton(onClick = { selectNotebookViewModel.onFileAddClicked() }) {
-                Icon(Icons.Outlined.Add, contentDescription = "New Notebook")
-            }
+            FabsWith2Options(
+                onFileAddClicked = { selectNotebookViewModel.onFileAddClicked() },
+                onFolderAddClicked = {
+                    selectNotebookViewModel.onFolderAddClicked()
+                }
+            )
         }
 
         Destination.CodingScreen::class.qualifiedName -> {
@@ -141,9 +202,6 @@ fun AppFab(
 @Composable
 fun App() {
     DnclIdeTheme {
-        //val drawerViewModel = koinViewModel<DrawerViewModel>()
-        val selectFileViewModel = koinViewModel<SelectFileScreenViewModel>()
-        val selectNotebookViewModel = koinViewModel<SelectFileScreenViewModel>()
         val ideViewModel = koinViewModel<IdeViewModel>()
         val notebookViewModel = koinViewModel<NotebookViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
@@ -151,6 +209,9 @@ fun App() {
         val navController = rememberNavController()
         val fileRepository = koinInject<FileRepository>()
         val selectedFile by fileRepository.selectedEntryPath.collectAsStateWithLifecycle()
+        val bse by navController.currentBackStackEntryAsState()
+
+
 
 
         LaunchedEffect(Unit) {
@@ -184,95 +245,84 @@ fun App() {
                     IconButton(onClick = {
                         navController.navigate(Destination.SelectFileScreen)
                     }) {
-                        Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null)
+                        val icon =
+                            if (bse?.destination?.route == Destination.SelectFileScreen::class.qualifiedName) {
+                                Icons.AutoMirrored.Filled.InsertDriveFile
+                            } else {
+                                Icons.AutoMirrored.Outlined.InsertDriveFile
+                            }
+                        Icon(icon, null)
                     }
 
-                    IconButton(onClick = {
-                        navController.navigate(Destination.SelectNotebookScreen)
-                    }) {
-                        Icon(Icons.Outlined.FormatListNumbered, null)
+                    run {
+                        val isSelected =
+                            remember(bse?.destination?.route) { bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName }
+                        IconButton(
+                            onClick = {
+                                navController.navigate(Destination.SelectNotebookScreen)
+                            },
+                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                        ) {
+                            val icon =
+                                if (bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName) {
+                                    Icons.Filled.FormatListNumbered
+                                } else {
+                                    Icons.Outlined.FormatListNumbered
+                                }
+                            Icon(
+                                icon,
+                                null,
+                                tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
+                            )
+                        }
                     }
 
-                    IconButton(onClick = {
-                        navController.navigate(Destination.CodingScreen)
-                    }) {
-                        Icon(Icons.Outlined.Code, null)
+                    run {
+                        val isSelected =
+                            remember(bse?.destination?.route) { bse?.destination?.route == Destination.CodingScreen::class.qualifiedName }
+                        IconButton(
+                            onClick = {
+                                navController.navigate(Destination.CodingScreen)
+                            },
+                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                        ) {
+                            val icon =
+                                if (bse?.destination?.route == Destination.CodingScreen::class.qualifiedName) {
+                                    Icons.Filled.Code
+                                } else {
+                                    Icons.Outlined.Code
+                                }
+                            Icon(
+                                icon,
+                                null,
+                                tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
+                            )
+                        }
                     }
-
 
                     IconButton(onClick = {
                         navController.navigate(Destination.SettingsScreen)
                     }) {
-                        Icon(Icons.Outlined.Settings, null)
+                        val icon =
+                            if (bse?.destination?.route == Destination.SettingsScreen::class.qualifiedName) {
+                                Icons.Filled.Settings
+                            } else {
+                                Icons.Outlined.Settings
+                            }
+                        Icon(icon, null)
                     }
                 }
             }
         }, floatingActionButton = {
             val bse by navController.currentBackStackEntryAsState()
             val dist = bse?.destination
-            AppFab(dist?.route)
-            /*
-            if (dist?.route in showFabDist) {
-                val isNotebook =
-                    dist?.route == Destination.SelectNotebookScreen::class.qualifiedName
-                var isShowDetails by remember { mutableStateOf(false) }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = bottomAppBarHeight + 12.dp)
-                ) {
-                    AnimatedVisibility(isShowDetails) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    if (isNotebook) {
-                                        selectNotebookViewModel.onFileAddClicked()
-                                    } else {
-                                        selectFileViewModel.onFileAddClicked()
-                                    }
-                                },
-                                containerColor = Color.White
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.InsertDriveFile,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            Spacer(Modifier.height(16.dp))
-
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    if (isNotebook) {
-                                        selectNotebookViewModel.onFolderAddClicked()
-                                    } else {
-                                        selectFileViewModel.onFolderAddClicked()
-                                    }
-                                },
-                                containerColor = Color.White
-                            ) {
-
-                                Icon(
-                                    Icons.Outlined.Folder,
-                                    null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    FloatingActionButton(
-                        onClick = { isShowDetails = !isShowDetails },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(
-                            Icons.Outlined.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
-            }*/
+            Box(
+                modifier = Modifier.wrapContentSize().padding(bottom = bottomAppBarHeight + 12.dp)
+            ) {
+                AppFab(dist?.route)
+            }
         }, floatingActionButtonPosition = FabPosition.EndOverlay) { contentPadding ->
             val padding = if (isImeVisible()) {
                 PaddingValues(
@@ -336,27 +386,27 @@ fun App() {
 }
 
 
-object Destination {
+sealed interface Destination {
     @Serializable
-    object App
+    object App : Destination
 
     @Serializable
-    object SelectFileScreen
+    object SelectFileScreen : Destination
 
     @Serializable
-    object SelectNotebookScreen
+    object SelectNotebookScreen : Destination
 
     @Serializable
-    object CodingScreen
+    object CodingScreen : Destination
 
     @Serializable
-    object SettingsScreen
+    object SettingsScreen : Destination
 
     @Serializable
-    object LicensesScreen
+    object LicensesScreen : Destination
 
     @Serializable
     data class SingleLicenseScreen(
         val content: String,
-    )
+    ) : Destination
 }
