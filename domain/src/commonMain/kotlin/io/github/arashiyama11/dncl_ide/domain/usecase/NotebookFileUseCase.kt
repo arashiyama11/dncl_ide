@@ -103,7 +103,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         }
     }
 
-    suspend fun createNotebookFile(
+    fun createNotebookFile(
         parentPath: EntryPath,
         fileName: FileName
     ) {
@@ -130,7 +130,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         fileRepository.saveFile(parentPath + fileName, content, cursorPosition = CursorPosition(0))
     }
 
-    suspend fun saveNotebookFile(
+    fun saveNotebookFile(
         notebookFile: NotebookFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
@@ -142,7 +142,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         return fileRepository.getNotebookFileContent(notebookFile).toNotebook()
     }
 
-    suspend fun modifyNotebookCell(
+    fun modifyNotebookCell(
         notebook: Notebook,
         cellId: String,
         newCell: Cell
@@ -194,7 +194,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
      * @param updateBlock 古いCellから新しいCellを生成するラムダ
      * @return 更新後のNotebookオブジェクト
      */
-    suspend fun updateCellAndSave(
+    fun updateCellAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String,
@@ -218,7 +218,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     /**
      * 新しいセルを指定位置に挿入し、ファイルに保存する
      */
-    suspend fun insertCellAndSave(
+    fun insertCellAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         newCell: Cell,
@@ -246,7 +246,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     /**
      * 指定セルを削除し、ファイルに保存する
      */
-    suspend fun deleteCellAndSave(
+    fun deleteCellAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String
@@ -264,7 +264,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     /**
      * セルのタイプを変更してファイルに保存する
      */
-    suspend fun changeCellTypeAndSave(
+    fun changeCellTypeAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String,
@@ -291,7 +291,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     /**
      * 指定セルの出力をクリアしてファイルに保存する
      */
-    suspend fun clearCellOutputAndSave(
+    fun clearCellOutputAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String
@@ -313,7 +313,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     }
 
 
-    suspend fun appendOutputAndSave(
+    fun appendOutputAndSave(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String,

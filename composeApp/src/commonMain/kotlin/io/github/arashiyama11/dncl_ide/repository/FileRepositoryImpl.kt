@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.repository
 
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.set
+import io.github.arashiyama11.dncl_ide.common.AppScope
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Entry
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -27,7 +28,8 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 
-class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
+class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScope: AppScope) :
+    FileRepository {
     private val _selectedEntryPath: MutableStateFlow<EntryPath?> = MutableStateFlow(null)
     override val selectedEntryPath: StateFlow<EntryPath?> = _selectedEntryPath
 
@@ -41,7 +43,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
 
     init {
         updateRootFolder()
-        CoroutineScope(Dispatchers.IO).launch {
+        appScope.launch(Dispatchers.IO) {
             val root = getEntryByPath(rootPath)
             if (root == null) {
                 createFolder(rootPath)
@@ -71,7 +73,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
 
 
     private fun updateRootFolder() {
-        CoroutineScope(Dispatchers.IO).launch {
+        appScope.launch(Dispatchers.IO) {
             _rootFolder.value = getRootFolder()
         }
     }
@@ -111,26 +113,30 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider) : FileRepository {
             }
         }
 
-    override suspend fun saveFile(
+    override fun saveFile(
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) = withContext(Dispatchers.IO) {
-        SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
-            it.writeString(fileContent.value)
+    ) {
+        appScope.launch(Dispatchers.IO) {
+            SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
+                it.writeString(fileContent.value)
+            }
+            updateRootFolder()
         }
-        updateRootFolder()
     }
 
-    override suspend fun saveFile(
+    override fun saveFile(
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition
     ) {
-        SystemFileSystem.sink(entryPath.toPath()).buffered().use {
-            it.writeString(fileContent.value)
+        appScope.launch(Dispatchers.IO) {
+            SystemFileSystem.sink(entryPath.toPath()).buffered().use {
+                it.writeString(fileContent.value)
+            }
+            updateRootFolder()
         }
-        updateRootFolder()
     }
 
     override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {

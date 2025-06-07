@@ -16,13 +16,13 @@ interface FileRepository {
     val rootFolder: StateFlow<Folder?>
     suspend fun getRootFolder(): Folder
     suspend fun getEntryByPath(entryPath: EntryPath): Entry?
-    suspend fun saveFile(
+    fun saveFile(
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
     )
 
-    suspend fun saveFile(
+    fun saveFile(
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition
