@@ -71,25 +71,20 @@ fun NotebookScreen(
     notebookViewModel: NotebookViewModel = koinViewModel(),
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-        ) {
-            if (uiState.notebook == null || uiState.loading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else {
-                NotebookContent(
-                    notebook = uiState.notebook!!,
-                    selectedCellId = uiState.selectedCellId,
-                    onAction = notebookViewModel::handleAction,
-                    codeCellStateMap = uiState.codeCellStateMap,
-                    cellSuggestionsMap = uiState.cellSuggestionsMap
-                )
-            }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        if (uiState.notebook == null || uiState.loading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        } else {
+            NotebookContent(
+                notebook = uiState.notebook!!,
+                selectedCellId = uiState.selectedCellId,
+                onAction = notebookViewModel::handleAction,
+                codeCellStateMap = uiState.codeCellStateMap,
+                cellSuggestionsMap = uiState.cellSuggestionsMap
+            )
         }
     }
 }
