@@ -177,10 +177,10 @@ fun NotebookToolbar(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Run All")
             }
+            Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onCancelExecution) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
             }
-            Spacer(modifier = Modifier.weight(1f))
         }
     }
     HorizontalDivider()

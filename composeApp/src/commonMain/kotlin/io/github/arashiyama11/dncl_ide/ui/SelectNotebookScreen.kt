@@ -3,7 +3,9 @@ package io.github.arashiyama11.dncl_ide.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
@@ -57,6 +59,8 @@ fun SelectNotebookScreen(
                 style = MaterialTheme.typography.headlineMedium
             )
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // File/folder listing
         if (uiState.rootFolder != null) {

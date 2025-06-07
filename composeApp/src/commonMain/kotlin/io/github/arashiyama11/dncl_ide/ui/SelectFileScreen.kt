@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -62,6 +63,8 @@ fun SelectFileScreen(
                 style = MaterialTheme.typography.headlineMedium
             )
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // File/folder listing
         if (uiState.rootFolder != null) {

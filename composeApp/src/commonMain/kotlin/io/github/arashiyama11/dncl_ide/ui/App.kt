@@ -72,7 +72,6 @@ import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -355,7 +354,7 @@ fun App() {
                 val dist = bse?.destination
                 Box(
                     modifier = Modifier.wrapContentSize()
-                        .padding(bottom = bottomAppBarHeight + 12.dp)
+                        .padding(bottom = bottomAppBarHeight)
                 ) {
                     AppFab(dist?.route)
                 }
