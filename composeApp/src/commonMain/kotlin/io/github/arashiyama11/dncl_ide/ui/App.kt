@@ -235,7 +235,7 @@ fun App() {
             SnackbarHost(snackbarHostState)
         }, bottomBar = {
             val dense = LocalDensity.current
-            BottomAppBar(modifier = Modifier.wrapContentHeight().onGloballyPositioned {
+            BottomAppBar(modifier = Modifier.height(100.dp).onGloballyPositioned {
                 bottomAppBarHeight = with(dense) { it.size.height.toDp() }
             }) {
                 Row(
@@ -335,15 +335,11 @@ fun App() {
                 contentPadding
             }
 
-            NavHost(navController, startDestination = Destination.App) {
-                composable<Destination.App> {
-                    if (selectedFile?.isNotebookFile() == true) {
-                        NotebookScreen(modifier = Modifier.padding(padding))
-                    } else DnclIDE(
-                        modifier = Modifier.padding(padding), ideViewModel
-                    )
-                }
-
+            NavHost(
+                navController,
+                modifier = Modifier.padding(padding),
+                startDestination = Destination.CodingScreen
+            ) {
                 composable<Destination.LicensesScreen> {
                     LicencesScreen(
                         onBack = { navController.popBackStack() }
@@ -387,9 +383,6 @@ fun App() {
 
 
 sealed interface Destination {
-    @Serializable
-    object App : Destination
-
     @Serializable
     object SelectFileScreen : Destination
 
