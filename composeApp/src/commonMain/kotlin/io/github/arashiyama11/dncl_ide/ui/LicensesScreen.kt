@@ -24,9 +24,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,29 +58,17 @@ fun LicencesScreen(onBack: () -> Unit = {}, navigateToSingleLicense: (String) ->
         isLoading = false
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ライセンス表示") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator()
-            } else if (libs != null) {
-                LicencesContent(libs!!, navigateToSingleLicense)
-            } else {
-                Text("Failed to load licenses", style = MaterialTheme.typography.bodyLarge)
-            }
+    // content only, top bar is handled in App.kt
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator()
+        } else if (libs != null) {
+            LicencesContent(libs!!, navigateToSingleLicense)
+        } else {
+            Text("Failed to load licenses", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -183,26 +169,12 @@ private fun LibraryItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SingleLicenseScreen(content: String, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("License") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(paddingValues).verticalScroll(
-                rememberScrollState()
-            ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(content, style = MaterialTheme.typography.bodyLarge)
-        }
+    // content only, topBar handled in App.kt
+    Box(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(content, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

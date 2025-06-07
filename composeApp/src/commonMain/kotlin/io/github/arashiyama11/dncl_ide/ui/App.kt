@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.filled.Add
@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,12 +70,10 @@ import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
-import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -199,6 +199,7 @@ fun AppFab(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
     DnclIdeTheme {
@@ -207,8 +208,6 @@ fun App() {
         val snackbarHostState = remember { SnackbarHostState() }
         val isDarkThemeStateFlow = rememberDarkThemeStateFlow()
         val navController = rememberNavController()
-        val fileRepository = koinInject<FileRepository>()
-        val selectedFile by fileRepository.selectedEntryPath.collectAsStateWithLifecycle()
         val bse by navController.currentBackStackEntryAsState()
 
 
@@ -231,99 +230,137 @@ fun App() {
 
         var bottomAppBarHeight by remember { mutableStateOf(0.dp) }
 
-        Scaffold(snackbarHost = {
-            SnackbarHost(snackbarHostState)
-        }, bottomBar = {
-            val dense = LocalDensity.current
-            BottomAppBar(modifier = Modifier.height(100.dp).onGloballyPositioned {
-                bottomAppBarHeight = with(dense) { it.size.height.toDp() }
-            }) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    IconButton(onClick = {
-                        navController.navigate(Destination.SelectFileScreen)
-                    }) {
-                        val icon =
-                            if (bse?.destination?.route == Destination.SelectFileScreen::class.qualifiedName) {
-                                Icons.AutoMirrored.Filled.InsertDriveFile
-                            } else {
-                                Icons.AutoMirrored.Outlined.InsertDriveFile
-                            }
-                        Icon(icon, null)
-                    }
-
-                    run {
-                        val isSelected =
-                            remember(bse?.destination?.route) { bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName }
-                        IconButton(
-                            onClick = {
-                                navController.navigate(Destination.SelectNotebookScreen)
-                            },
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
-                        ) {
-                            val icon =
-                                if (bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName) {
-                                    Icons.Filled.FormatListNumbered
-                                } else {
-                                    Icons.Outlined.FormatListNumbered
+        Scaffold(
+            topBar = {
+                val currentRoute =
+                    navController.currentBackStackEntryAsState().value?.destination?.route
+                when (currentRoute) {
+                    Destination.LicensesScreen::class.qualifiedName -> {
+                        TopAppBar(
+                            title = { Text("ライセンス表示") },
+                            navigationIcon = {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back"
+                                    )
                                 }
-                            Icon(
-                                icon,
-                                null,
-                                tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
-                            )
-                        }
-                    }
-
-                    run {
-                        val isSelected =
-                            remember(bse?.destination?.route) { bse?.destination?.route == Destination.CodingScreen::class.qualifiedName }
-                        IconButton(
-                            onClick = {
-                                navController.navigate(Destination.CodingScreen)
-                            },
-                            modifier = Modifier.clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
-                        ) {
-                            val icon =
-                                if (bse?.destination?.route == Destination.CodingScreen::class.qualifiedName) {
-                                    Icons.Filled.Code
-                                } else {
-                                    Icons.Outlined.Code
-                                }
-                            Icon(
-                                icon,
-                                null,
-                                tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = {
-                        navController.navigate(Destination.SettingsScreen)
-                    }) {
-                        val icon =
-                            if (bse?.destination?.route == Destination.SettingsScreen::class.qualifiedName) {
-                                Icons.Filled.Settings
-                            } else {
-                                Icons.Outlined.Settings
                             }
-                        Icon(icon, null)
+                        )
+                    }
+
+                    Destination.SingleLicenseScreen::class.qualifiedName -> {
+                        TopAppBar(
+                            title = { Text("License") },
+                            navigationIcon = {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back"
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    else -> {}
+                }
+            },
+            snackbarHost = {
+                SnackbarHost(snackbarHostState)
+            }, bottomBar = {
+                val dense = LocalDensity.current
+                BottomAppBar(modifier = Modifier.height(100.dp).onGloballyPositioned {
+                    bottomAppBarHeight = with(dense) { it.size.height.toDp() }
+                }) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        IconButton(onClick = {
+                            navController.navigate(Destination.SelectFileScreen)
+                        }) {
+                            val icon =
+                                if (bse?.destination?.route == Destination.SelectFileScreen::class.qualifiedName) {
+                                    Icons.AutoMirrored.Filled.InsertDriveFile
+                                } else {
+                                    Icons.AutoMirrored.Outlined.InsertDriveFile
+                                }
+                            Icon(icon, null)
+                        }
+
+                        run {
+                            val isSelected =
+                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName }
+                            IconButton(
+                                onClick = {
+                                    navController.navigate(Destination.SelectNotebookScreen)
+                                },
+                                modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                            ) {
+                                val icon =
+                                    if (bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName) {
+                                        Icons.Filled.FormatListNumbered
+                                    } else {
+                                        Icons.Outlined.FormatListNumbered
+                                    }
+                                Icon(
+                                    icon,
+                                    null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
+                                )
+                            }
+                        }
+
+                        run {
+                            val isSelected =
+                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.CodingScreen::class.qualifiedName }
+                            IconButton(
+                                onClick = {
+                                    navController.navigate(Destination.CodingScreen)
+                                },
+                                modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                            ) {
+                                val icon =
+                                    if (bse?.destination?.route == Destination.CodingScreen::class.qualifiedName) {
+                                        Icons.Filled.Code
+                                    } else {
+                                        Icons.Outlined.Code
+                                    }
+                                Icon(
+                                    icon,
+                                    null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.surface else LocalContentColor.current
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = {
+                            navController.navigate(Destination.SettingsScreen)
+                        }) {
+                            val icon =
+                                if (bse?.destination?.route == Destination.SettingsScreen::class.qualifiedName) {
+                                    Icons.Filled.Settings
+                                } else {
+                                    Icons.Outlined.Settings
+                                }
+                            Icon(icon, null)
+                        }
                     }
                 }
-            }
-        }, floatingActionButton = {
-            val bse by navController.currentBackStackEntryAsState()
-            val dist = bse?.destination
-            Box(
-                modifier = Modifier.wrapContentSize().padding(bottom = bottomAppBarHeight + 12.dp)
-            ) {
-                AppFab(dist?.route)
-            }
-        }, floatingActionButtonPosition = FabPosition.EndOverlay) { contentPadding ->
+            }, floatingActionButton = {
+                val bse by navController.currentBackStackEntryAsState()
+                val dist = bse?.destination
+                Box(
+                    modifier = Modifier.wrapContentSize()
+                        .padding(bottom = bottomAppBarHeight + 12.dp)
+                ) {
+                    AppFab(dist?.route)
+                }
+            }, floatingActionButtonPosition = FabPosition.EndOverlay
+        ) { contentPadding ->
             val padding = if (isImeVisible()) {
                 PaddingValues(
                     start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
