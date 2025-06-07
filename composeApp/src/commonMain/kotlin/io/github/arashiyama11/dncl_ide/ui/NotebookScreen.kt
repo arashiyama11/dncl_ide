@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -153,6 +155,12 @@ fun NotebookContent(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
+
+            item {
+                with(LocalDensity.current) {
+                    Spacer(Modifier.height(LocalWindowInfo.current.containerSize.height.toDp() / 3))
+                }
+            }
         }
     }
 }
@@ -258,7 +266,7 @@ fun CellComponent(
             CellType.CODE -> CodeCellContent(
                 cell,
                 onAction,
-                codeCellStateMap[cell.id]!!,
+                codeCellStateMap[cell.id] ?: CodeCellState(),
                 suggestions
             )
 

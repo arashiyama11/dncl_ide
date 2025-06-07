@@ -36,7 +36,6 @@ class SelectNotebookScreenViewModel(
     }.stateIn(viewModelScope, SharingStarted.Lazily, SelectUiState())
 
     override fun onFileAddClicked() {
-        super.onFileAddClicked()
         println("notebook onFileAddClicked")
         val currentState = appStateStore.state.value
         _localState.update {

@@ -49,8 +49,11 @@ data class NotebookUiState(
 )
 
 data class CodeCellState(
-    val textFieldValue: TextFieldValue,
-    val annotatedString: AnnotatedString
+    val textFieldValue: TextFieldValue = TextFieldValue(
+        text = "",
+        selection = TextRange(0)
+    ),
+    val annotatedString: AnnotatedString = AnnotatedString("")
 )
 
 
