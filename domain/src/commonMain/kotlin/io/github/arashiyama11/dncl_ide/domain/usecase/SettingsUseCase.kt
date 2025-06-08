@@ -5,7 +5,6 @@ import io.github.arashiyama11.dncl_ide.domain.model.SettingsState
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
