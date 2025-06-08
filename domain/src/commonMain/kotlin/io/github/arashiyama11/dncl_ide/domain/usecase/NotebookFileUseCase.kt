@@ -113,7 +113,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 Cell(
                     id = "cell-1",
                     type = CellType.CODE,
-                    source = listOf("表示する('Hello, world!')"),
+                    source = listOf(""""表示する("Hello, world!")"""),
                     executionCount = 0,
                     outputs = emptyList()
                 ),

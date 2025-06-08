@@ -2,26 +2,32 @@ package io.github.arashiyama11.dncl_ide.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
@@ -212,29 +219,61 @@ fun FolderItemCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp, horizontal = (depth * 16).dp)
+                .clickable {
+                    onFolderClick(folder)
+                    onExpandToggle(folder.path.toString())
+                }
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
             ) {
+                Icon(
+                    Icons.Outlined.ChevronRight,
+                    null,
+                    modifier = Modifier.rotate(if (isExpanded) 90f else 0f)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
                 Icon(
                     Icons.Outlined.Folder,
                     contentDescription = null
                 )
-                TextButton(
-                    onClick = {
-                        onFolderClick(folder)
-                        onExpandToggle(folder.path.toString())
-                    },
-                    modifier = Modifier.weight(1f)
+
+                Spacer(Modifier.width(8.dp))
+
+
+                Text(
+                    text = folder.name.value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                )
+
+
+
+
+                Row(
+                    modifier = Modifier.weight(1f, fill = true),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = folder.name.value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
+                        //TODO handle file creation
+                    }) {
+                        Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null)
+                        Icon(Icons.Outlined.Add, null, modifier = Modifier.size(14.dp))
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
+                        //TODO handle folder creation
+                    }) {
+                        Icon(Icons.Outlined.Folder, null)
+                        Icon(Icons.Outlined.Add, null, modifier = Modifier.size(14.dp))
+                    }
                 }
             }
         }

@@ -408,7 +408,7 @@ fun OutputDisplay(output: Output) {
                 output.text?.let { textLines ->
                     Text(
                         text = textLines.joinToString("\n"),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = LocalCodeTypography.current.bodyMedium,
                     )
                 }
             }
@@ -417,20 +417,20 @@ fun OutputDisplay(output: Output) {
                 Text(
                     text = "Error: ${output.ename ?: "Unknown error"}",
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = LocalCodeTypography.current.bodyMedium,
                 )
 
                 Text(
                     text = output.evalue.orEmpty(),
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                    style = LocalCodeTypography.current.bodyMedium,
                 )
             }
 
             else -> {
                 Text(
                     text = "Output: ${output.outputType}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = LocalCodeTypography.current.bodyMedium,
                 )
             }
         }
