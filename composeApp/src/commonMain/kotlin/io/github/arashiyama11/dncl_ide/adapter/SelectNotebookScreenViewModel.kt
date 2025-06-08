@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
@@ -35,13 +36,13 @@ class SelectNotebookScreenViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, SelectUiState())
 
-    override fun onFileAddClicked() {
+    override fun onFileAddClicked(path: EntryPath?) {
         println("notebook onFileAddClicked")
         val currentState = appStateStore.state.value
         _localState.update {
             it.copy(
                 creatingType = CreatingType.FILE,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: currentState.rootFolder!!.path,
+                inputtingEntryPath = path ?: currentState.rootFolder!!.path,
                 inputtingFileName = "", // 拡張子は表示しない
             )
         }

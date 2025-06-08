@@ -66,12 +66,12 @@ abstract class BaseSelectViewModel(
         }
     }
 
-    open fun onFileAddClicked() {
+    open fun onFileAddClicked(path: EntryPath? = null) {
         val currentState = appStateStore.state.value
         _localState.update {
             it.copy(
                 creatingType = CreatingType.FILE,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: currentState.rootFolder!!.path,
+                inputtingEntryPath = path ?: currentState.rootFolder!!.path,
                 inputtingFileName = ""
             )
         }
@@ -79,12 +79,12 @@ abstract class BaseSelectViewModel(
         requestFocus()
     }
 
-    fun onFolderAddClicked() {
+    fun onFolderAddClicked(path: EntryPath? = null) {
         val currentState = appStateStore.state.value
         _localState.update {
             it.copy(
                 creatingType = CreatingType.FOLDER,
-                inputtingEntryPath = it.lastClickedFolder?.path ?: currentState.rootFolder!!.path,
+                inputtingEntryPath = path ?: currentState.rootFolder!!.path,
                 inputtingFileName = ""
             )
         }

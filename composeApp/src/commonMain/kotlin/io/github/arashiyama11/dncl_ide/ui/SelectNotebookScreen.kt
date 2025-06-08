@@ -71,12 +71,19 @@ fun SelectNotebookScreen(
                         folder = entry,
                         depth = 0,
                         expandedFolders = expandedFolders,
-                        onExpandToggle = { folderPath ->
-                            expandedFolders = if (expandedFolders.contains(folderPath)) {
-                                expandedFolders - folderPath
-                            } else {
-                                expandedFolders + folderPath
-                            }
+                        onExpandToggle = { folderPath, b ->
+                            expandedFolders = if (b != null) {
+                                if (b) {
+                                    expandedFolders + folderPath
+                                } else {
+                                    expandedFolders - folderPath
+                                }
+                            } else
+                                (if ((expandedFolders.contains(folderPath))) {
+                                    expandedFolders - folderPath
+                                } else {
+                                    expandedFolders + folderPath
+                                })
                         },
                         inputtingEntryPath = uiState.inputtingEntryPath,
                         inputtingFileName = uiState.inputtingFileName,
@@ -88,7 +95,13 @@ fun SelectNotebookScreen(
                             navigateToCodeScreen()
                         },
                         onFolderClick = viewModel::onFolderClicked,
-                        isNotebookMode = true
+                        isNotebookMode = true,
+                        onFileAddClicked = {
+                            viewModel.onFileAddClicked(it)
+                        },
+                        onFolderAddClicked = {
+                            viewModel.onFolderAddClicked(it)
+                        }
                     )
 
                     else -> {

@@ -86,12 +86,19 @@ fun SelectFileScreen(
                         folder = entry,
                         depth = 0,
                         expandedFolders = expandedFolders,
-                        onExpandToggle = { folderPath ->
-                            expandedFolders = if (expandedFolders.contains(folderPath)) {
-                                expandedFolders - folderPath
-                            } else {
-                                expandedFolders + folderPath
-                            }
+                        onExpandToggle = { folderPath, b ->
+                            expandedFolders = if (b != null) {
+                                if (b) {
+                                    expandedFolders + folderPath
+                                } else {
+                                    expandedFolders - folderPath
+                                }
+                            } else
+                                (if ((expandedFolders.contains(folderPath))) {
+                                    expandedFolders - folderPath
+                                } else {
+                                    expandedFolders + folderPath
+                                })
                         },
                         inputtingEntryPath = uiState.inputtingEntryPath,
                         inputtingFileName = uiState.inputtingFileName,
@@ -103,7 +110,13 @@ fun SelectFileScreen(
                             navigateToCodeScreen()
                         },
                         onFolderClick = viewModel::onFolderClicked,
-                        isNotebookMode = false
+                        isNotebookMode = false,
+                        onFileAddClicked = {
+                            viewModel.onFileAddClicked(it)
+                        },
+                        onFolderAddClicked = {
+                            viewModel.onFolderAddClicked(it)
+                        }
                     )
 
                     is ProgramFile -> {
@@ -202,7 +215,7 @@ fun FolderItemCard(
     folder: Folder,
     depth: Int = 0,
     expandedFolders: Set<String>,
-    onExpandToggle: (String) -> Unit,
+    onExpandToggle: (String, Boolean?) -> Unit,
     inputtingEntryPath: EntryPath?,
     inputtingFileName: String?,
     focusRequester: FocusRequester,
@@ -210,7 +223,9 @@ fun FolderItemCard(
     onInputtingEntryNameChanged: (String) -> Unit,
     onFileClick: (EntryPath) -> Unit,
     onFolderClick: (Folder) -> Unit,
-    isNotebookMode: Boolean
+    isNotebookMode: Boolean,
+    onFileAddClicked: (EntryPath) -> Unit, // 追加
+    onFolderAddClicked: (EntryPath) -> Unit // 追加
 ) {
     val isExpanded = expandedFolders.contains(folder.path.toString())
 
@@ -221,7 +236,7 @@ fun FolderItemCard(
                 .padding(vertical = 4.dp, horizontal = (depth * 16).dp)
                 .clickable {
                     onFolderClick(folder)
-                    onExpandToggle(folder.path.toString())
+                    onExpandToggle(folder.path.toString(), null)
                 }
         ) {
             Row(
@@ -261,7 +276,9 @@ fun FolderItemCard(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
-                        //TODO handle file creation
+                        onFolderClick(folder)
+                        onFileAddClicked(folder.path)
+                        onExpandToggle(folder.path.toString(), true)
                     }) {
                         Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null)
                         Icon(Icons.Outlined.Add, null, modifier = Modifier.size(14.dp))
@@ -269,7 +286,9 @@ fun FolderItemCard(
 
                     Spacer(Modifier.width(8.dp))
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
-                        //TODO handle folder creation
+                        onFolderClick(folder)
+                        onFolderAddClicked(folder.path)
+                        onExpandToggle(folder.path.toString(), true)
                     }) {
                         Icon(Icons.Outlined.Folder, null)
                         Icon(Icons.Outlined.Add, null, modifier = Modifier.size(14.dp))
@@ -296,7 +315,9 @@ fun FolderItemCard(
                             onInputtingEntryNameChanged = onInputtingEntryNameChanged,
                             onFileClick = onFileClick,
                             onFolderClick = onFolderClick,
-                            isNotebookMode = isNotebookMode
+                            isNotebookMode = isNotebookMode,
+                            onFileAddClicked = onFileAddClicked,
+                            onFolderAddClicked = onFolderAddClicked
                         )
 
                         is ProgramFile -> {
