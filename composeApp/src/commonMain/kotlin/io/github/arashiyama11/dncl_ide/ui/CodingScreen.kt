@@ -9,11 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.domain.model.Entry
-import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
-import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import org.koin.compose.koinInject
 
 @Composable
