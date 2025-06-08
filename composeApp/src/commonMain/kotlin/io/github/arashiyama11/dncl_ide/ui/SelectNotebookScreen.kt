@@ -67,42 +67,28 @@ fun SelectNotebookScreen(
             // Only show notebook files
             for (entry in uiState.rootFolder!!.entities) {
                 when (entry) {
-                    is Folder -> FolderItemCard(
-                        folder = entry,
-                        depth = 0,
-                        expandedFolders = expandedFolders,
-                        onExpandToggle = { folderPath, b ->
-                            expandedFolders = if (b != null) {
-                                if (b) {
-                                    expandedFolders + folderPath
-                                } else {
-                                    expandedFolders - folderPath
-                                }
-                            } else
-                                (if ((expandedFolders.contains(folderPath))) {
-                                    expandedFolders - folderPath
-                                } else {
-                                    expandedFolders + folderPath
-                                })
-                        },
-                        inputtingEntryPath = uiState.inputtingEntryPath,
-                        inputtingFileName = uiState.inputtingFileName,
-                        focusRequester = focusRequester,
-                        creatingType = uiState.creatingType,
-                        onInputtingEntryNameChanged = viewModel::onInputtingFileNameChanged,
-                        onFileClick = {
-                            viewModel.onFileSelected(it)
-                            navigateToCodeScreen()
-                        },
-                        onFolderClick = viewModel::onFolderClicked,
-                        isNotebookMode = true,
-                        onFileAddClicked = {
-                            viewModel.onFileAddClicked(it)
-                        },
-                        onFolderAddClicked = {
-                            viewModel.onFolderAddClicked(it)
-                        }
-                    )
+                    is Folder -> with(viewModel) {
+                        FolderItemCard(
+                            folder = entry,
+                            depth = 0,
+                            expandedFolders = expandedFolders,
+                            onExpandToggle = { folderPath, b ->
+                                expandedFolders = if (b != null) {
+                                    if (b) {
+                                        expandedFolders + folderPath
+                                    } else {
+                                        expandedFolders - folderPath
+                                    }
+                                } else
+                                    (if ((expandedFolders.contains(folderPath))) {
+                                        expandedFolders - folderPath
+                                    } else {
+                                        expandedFolders + folderPath
+                                    })
+                            },
+                            isNotebookMode = true,
+                        )
+                    }
 
                     else -> {
                         // Show only notebook files at root level

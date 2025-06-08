@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import io.github.arashiyama11.dncl_ide.adapter.BaseSelectViewModel
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
 import io.github.arashiyama11.dncl_ide.adapter.SelectFileScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -82,42 +83,28 @@ fun SelectFileScreen(
             // Filter out notebook files
             for (entry in uiState.rootFolder!!.entities) {
                 when (entry) {
-                    is Folder -> FolderItemCard(
-                        folder = entry,
-                        depth = 0,
-                        expandedFolders = expandedFolders,
-                        onExpandToggle = { folderPath, b ->
-                            expandedFolders = if (b != null) {
-                                if (b) {
-                                    expandedFolders + folderPath
-                                } else {
-                                    expandedFolders - folderPath
-                                }
-                            } else
-                                (if ((expandedFolders.contains(folderPath))) {
-                                    expandedFolders - folderPath
-                                } else {
-                                    expandedFolders + folderPath
-                                })
-                        },
-                        inputtingEntryPath = uiState.inputtingEntryPath,
-                        inputtingFileName = uiState.inputtingFileName,
-                        focusRequester = focusRequester,
-                        creatingType = uiState.creatingType,
-                        onInputtingEntryNameChanged = viewModel::onInputtingFileNameChanged,
-                        onFileClick = {
-                            viewModel.onFileSelected(it)
-                            navigateToCodeScreen()
-                        },
-                        onFolderClick = viewModel::onFolderClicked,
-                        isNotebookMode = false,
-                        onFileAddClicked = {
-                            viewModel.onFileAddClicked(it)
-                        },
-                        onFolderAddClicked = {
-                            viewModel.onFolderAddClicked(it)
-                        }
-                    )
+                    is Folder -> with(viewModel) {
+                        FolderItemCard(
+                            folder = entry,
+                            depth = 0,
+                            expandedFolders = expandedFolders,
+                            onExpandToggle = { folderPath, b ->
+                                expandedFolders = if (b != null) {
+                                    if (b) {
+                                        expandedFolders + folderPath
+                                    } else {
+                                        expandedFolders - folderPath
+                                    }
+                                } else
+                                    (if ((expandedFolders.contains(folderPath))) {
+                                        expandedFolders - folderPath
+                                    } else {
+                                        expandedFolders + folderPath
+                                    })
+                            },
+                            isNotebookMode = false
+                        )
+                    }
 
                     is ProgramFile -> {
                         if (!entry.name.isNotebookFile()) {
@@ -210,24 +197,21 @@ fun FileItemCard(
     }
 }
 
+context(viewModel: BaseSelectViewModel)
 @Composable
 fun FolderItemCard(
     folder: Folder,
     depth: Int = 0,
     expandedFolders: Set<String>,
     onExpandToggle: (String, Boolean?) -> Unit,
-    inputtingEntryPath: EntryPath?,
-    inputtingFileName: String?,
-    focusRequester: FocusRequester,
-    creatingType: CreatingType?,
-    onInputtingEntryNameChanged: (String) -> Unit,
-    onFileClick: (EntryPath) -> Unit,
-    onFolderClick: (Folder) -> Unit,
-    isNotebookMode: Boolean,
-    onFileAddClicked: (EntryPath) -> Unit, // 追加
-    onFolderAddClicked: (EntryPath) -> Unit // 追加
+    isNotebookMode: Boolean
 ) {
     val isExpanded = expandedFolders.contains(folder.path.toString())
+    val uiState = viewModel.uiState.collectAsState().value
+    val inputtingEntryPath = uiState.inputtingEntryPath
+    val inputtingFileName = uiState.inputtingFileName
+    val focusRequester = remember { FocusRequester() }
+    val creatingType = uiState.creatingType
 
     Column {
         Card(
@@ -235,7 +219,7 @@ fun FolderItemCard(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp, horizontal = (depth * 16).dp)
                 .clickable {
-                    onFolderClick(folder)
+                    viewModel.onFolderClicked(folder)
                     onExpandToggle(folder.path.toString(), null)
                 }
         ) {
@@ -261,23 +245,19 @@ fun FolderItemCard(
 
                 Spacer(Modifier.width(8.dp))
 
-
                 Text(
                     text = folder.name.value,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                 )
 
-
-
-
                 Row(
                     modifier = Modifier.weight(1f, fill = true),
                     horizontalArrangement = Arrangement.End
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
-                        onFolderClick(folder)
-                        onFileAddClicked(folder.path)
+                        viewModel.onFolderClicked(folder)
+                        viewModel.onFileAddClicked(folder.path)
                         onExpandToggle(folder.path.toString(), true)
                     }) {
                         Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null)
@@ -286,8 +266,8 @@ fun FolderItemCard(
 
                     Spacer(Modifier.width(8.dp))
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
-                        onFolderClick(folder)
-                        onFolderAddClicked(folder.path)
+                        viewModel.onFolderClicked(folder)
+                        viewModel.onFolderAddClicked(folder.path)
                         onExpandToggle(folder.path.toString(), true)
                     }) {
                         Icon(Icons.Outlined.Folder, null)
@@ -308,16 +288,7 @@ fun FolderItemCard(
                             depth = depth + 1,
                             expandedFolders = expandedFolders,
                             onExpandToggle = onExpandToggle,
-                            inputtingEntryPath = inputtingEntryPath,
-                            inputtingFileName = inputtingFileName,
-                            focusRequester = focusRequester,
-                            creatingType = creatingType,
-                            onInputtingEntryNameChanged = onInputtingEntryNameChanged,
-                            onFileClick = onFileClick,
-                            onFolderClick = onFolderClick,
-                            isNotebookMode = isNotebookMode,
-                            onFileAddClicked = onFileAddClicked,
-                            onFolderAddClicked = onFolderAddClicked
+                            isNotebookMode = isNotebookMode
                         )
 
                         is ProgramFile -> {
@@ -325,7 +296,9 @@ fun FolderItemCard(
                                 FileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = onFileClick
+                                    onClick = {
+                                        viewModel.onFileSelected(it)
+                                    }
                                 )
                             }
                         }
@@ -335,7 +308,9 @@ fun FolderItemCard(
                                 NotebookFileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = onFileClick
+                                    onClick = {
+                                        viewModel.onFileSelected(it)
+                                    }
                                 )
                             }
                         }
@@ -364,7 +339,7 @@ fun FolderItemCard(
 
                             OutlinedTextField(
                                 value = inputtingFileName.orEmpty(),
-                                onValueChange = onInputtingEntryNameChanged,
+                                onValueChange = viewModel::onInputtingFileNameChanged,
                                 modifier = Modifier
                                     .focusRequester(focusRequester)
                                     .padding(start = 8.dp)
