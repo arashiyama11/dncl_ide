@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
@@ -59,6 +60,7 @@ import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
+import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
@@ -81,44 +83,7 @@ fun NotebookScreen(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
             NotebookContent(
-                notebook = uiState.notebook!!,
-                selectedCellId = uiState.selectedCellId,
-                onAction = notebookViewModel::handleAction,
-                codeCellStateMap = uiState.codeCellStateMap,
-                cellSuggestionsMap = uiState.cellSuggestionsMap
-            )
-        }
-    }
-}
-
-@Composable
-fun AddCellFAB(onAddCell: (CellType) -> Unit) {
-    var showDropdown by remember { mutableStateOf(false) }
-
-    Box {
-        FloatingActionButton(
-            onClick = { showDropdown = true }
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Cell")
-        }
-
-        DropdownMenu(
-            expanded = showDropdown,
-            onDismissRequest = { showDropdown = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Add Code Cell") },
-                onClick = {
-                    onAddCell(CellType.CODE)
-                    showDropdown = false
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Add Markdown Cell") },
-                onClick = {
-                    onAddCell(CellType.MARKDOWN)
-                    showDropdown = false
-                }
+                notebookViewModel
             )
         }
     }
@@ -126,17 +91,16 @@ fun AddCellFAB(onAddCell: (CellType) -> Unit) {
 
 @Composable
 fun NotebookContent(
-    notebook: Notebook,
-    selectedCellId: String?,
-    onAction: (NotebookAction) -> Unit,
-    codeCellStateMap: Map<String, CodeCellState>,
-    cellSuggestionsMap: Map<String, List<Definition>>
+    notebookViewModel: NotebookViewModel = koinViewModel(),
 ) {
+    val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Notebook toolbar with cancel capability
         NotebookToolbar(
-            onExecuteAllCells = { onAction(NotebookAction.ExecuteAllCells) },
-            onCancelExecution = { onAction(NotebookAction.CancelExecution) }
+            selectedEntryPath = uiState.selectedEntryPath,
+            onExecuteAllCells = { notebookViewModel.handleAction(NotebookAction.ExecuteAllCells) },
+            onCancelExecution = { notebookViewModel.handleAction(NotebookAction.CancelExecution) }
         )
 
         // Cells
@@ -145,13 +109,13 @@ fun NotebookContent(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            items(notebook.cells) { cell ->
+            items(uiState.notebook!!.cells) { cell ->
                 CellComponent(
                     cell = cell,
-                    isSelected = cell.id == selectedCellId,
-                    onAction = onAction,
-                    codeCellStateMap = codeCellStateMap,
-                    suggestions = cellSuggestionsMap[cell.id] ?: emptyList()
+                    isSelected = cell.id == uiState.selectedCellId,
+                    onAction = notebookViewModel::handleAction,
+                    codeCellStateMap = uiState.codeCellStateMap,
+                    suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -167,6 +131,7 @@ fun NotebookContent(
 
 @Composable
 fun NotebookToolbar(
+    selectedEntryPath: EntryPath?,
     onExecuteAllCells: () -> Unit,
     onCancelExecution: () -> Unit
 ) {
@@ -186,6 +151,7 @@ fun NotebookToolbar(
                 Text("Run All")
             }
             Spacer(modifier = Modifier.weight(1f))
+            Text(selectedEntryPath?.value?.lastOrNull()?.value.orEmpty().removeSuffix(".dnclnb"))
             IconButton(onClick = onCancelExecution) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
             }

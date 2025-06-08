@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
+import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
@@ -45,7 +46,8 @@ data class NotebookUiState(
     val loading: Boolean = true,
     val focusedCellId: String? = null,
     val cellSuggestionsMap: Map<String, List<Definition>> = emptyMap(),
-    val fontSize: Int = 16
+    val fontSize: Int = 16,
+    val selectedEntryPath: EntryPath? = null
 )
 
 data class CodeCellState(
@@ -101,7 +103,8 @@ class NotebookViewModel(
             loading = localState.loading,
             focusedCellId = localState.focusedCellId,
             cellSuggestionsMap = localState.cellSuggestionsMap,
-            fontSize = appState.fontSize
+            fontSize = appState.fontSize,
+            selectedEntryPath = appState.selectedEntryPath
         )
     }.stateIn(
         viewModelScope,
