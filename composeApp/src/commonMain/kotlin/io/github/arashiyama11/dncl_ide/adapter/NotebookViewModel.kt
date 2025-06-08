@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -156,13 +158,14 @@ class NotebookViewModel(
             }
         }.launchIn(viewModelScope)
 
+        val mutex = Mutex()
         viewModelScope.launch {
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
-                        this@NotebookViewModel.viewModelScope.launch {
-                            val file = notebookFile ?: return@launch
-                            val notebook = uiState.value.notebook ?: return@launch
+                        mutex.withLock {
+                            val file = notebookFile!!
+                            val notebook = uiState.value.notebook!!
                             val newOutput = Output(
                                 outputType = "stream",
                                 name = "stdout",
@@ -171,10 +174,11 @@ class NotebookViewModel(
                             val updatedNotebook = notebookFileUseCase.appendOutputAndSave(
                                 file,
                                 notebook,
-                                selectCellId ?: return@launch,
+                                selectCellId!!,
                                 newOutput
                             )
                             _localState.update { it.copy(notebook = updatedNotebook) }
+                            delay(50)
                         }
                     }, onClear = {
                         clearCellOutput(selectCellId!!)

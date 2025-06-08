@@ -62,7 +62,8 @@ data class IdeUiState(
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
-    val isFocused: Boolean = false
+    val isFocused: Boolean = false,
+    val selectedEntryPath: EntryPath? = null
 )
 
 enum class TextFieldType {
@@ -123,7 +124,8 @@ class IdeViewModel(
             debugRunningMode = appState.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
             textSuggestions = localState.textSuggestions,
-            isFocused = localState.isFocused
+            isFocused = localState.isFocused,
+            selectedEntryPath = appState.selectedEntryPath
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
