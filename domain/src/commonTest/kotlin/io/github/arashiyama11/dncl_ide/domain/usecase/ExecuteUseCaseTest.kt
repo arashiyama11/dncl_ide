@@ -7,6 +7,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.Entry
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
+import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
@@ -332,6 +333,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     private class MockFileRepository : FileRepository {
+        override val rootFolder: StateFlow<Folder?>
+            get() = MutableStateFlow(null)
         override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
         override val selectedEntryPath: StateFlow<EntryPath?> =
             MutableStateFlow(null)
@@ -345,14 +348,14 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         override suspend fun getEntryByPath(entryPath: EntryPath) =
             mockGetEntryByPath(entryPath)
 
-        override suspend fun saveFile(
+        override fun saveFile(
             programFile: ProgramFile,
             fileContent: FileContent,
             cursorPosition: CursorPosition
         ) {
         }
 
-        override suspend fun saveFile(
+        override fun saveFile(
             entryPath: EntryPath,
             fileContent: FileContent,
             cursorPosition: CursorPosition

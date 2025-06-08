@@ -104,6 +104,8 @@ class FileNameValidationUseCaseTest {
 }
 
 class MockFileRepository : FileRepository {
+    override val rootFolder: StateFlow<Folder?>
+        get() = MutableStateFlow(null)
     override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
     override val selectedEntryPath: StateFlow<EntryPath?> = MutableStateFlow(null)
     var mockGetEntryByPath: (EntryPath) -> io.github.arashiyama11.dncl_ide.domain.model.Entry? =
@@ -113,14 +115,14 @@ class MockFileRepository : FileRepository {
         Folder(FolderName("root"), EntryPath(listOf(FolderName("root"))), emptyList())
 
     override suspend fun getEntryByPath(entryPath: EntryPath) = mockGetEntryByPath(entryPath)
-    override suspend fun saveFile(
+    override fun saveFile(
         programFile: ProgramFile,
         fileContent: io.github.arashiyama11.dncl_ide.domain.model.FileContent,
         cursorPosition: io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
     ) {
     }
 
-    override suspend fun saveFile(
+    override fun saveFile(
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition

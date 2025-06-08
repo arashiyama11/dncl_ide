@@ -151,6 +151,8 @@ class FileUseCaseTest {
     }
 
     private class MockFileRepository : FileRepository {
+        override val rootFolder: StateFlow<Folder?>
+            get() = MutableStateFlow(null)
         override val rootPath: EntryPath = EntryPath(listOf(FolderName("root")))
         val selectedEntryPathFlow = MutableStateFlow<EntryPath?>(null)
         override val selectedEntryPath: StateFlow<EntryPath?> = selectedEntryPathFlow
@@ -166,13 +168,13 @@ class FileUseCaseTest {
         var mockGetCursorPosition: (ProgramFile) -> CursorPosition = { CursorPosition(0) }
         override suspend fun getRootFolder(): Folder = mockGetRootFolder()
         override suspend fun getEntryByPath(entryPath: EntryPath) = mockGetEntryByPath(entryPath)
-        override suspend fun saveFile(
+        override fun saveFile(
             programFile: ProgramFile,
             fileContent: FileContent,
             cursorPosition: CursorPosition
         ) = mockSaveFile(programFile, fileContent, cursorPosition)
 
-        override suspend fun saveFile(
+        override fun saveFile(
             entryPath: EntryPath,
             fileContent: FileContent,
             cursorPosition: CursorPosition
