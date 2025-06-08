@@ -102,7 +102,11 @@ fun SelectFileScreen(
                                         expandedFolders + folderPath
                                     })
                             },
-                            isNotebookMode = false
+                            isNotebookMode = false,
+                            onFileClicked = {
+                                viewModel.onFileSelected(it)
+                                navigateToCodeScreen()
+                            }
                         )
                     }
 
@@ -204,7 +208,8 @@ fun FolderItemCard(
     depth: Int = 0,
     expandedFolders: Set<String>,
     onExpandToggle: (String, Boolean?) -> Unit,
-    isNotebookMode: Boolean
+    isNotebookMode: Boolean,
+    onFileClicked: (EntryPath) -> Unit = {}
 ) {
     val isExpanded = expandedFolders.contains(folder.path.toString())
     val uiState = viewModel.uiState.collectAsState().value
@@ -296,9 +301,7 @@ fun FolderItemCard(
                                 FileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = {
-                                        viewModel.onFileSelected(it)
-                                    }
+                                    onClick = onFileClicked
                                 )
                             }
                         }
@@ -308,9 +311,7 @@ fun FolderItemCard(
                                 NotebookFileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = {
-                                        viewModel.onFileSelected(it)
-                                    }
+                                    onClick = onFileClicked
                                 )
                             }
                         }

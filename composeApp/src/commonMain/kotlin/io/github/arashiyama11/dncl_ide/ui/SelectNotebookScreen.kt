@@ -86,6 +86,10 @@ fun SelectNotebookScreen(
                                     })
                             },
                             isNotebookMode = true,
+                            onFileClicked = {
+                                viewModel.onFileSelected(it)
+                                navigateToCodeScreen()
+                            }
                         )
                     }
 
