@@ -115,7 +115,7 @@ fun CodeEditor(
                 .fillMaxSize()
                 .run {
                     if (verticalScroll) {
-                        verticalScroll(rememberScrollState())
+                        verticalScroll(scrollState)
                     } else this
                 }
                 .background(MaterialTheme.colorScheme.background)
