@@ -34,7 +34,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         ignoreUnknownKeys = true
     }
 
-    fun FileContent.toNotebook(): Notebook = json.decodeFromString(value)
+    fun FileContent.toNotebook(): Notebook = Json.decodeFromString(value)
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
 
@@ -62,12 +62,18 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                     DnclOutput.Error(it.explain(code))
                 }
             ) {
-                if (it is DnclObject.Error) {
-                    DnclOutput.RuntimeError(it)
-                } else if (it is DnclObject.Nothing) {
-                    null
-                } else {
-                    DnclOutput.Stdout(it.toString())
+                when (it) {
+                    is DnclObject.Error -> {
+                        DnclOutput.RuntimeError(it)
+                    }
+
+                    is DnclObject.Nothing -> {
+                        null
+                    }
+
+                    else -> {
+                        DnclOutput.Stdout(it.toString())
+                    }
                 }
             }
         }
@@ -291,7 +297,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     /**
      * 指定セルの出力をクリアしてファイルに保存する
      */
-    fun clearCellOutputAndSave(
+    fun clearCellOutput(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String
@@ -304,16 +310,11 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             }
         }
         val updatedNotebook = notebook.copy(cells = updatedCells)
-        saveNotebookFile(
-            notebookFile,
-            updatedNotebook.toFileContent(),
-            CursorPosition(0)
-        )
         return updatedNotebook
     }
 
 
-    fun appendOutputAndSave(
+    fun appendOutput(
         notebookFile: NotebookFile,
         notebook: Notebook,
         cellId: String,
@@ -336,11 +337,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             executionCount = (oldCell.executionCount ?: 0) + 1
         )
         val updatedNotebook = modifyNotebookCell(notebook, cellId, updatedCell)
-        saveNotebookFile(
-            notebookFile,
-            updatedNotebook.toFileContent(),
-            CursorPosition(0)
-        )
+
         return updatedNotebook
     }
 

@@ -22,10 +22,12 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +40,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -116,6 +122,10 @@ class NotebookViewModel(
 
     val errorChannel = Channel<String>()
 
+    private val stdoutChannel = Channel<String>(capacity = Int.MAX_VALUE)
+    val mutex = Mutex()
+    var pendingCount = 0
+
     private var notebookFile: NotebookFile? = null
     private var selectCellId: String? = null
     private var executeJob: Job? = null
@@ -123,6 +133,7 @@ class NotebookViewModel(
 
     private lateinit var environment: Environment
 
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     fun onStart() {
         appStateStore.state.onEach { appState ->
             val entryPath = appState.selectedEntryPath
@@ -130,9 +141,12 @@ class NotebookViewModel(
                 if (entryPath?.isNotebookFile() == true) {
                     val notebookFile = fileUseCase.getEntryByPath(entryPath)
                     if (notebookFile is NotebookFile) {
-                        notebookFileUseCase.getNotebook(notebookFile)
                         this@NotebookViewModel.notebookFile = notebookFile
-                        val notebook = notebookFileUseCase.getNotebook(notebookFile)
+                        val notebook =
+                            runCatching { notebookFileUseCase.getNotebook(notebookFile) }.onFailure {
+                                errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
+                                return@coroutineScope
+                            }.getOrNull()!!
                         _localState.update {
                             it.copy(
                                 notebook = notebook
@@ -158,30 +172,20 @@ class NotebookViewModel(
             }
         }.launchIn(viewModelScope)
 
-        val mutex = Mutex()
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
+                        stdoutChannel.send(outputStr)
                         mutex.withLock {
-                            val file = notebookFile!!
-                            val notebook = uiState.value.notebook!!
-                            val newOutput = Output(
-                                outputType = "stream",
-                                name = "stdout",
-                                text = listOf(outputStr)
-                            )
-                            val updatedNotebook = notebookFileUseCase.appendOutputAndSave(
-                                file,
-                                notebook,
-                                selectCellId!!,
-                                newOutput
-                            )
-                            _localState.update { it.copy(notebook = updatedNotebook) }
-                            delay(50)
+                            pendingCount++
                         }
+
                     }, onClear = {
-                        clearCellOutput(selectCellId!!)
+                        stdoutChannel.send("\u0000")
+                        mutex.withLock {
+                            pendingCount++
+                        }
                     }, onImport = { importPath ->
                         // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
@@ -194,6 +198,59 @@ class NotebookViewModel(
                         }.also { println("Import completed") }
                     }
                 ))
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            var notebookCache = _localState.value.notebook
+            //busy時はcacheを使う
+            var isBusy = false
+            stdoutChannel.consumeEach { outputStr ->
+                delay(10 - pendingCount * pendingCount.toLong())
+                mutex.withLock {
+                    pendingCount--
+                }
+
+                //busy開始時
+                if (pendingCount > 0 && !isBusy) {
+                    notebookCache = _localState.value.notebook
+                }
+
+                //busy終了時
+                if (stdoutChannel.isEmpty) {
+                    mutex.withLock {
+                        pendingCount = 0
+                    }
+                    isBusy = false
+                    withContext(Dispatchers.Main) {
+                        _localState.update {
+                            it.copy(notebook = notebookCache ?: return@withContext)
+                        }
+                    }
+                } else isBusy = true
+                if (outputStr == "\u0000") {
+                    notebookCache = notebookFileUseCase.clearCellOutput(
+                        notebookFile ?: return@consumeEach,
+                        notebookCache ?: return@consumeEach,
+                        selectCellId ?: return@consumeEach
+                    )
+                    // busy時は出力消去アップデートをしない
+
+                    if (stdoutChannel.isEmpty) withContext(Dispatchers.Main) {
+                        _localState.update { it.copy(notebook = notebookCache) }
+                    }
+                    return@consumeEach
+                }
+                val newOutput = Output("stream", "stdout", listOf(outputStr))
+                notebookCache = notebookFileUseCase.appendOutput(
+                    notebookFile ?: return@consumeEach,
+                    notebookCache ?: return@consumeEach,
+                    selectCellId ?: return@consumeEach,
+                    newOutput
+                )
+                withContext(Dispatchers.Main) {
+                    _localState.update { it.copy(notebook = notebookCache) }
+                }
+            }
         }
     }
 
@@ -287,9 +344,9 @@ class NotebookViewModel(
     fun executeCell(cellId: String) {
         selectCellId = cellId
         executeJob?.cancel()
-        executeJob = viewModelScope.launch {
+        executeJob = viewModelScope.launch(Dispatchers.Default) {
             clearCellOutput(cellId).join()
-            delay(50) //await clear
+            delay(100) //await clear
             val output = notebookFileUseCase.executeCell(
                 uiState.value.notebook!!, cellId, environment
             )
@@ -297,7 +354,7 @@ class NotebookViewModel(
             val file = notebookFile ?: return@launch
             val notebook = _localState.value.notebook ?: return@launch
 
-            notebookFileUseCase.appendOutputAndSave(
+            notebookFileUseCase.appendOutput(
                 file,
                 notebook,
                 cellId,
@@ -320,7 +377,7 @@ class NotebookViewModel(
             val file = notebookFile ?: return@launch
             val notebook = _localState.value.notebook ?: return@launch
             // 出力クリアと保存
-            val updatedNotebook = notebookFileUseCase.clearCellOutputAndSave(
+            val updatedNotebook = notebookFileUseCase.clearCellOutput(
                 file,
                 notebook,
                 cellId
