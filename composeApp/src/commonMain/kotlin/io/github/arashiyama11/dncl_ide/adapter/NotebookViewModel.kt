@@ -234,7 +234,6 @@ class NotebookViewModel(
                     i = 0
                     yield()
                 }
-                println("stdout ${hashCode()} ${channel.isClosedForReceive} ${scope.coroutineContext} $coroutineContext ${scope.coroutineContext.job}")
                 if (channel.isClosedForReceive) {
                     println("stdout channel closed, exiting watchStdoutChannel")
                     return
@@ -247,20 +246,16 @@ class NotebookViewModel(
                     }
                 }
 
-                //delay(100 - pendingCount * pendingCount * pendingCount.toLong())
-                val p = pendingCount
                 val x = 4L - pendingCount.toLong()
                 val t = x * x * x + x * 10L
                 if (t > 0) {
-                    println("delay ${t}ms, pendingCount: $p")
                     delay(t)
                 }
                 // busy終了時
-                println("pendingCount: $pendingCount, stdoutChannel.isEmpty: ${stdoutChannel.isEmpty}, isBusy: $isBusy")
                 if (stdoutChannel.isEmpty && isBusy) {
                     println("end busy")
                     isBusy = false
-                    withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.Main.immediate) {
                         _localState.update {
                             it.copy(notebook = notebookCache ?: return@withContext)
                         }
@@ -284,10 +279,8 @@ class NotebookViewModel(
                         selectCellId ?: continue
                     )
                     // busy時は出力消去アップデートをしない
-                    if (!isBusy) scope.launch(Dispatchers.Main) {
-                        delay(50)
-                        if (pendingCount == 0)
-                            _localState.update { it.copy(notebook = notebookCache) }
+                    if (!isBusy) withContext(Dispatchers.Main) {
+                        _localState.update { it.copy(notebook = notebookCache) }
                     }
                     continue
                 }
@@ -301,11 +294,11 @@ class NotebookViewModel(
 
                 if (isBusy) {
                     if (pendingCount < 20)
-                        scope.launch(Dispatchers.Main) {
+                        scope.launch(Dispatchers.Main.immediate) {
                             _localState.update { it.copy(notebook = notebookCache) }
                         }
                 } else {
-                    withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.Main.immediate) {
                         _localState.update { it.copy(notebook = notebookCache) }
                     }
                 }
@@ -405,9 +398,7 @@ class NotebookViewModel(
      */
     fun executeCell(cellId: String) {
         selectCellId = cellId
-        viewModelScope.launch {
-            cancelExecution().join()
-
+        cancelExecution().invokeOnCompletion {
             executeScope.launch {
                 clearCellOutput(cellId).join()
                 delay(100) //await clear
@@ -435,7 +426,6 @@ class NotebookViewModel(
                 }
             }
         }
-
     }
 
     fun clearCellOutput(cellId: String): Job {
