@@ -21,13 +21,16 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,12 +40,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.coroutines.coroutineContext
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -122,19 +127,22 @@ class NotebookViewModel(
 
     val errorChannel = Channel<String>()
 
-    private val stdoutChannel = Channel<String>(capacity = Int.MAX_VALUE)
+    private var stdoutChannel = Channel<String>(capacity = 1024)
     val mutex = Mutex()
     var pendingCount = 0
 
     private var notebookFile: NotebookFile? = null
     private var selectCellId: String? = null
-    private var executeJob: Job? = null
-
+    private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
+    private var watchJob: Job? = null
 
     private lateinit var environment: Environment
+    private var started = false
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     fun onStart() {
+        if (started) return
+        started = true
         appStateStore.state.onEach { appState ->
             val entryPath = appState.selectedEntryPath
             coroutineScope {
@@ -176,13 +184,14 @@ class NotebookViewModel(
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
-                        stdoutChannel.send(outputStr)
+                        if (!stdoutChannel.isClosedForSend)
+                            stdoutChannel.send(outputStr)
                         mutex.withLock {
                             pendingCount++
                         }
-
                     }, onClear = {
-                        stdoutChannel.send("\u0000")
+                        if (!stdoutChannel.isClosedForSend)
+                            stdoutChannel.send("\u0000")
                         mutex.withLock {
                             pendingCount++
                         }
@@ -200,57 +209,110 @@ class NotebookViewModel(
                 ))
         }
 
-        viewModelScope.launch(Dispatchers.Default) {
+        watchJob = executeScope.launch {
+            watchStdoutChannel()
+        }
+    }
+
+    context(scope: CoroutineScope)
+    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
+    private suspend fun watchStdoutChannel() {
+        try {
+            println("starting watchStdoutChannel stdout")
             var notebookCache = _localState.value.notebook
+            val channel = stdoutChannel
             //busy時はcacheを使う
             var isBusy = false
-            stdoutChannel.consumeEach { outputStr ->
-                delay(10 - pendingCount * pendingCount.toLong())
+            var i = 0
+            for (outputStr in channel) {
+                if (channel.isClosedForReceive || !coroutineContext.isActive || !scope.coroutineContext.isActive || scope.coroutineContext.job.isCancelled) {
+                    println("stdout channel closed or coroutine context is not active, exiting watchStdoutChannel")
+                    println("condition: ${channel.isClosedForReceive} ${coroutineContext.isActive} ${scope.coroutineContext.isActive} ${scope.coroutineContext.job.isCancelled}")
+                    return
+                }
+                if (i++ > 100) {
+                    i = 0
+                    yield()
+                }
+                println("stdout ${hashCode()} ${channel.isClosedForReceive} ${scope.coroutineContext} $coroutineContext ${scope.coroutineContext.job}")
+                if (channel.isClosedForReceive) {
+                    println("stdout channel closed, exiting watchStdoutChannel")
+                    return
+                }
+
                 mutex.withLock {
                     pendingCount--
-                }
-
-                //busy開始時
-                if (pendingCount > 0 && !isBusy) {
-                    notebookCache = _localState.value.notebook
-                }
-
-                //busy終了時
-                if (stdoutChannel.isEmpty) {
-                    mutex.withLock {
+                    if (stdoutChannel.isEmpty || pendingCount < 0) {
                         pendingCount = 0
                     }
+                }
+
+                //delay(100 - pendingCount * pendingCount * pendingCount.toLong())
+                val p = pendingCount
+                val x = 4L - pendingCount.toLong()
+                val t = x * x * x + x * 10L
+                if (t > 0) {
+                    println("delay ${t}ms, pendingCount: $p")
+                    delay(t)
+                }
+                // busy終了時
+                println("pendingCount: $pendingCount, stdoutChannel.isEmpty: ${stdoutChannel.isEmpty}, isBusy: $isBusy")
+                if (stdoutChannel.isEmpty && isBusy) {
+                    println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main) {
                         _localState.update {
                             it.copy(notebook = notebookCache ?: return@withContext)
                         }
                     }
-                } else isBusy = true
+                    mutex.withLock {
+                        pendingCount = 0
+                    }
+                }
+
+                // busy開始時
+                if (!stdoutChannel.isEmpty && !isBusy) {
+                    println("start busy")
+                    isBusy = true
+                    notebookCache = _localState.value.notebook
+                }
+
                 if (outputStr == "\u0000") {
                     notebookCache = notebookFileUseCase.clearCellOutput(
-                        notebookFile ?: return@consumeEach,
-                        notebookCache ?: return@consumeEach,
-                        selectCellId ?: return@consumeEach
+                        notebookFile ?: continue,
+                        notebookCache ?: continue,
+                        selectCellId ?: continue
                     )
                     // busy時は出力消去アップデートをしない
-
-                    if (stdoutChannel.isEmpty) withContext(Dispatchers.Main) {
-                        _localState.update { it.copy(notebook = notebookCache) }
+                    if (!isBusy) scope.launch(Dispatchers.Main) {
+                        delay(50)
+                        if (pendingCount == 0)
+                            _localState.update { it.copy(notebook = notebookCache) }
                     }
-                    return@consumeEach
+                    continue
                 }
                 val newOutput = Output("stream", "stdout", listOf(outputStr))
                 notebookCache = notebookFileUseCase.appendOutput(
-                    notebookFile ?: return@consumeEach,
-                    notebookCache ?: return@consumeEach,
-                    selectCellId ?: return@consumeEach,
+                    notebookFile ?: continue,
+                    notebookCache ?: continue,
+                    selectCellId ?: continue,
                     newOutput
                 )
-                withContext(Dispatchers.Main) {
-                    _localState.update { it.copy(notebook = notebookCache) }
+
+                if (isBusy) {
+                    if (pendingCount < 20)
+                        scope.launch(Dispatchers.Main) {
+                            _localState.update { it.copy(notebook = notebookCache) }
+                        }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _localState.update { it.copy(notebook = notebookCache) }
+                    }
                 }
             }
+
+        } finally {
+            println("watchStdoutChannel finished, closing stdoutChannel")
         }
     }
 
@@ -343,33 +405,37 @@ class NotebookViewModel(
      */
     fun executeCell(cellId: String) {
         selectCellId = cellId
-        executeJob?.cancel()
-        executeJob = viewModelScope.launch(Dispatchers.Default) {
-            clearCellOutput(cellId).join()
-            delay(100) //await clear
-            val output = notebookFileUseCase.executeCell(
-                uiState.value.notebook!!, cellId, environment
-            )
+        viewModelScope.launch {
+            cancelExecution().join()
 
-            val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
+            executeScope.launch {
+                clearCellOutput(cellId).join()
+                delay(100) //await clear
+                val output = notebookFileUseCase.executeCell(
+                    uiState.value.notebook!!, cellId, environment
+                )
 
-            notebookFileUseCase.appendOutput(
-                file,
-                notebook,
-                cellId,
-                output ?: return@launch
-            ).also { updatedNotebook ->
-                // UIステートの更新
-                _localState.update {
-                    it.copy(
-                        notebook = updatedNotebook,
-                        selectedCellId = cellId,
-                        focusedCellId = cellId
-                    )
+                val file = notebookFile ?: return@launch
+                val notebook = _localState.value.notebook ?: return@launch
+
+                notebookFileUseCase.appendOutput(
+                    file,
+                    notebook,
+                    cellId,
+                    output ?: return@launch
+                ).also { updatedNotebook ->
+                    // UIステートの更新
+                    _localState.update {
+                        it.copy(
+                            notebook = updatedNotebook,
+                            selectedCellId = cellId,
+                            focusedCellId = cellId
+                        )
+                    }
                 }
             }
         }
+
     }
 
     fun clearCellOutput(cellId: String): Job {
@@ -392,32 +458,37 @@ class NotebookViewModel(
      */
     fun executeAllCells() {
         // Cancel any ongoing execution
-        executeJob?.cancel()
         // Launch new execution job
-        executeJob = viewModelScope.launch {
-            val notebook = _localState.value.notebook ?: return@launch
+        viewModelScope.launch {
+            cancelExecution().join()
 
-            // すべてのセルの出力をクリア
-            val clearedNotebook = notebook.copy(
-                cells = notebook.cells.map { cell ->
-                    cell.copy(outputs = emptyList(), executionCount = 0)
-                }
-            )
 
-            _localState.update { it.copy(notebook = clearedNotebook) }
+            executeScope.launch {
 
-            // 各セルを順番に実行
-            for (cell in clearedNotebook.cells) {
-                if (cell.type == CellType.CODE) {
-                    selectCellId = cell.id
-                    // コードセルの実行
-                    delay(100) // UIの更新を待つ
-                    notebookFileUseCase.executeCell(
-                        uiState.value.notebook!!,
-                        cell.id,
-                        environment
-                    )
-                    delay(200) // 実行完了を少し待つ
+                val notebook = _localState.value.notebook ?: return@launch
+
+                // すべてのセルの出力をクリア
+                val clearedNotebook = notebook.copy(
+                    cells = notebook.cells.map { cell ->
+                        cell.copy(outputs = emptyList(), executionCount = 0)
+                    }
+                )
+
+                _localState.update { it.copy(notebook = clearedNotebook) }
+
+                // 各セルを順番に実行
+                for (cell in clearedNotebook.cells) {
+                    if (cell.type == CellType.CODE) {
+                        selectCellId = cell.id
+                        // コードセルの実行
+                        delay(100) // UIの更新を待つ
+                        notebookFileUseCase.executeCell(
+                            uiState.value.notebook!!,
+                            cell.id,
+                            environment
+                        )
+                        delay(200) // 実行完了を少し待つ
+                    }
                 }
             }
         }
@@ -567,7 +638,7 @@ class NotebookViewModel(
             is NotebookAction.ExecuteCell -> executeCell(action.cellId)
             is NotebookAction.DeleteCell -> deleteCell(action.cellId)
             is NotebookAction.ExecuteAllCells -> executeAllCells()
-            is NotebookAction.CancelExecution -> executeJob?.cancel()
+            is NotebookAction.CancelExecution -> cancelExecution()
             is NotebookAction.AddCellAfter -> addCellAfter(action.cellId, action.cellType)
             is NotebookAction.ChangeCellType -> changeCellType(action.cellId, action.cellType)
             is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(
@@ -597,6 +668,30 @@ class NotebookViewModel(
     @OptIn(ExperimentalUuidApi::class)
     private fun generateCellId(): String {
         return Uuid.random().toString()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun cancelExecution(): Job {
+        return viewModelScope.launch(Dispatchers.Default) {
+            println("!!!!!cancelExecution called stdout!!!!!")
+            watchJob?.cancelAndJoin()
+
+            println("stdout !!! canceling executeScope !!!")
+            executeScope.coroutineContext.job.cancelAndJoin()
+            println("stdout !!! executeScope canceled !!!")
+            executeScope.cancel()
+            executeScope = CoroutineScope(Dispatchers.Default + Job())
+            //if (!stdoutChannel.isEmpty) {
+            stdoutChannel.close()
+            stdoutChannel = Channel(capacity = 1024)
+            println("stdout !!! creating new stdout channel !!!")
+            watchJob = executeScope.launch {
+                watchStdoutChannel()
+            }
+            println("stdout !!! end !!!")
+
+            pendingCount = 0
+        }
     }
 
     fun autoIndent(

@@ -25,6 +25,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlin.collections.plus
 
 class NotebookFileUseCase(private val fileRepository: FileRepository) {
@@ -38,76 +41,85 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
 
-    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output? {
-        val cell = notebook.cells.find { it.id == cellId }
-            ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
+    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output? =
+        withContext(
+            Dispatchers.Default
+        ) {
+            val cell = notebook.cells.find { it.id == cellId }
+                ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
 
-        if (cell.type != CellType.CODE) {
-            throw IllegalArgumentException("Only code cells can be executed.")
-        }
+            if (cell.type != CellType.CODE) {
+                throw IllegalArgumentException("Only code cells can be executed.")
+            }
 
-        val code = cell.source.joinToString("\n")
+            val code = cell.source.joinToString("\n")
 
-        val output = run {
+            val output = run {
 
-            val program =
-                Parser(Lexer(code)).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
-                    .parseProgram()
-                    .getOrElse { return@run DnclOutput.Error(it.explain(code)) }
-            val evaluator = EvaluatorFactory.create(
-                Channel(), 0, null, null
-            )
-            evaluator.evalProgram(program, env).fold(
-                ifLeft = {
-                    DnclOutput.Error(it.explain(code))
+                val program =
+                    Parser(Lexer(code)).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                        .parseProgram()
+                        .getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                var i = 0
+                val evaluator = EvaluatorFactory.create(
+                    Channel(), 0, null, { _, _ ->
+                        if (i++ > 1000) {
+                            coroutineContext.ensureActive()
+                            i = 0
+                        }
+                    }
+                )
+                evaluator.evalProgram(program, env).fold(
+                    ifLeft = {
+                        DnclOutput.Error(it.explain(code))
+                    }
+                ) {
+                    when (it) {
+                        is DnclObject.Error -> {
+                            DnclOutput.RuntimeError(it)
+                        }
+
+                        is DnclObject.Nothing -> {
+                            null
+                        }
+
+                        else -> {
+                            DnclOutput.Stdout(it.toString())
+                        }
+                    }
                 }
-            ) {
-                when (it) {
-                    is DnclObject.Error -> {
-                        DnclOutput.RuntimeError(it)
-                    }
+            }
 
-                    is DnclObject.Nothing -> {
-                        null
-                    }
-
-                    else -> {
-                        DnclOutput.Stdout(it.toString())
-                    }
+            when (output) {
+                is DnclOutput.Stdout -> {
+                    Output(
+                        outputType = "stream",
+                        name = "stdout",
+                        text = listOf(output.value)
+                    )
                 }
+
+                is DnclOutput.Error -> {
+                    Output(
+                        outputType = "error",
+                        text = listOf(output.value),
+                        evalue = output.value,
+                        ename = output::class.simpleName,
+                    )
+                }
+
+                is DnclOutput.RuntimeError -> {
+                    Output(
+                        outputType = "error",
+                        text = listOf(output.value.explain(code)),
+                        evalue = output.value.explain(code),
+                        ename = "RuntimeError",
+                    )
+                }
+
+                else -> null
             }
         }
-
-        return when (output) {
-            is DnclOutput.Stdout -> {
-                Output(
-                    outputType = "stream",
-                    name = "stdout",
-                    text = listOf(output.value)
-                )
-            }
-
-            is DnclOutput.Error -> {
-                Output(
-                    outputType = "error",
-                    text = listOf(output.value),
-                    evalue = output.value,
-                    ename = output::class.simpleName,
-                )
-            }
-
-            is DnclOutput.RuntimeError -> {
-                Output(
-                    outputType = "error",
-                    text = listOf(output.value.explain(code)),
-                    evalue = output.value.explain(code),
-                    ename = "RuntimeError",
-                )
-            }
-
-            else -> null
-        }
-    }
 
     fun createNotebookFile(
         parentPath: EntryPath,
@@ -345,7 +357,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         notebookFile: NotebookFile,
         importPath: String,
         env: Environment
-    ): DnclObject {
+    ): DnclObject = withContext(Dispatchers.Default) {
         // パスを分割してEntryPathを生成
         val parts = importPath.split("/")
         // ファイル取得 (タイムアウト付き)
@@ -365,23 +377,29 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 )
             )
         }
-        return if (entry is ProgramFile) {
+        return@withContext if (entry is ProgramFile) {
             val content = fileRepository.getFileContent(entry).value
             val parser = Parser(Lexer(content)).getOrElse { err ->
-                return DnclObject.RuntimeError(
+                return@withContext DnclObject.RuntimeError(
                     err.explain(content),
                     astNode
                 )
             }
             val prog = parser.parseProgram().getOrElse { err ->
-                return DnclObject.RuntimeError(
+                return@withContext DnclObject.RuntimeError(
                     err.explain(content),
                     astNode
                 )
             }
             // 新規Evaluatorで同じ環境に対して実行
+            var i = 0
             val evaluator = EvaluatorFactory.create(
-                Channel(), 0, null, null
+                Channel(), 0, null, { _, _ ->
+                    if (i++ > 1000) {
+                        coroutineContext.ensureActive()
+                        i = 0
+                    }
+                }
             )
             evaluator.evalProgram(prog, env).fold(
                 ifLeft = { lhs ->
