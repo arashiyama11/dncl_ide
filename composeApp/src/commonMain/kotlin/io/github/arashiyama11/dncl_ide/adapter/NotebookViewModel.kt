@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
@@ -94,6 +95,11 @@ class NotebookViewModel(
     private val suggestionUseCase: SuggestionUseCase,
     private val appStateStore: AppStateStore
 ) : ViewModel() {
+    companion object {
+        private const val SAVE_DELAY_MS = 1000L
+    }
+
+    private val saveJobs = mutableMapOf<String, Job>()
     private val _localState = MutableStateFlow(
         NotebookLocalState(
             notebook = null,
@@ -145,6 +151,17 @@ class NotebookViewModel(
         started = true
         appStateStore.state.onEach { appState ->
             val entryPath = appState.selectedEntryPath
+
+            run {
+                notebookFileUseCase.saveNotebookFile(
+                    notebookFile ?: return@run,
+                    with(notebookFileUseCase) {
+                        _localState.value.notebook?.toFileContent() ?: return@run
+                    },
+                    CursorPosition(0)
+                )
+            }
+
             coroutineScope {
                 if (entryPath?.isNotebookFile() == true) {
                     val notebookFile = fileUseCase.getEntryByPath(entryPath)
@@ -530,13 +547,11 @@ class NotebookViewModel(
         textFieldValue: TextFieldValue
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
-            val file = notebookFile ?: return@launch
             // インデント調整
             val newTextFieldValue = autoIndent(
                 uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
                 textFieldValue
             )
-            val notebook = _localState.value.notebook ?: return@launch
             val newText = newTextFieldValue.text
             // シンタックスハイライト用処理
             val lexer = Lexer(newText)
@@ -568,36 +583,34 @@ class NotebookViewModel(
                 }
             }
 
-            // セル更新と保存をユースケースに委譲
-            val updatedNotebook = notebookFileUseCase.updateCellAndSave(
-                file,
-                notebook,
-                cellId
-            ) { oldCell ->
-                oldCell.copy(source = newText.split("\n"))
-            }
-            // UIステートの更新
-
-            _localState.update {
-                val newMap =
-                    if (it.codeCellStateMap.contains(cellId)) it.codeCellStateMap.mapValues {
-                        if (it.key == cellId) {
-                            CodeCellState(
-                                textFieldValue = newTextFieldValue,
-                                annotatedString = annotatedStr
-                            )
-                        } else it.value
-                    } else {
-                        it.codeCellStateMap + (cellId to CodeCellState(
-                            textFieldValue = newTextFieldValue,
-                            annotatedString = annotatedStr
-                        ))
-                    }
-                it.copy(
-                    notebook = updatedNotebook,
-                    codeCellStateMap = newMap,
-                    cellSuggestionsMap = it.cellSuggestionsMap + (cellId to suggestions)
+            // Capture file and current state
+            val file = notebookFile ?: return@launch
+            val currentState = _localState.value
+            // Update UI code cell state and suggestions
+            val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
+                this[cellId] = CodeCellState(
+                    textFieldValue = newTextFieldValue,
+                    annotatedString = annotatedStr
                 )
+            }
+            val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
+                this[cellId] = suggestions
+            }
+            _localState.update { state ->
+                state.copy(codeCellStateMap = newCodeMap, cellSuggestionsMap = newSugMap)
+            }
+            // Debounce saving cell to file
+            saveJobs[cellId]?.cancel()
+            saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
+                delay(SAVE_DELAY_MS)
+                val saved = notebookFileUseCase.updateCellAndSave(
+                    file,
+                    _localState.value.notebook ?: return@launch,
+                    cellId
+                ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
+                withContext(Dispatchers.Main) {
+                    _localState.update { it.copy(notebook = saved) }
+                }
             }
         }
     }
@@ -608,17 +621,24 @@ class NotebookViewModel(
     ) {
         viewModelScope.launch {
             val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
-            // セル更新と保存をユースケースに委譲
-            val updatedNotebook = notebookFileUseCase.updateCellAndSave(
-                file,
-                notebook,
-                cellId
-            ) { oldCell ->
-                oldCell.copy(source = newSource)
-            }
-            // UIステートの更新
+            // Update UI state
+            val updatedNotebook = (_localState.value.notebook
+                ?: return@launch).copy(cells = _localState.value.notebook!!.cells.map {
+                if (it.id == cellId) it.copy(
+                    source = newSource
+                ) else it
+            })
             _localState.update { it.copy(notebook = updatedNotebook) }
+            // Debounce saving markdown cell
+            saveJobs[cellId]?.cancel()
+            saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
+                delay(SAVE_DELAY_MS)
+                notebookFileUseCase.updateCellAndSave(
+                    file,
+                    updatedNotebook,
+                    cellId
+                ) { oldCell -> oldCell.copy(source = newSource) }
+            }
         }
     }
 
