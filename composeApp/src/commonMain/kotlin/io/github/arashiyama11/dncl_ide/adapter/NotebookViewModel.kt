@@ -36,11 +36,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -135,12 +137,14 @@ class NotebookViewModel(
 
     private var stdoutChannel = Channel<String>(capacity = 1024)
     val mutex = Mutex()
+
+    private val notebookMutex = Mutex()
     var pendingCount = 0
 
     private var notebookFile: NotebookFile? = null
     private var selectCellId: String? = null
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
-    private var watchJob: Job? = null
+    //private var watchJob: Job? = null
 
     private lateinit var environment: Environment
     private var started = false
@@ -172,11 +176,8 @@ class NotebookViewModel(
                                 errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
                                 return@coroutineScope
                             }.getOrNull()!!
-                        _localState.update {
-                            it.copy(
-                                notebook = notebook
-                            )
-                        }
+                        updateLocalNotebook(notebook)
+
                         awaitAll(*notebook.cells.map { cell ->
                             async {
                                 onUpdateCodeCell(
@@ -226,7 +227,7 @@ class NotebookViewModel(
                 ))
         }
 
-        watchJob = executeScope.launch {
+        executeScope.launch {
             watchStdoutChannel()
         }
     }
@@ -273,9 +274,7 @@ class NotebookViewModel(
                     println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
-                        _localState.update {
-                            it.copy(notebook = notebookCache ?: return@withContext)
-                        }
+                        updateLocalNotebook(notebookCache ?: return@withContext)
                     }
                     mutex.withLock {
                         pendingCount = 0
@@ -297,7 +296,7 @@ class NotebookViewModel(
                     )
                     // busy時は出力消去アップデートをしない
                     if (!isBusy) withContext(Dispatchers.Main) {
-                        _localState.update { it.copy(notebook = notebookCache) }
+                        updateLocalNotebook(notebookCache)
                     }
                     continue
                 }
@@ -312,11 +311,11 @@ class NotebookViewModel(
                 if (isBusy) {
                     if (pendingCount < 20)
                         scope.launch(Dispatchers.Main.immediate) {
-                            _localState.update { it.copy(notebook = notebookCache) }
+                            updateLocalNotebook(notebookCache ?: return@launch)
                         }
                 } else {
                     withContext(Dispatchers.Main.immediate) {
-                        _localState.update { it.copy(notebook = notebookCache) }
+                        updateLocalNotebook(notebookCache)
                     }
                 }
             }
@@ -370,8 +369,9 @@ class NotebookViewModel(
 
 
             // UIステートの更新
+            updateLocalNotebook(updatedNotebook)
             _localState.update {
-                it.copy(notebook = updatedNotebook, selectedCellId = cellId)
+                it.copy(selectedCellId = cellId)
             }
         }
     }
@@ -400,9 +400,9 @@ class NotebookViewModel(
             // CodeCellStateMapから削除
             val updatedStateMap = _localState.value.codeCellStateMap - cellId
             // UIステートの更新
+            updateLocalNotebook(updatedNotebook)
             _localState.update {
                 it.copy(
-                    notebook = updatedNotebook,
                     selectedCellId = nextSelected,
                     codeCellStateMap = updatedStateMap
                 )
@@ -432,10 +432,10 @@ class NotebookViewModel(
                     cellId,
                     output ?: return@launch
                 ).also { updatedNotebook ->
+                    updateLocalNotebook(updatedNotebook)
                     // UIステートの更新
                     _localState.update {
                         it.copy(
-                            notebook = updatedNotebook,
                             selectedCellId = cellId,
                             focusedCellId = cellId
                         )
@@ -456,7 +456,7 @@ class NotebookViewModel(
                 cellId
             )
             // UIステートの更新
-            _localState.update { it.copy(notebook = updatedNotebook) }
+            updateLocalNotebook(updatedNotebook)
         }
     }
 
@@ -481,7 +481,7 @@ class NotebookViewModel(
                     }
                 )
 
-                _localState.update { it.copy(notebook = clearedNotebook) }
+                updateLocalNotebook(clearedNotebook)
 
                 // 各セルを順番に実行
                 for (cell in clearedNotebook.cells) {
@@ -522,9 +522,9 @@ class NotebookViewModel(
                 cellId,
                 newType
             )
+            updateLocalNotebook(updatedNotebook)
             _localState.update {
                 it.copy(
-                    notebook = updatedNotebook,
                     selectedCellId = cellId,
                     focusedCellId = cellId
                 )
@@ -609,7 +609,7 @@ class NotebookViewModel(
                     cellId
                 ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
                 withContext(Dispatchers.Main) {
-                    _localState.update { it.copy(notebook = saved) }
+                    updateLocalNotebook(saved)
                 }
             }
         }
@@ -628,7 +628,7 @@ class NotebookViewModel(
                     source = newSource
                 ) else it
             })
-            _localState.update { it.copy(notebook = updatedNotebook) }
+            updateLocalNotebook(updatedNotebook)
             // Debounce saving markdown cell
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
@@ -684,7 +684,7 @@ class NotebookViewModel(
     private fun cancelExecution(): Job {
         return viewModelScope.launch(Dispatchers.Default) {
             println("!!!!!cancelExecution called stdout!!!!!")
-            watchJob?.cancelAndJoin()
+            //watchJob?.cancelAndJoin()
 
             println("stdout !!! canceling executeScope !!!")
             executeScope.coroutineContext.job.cancelAndJoin()
@@ -695,7 +695,7 @@ class NotebookViewModel(
             stdoutChannel.close()
             stdoutChannel = Channel(capacity = 1024)
             println("stdout !!! creating new stdout channel !!!")
-            watchJob = executeScope.launch {
+            executeScope.launch {
                 watchStdoutChannel()
             }
             println("stdout !!! end !!!")
@@ -732,6 +732,14 @@ class NotebookViewModel(
         } catch (e: Exception) {
             e.printStackTrace()
             return newTextFiledValue
+        }
+    }
+
+    private suspend fun updateLocalNotebook(notebook: Notebook) {
+        notebookMutex.withLock {
+            _localState.update {
+                it.copy(notebook = notebook)
+            }
         }
     }
 }
