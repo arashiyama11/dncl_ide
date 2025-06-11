@@ -31,7 +31,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.ensureActive
 
 private enum class DebugStepRunMode {
     STEP, LINE
@@ -101,6 +103,7 @@ class ExecuteUseCase(
             outputChannel = channel
             withContext(Dispatchers.Default) {
                 val delayDuration = settingsRepository.onEvalDelay.value.toLong()
+                var i = 0
                 val evaluator = getEvaluator(
                     inputChannel,
                     arrayOrigin,
@@ -152,9 +155,14 @@ class ExecuteUseCase(
                                 delay(delayDuration)
                             }
                         }
-                    } else null,
+                    } else { _, _ ->
+                        if (i++ == 1000000) {
+                            ensureActive()
+                        }
+                    },
                     inputLifecycleCallback = this@ExecuteUseCase
                 )
+
 
                 val globalEnv = Environment(
                     EvaluatorFactory.createBuiltInFunctionEnvironment(

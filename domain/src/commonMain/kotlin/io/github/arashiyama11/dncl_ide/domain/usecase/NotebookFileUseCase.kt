@@ -63,7 +63,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 var i = 0
                 val evaluator = EvaluatorFactory.create(
                     Channel(), 0, null, { _, _ ->
-                        if (i++ > 1000) {
+                        if (i++ > 1000000) {
                             coroutineContext.ensureActive()
                             i = 0
                         }
@@ -395,7 +395,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             var i = 0
             val evaluator = EvaluatorFactory.create(
                 Channel(), 0, null, { _, _ ->
-                    if (i++ > 1000) {
+                    if (i++ > 1000000) {
                         coroutineContext.ensureActive()
                         i = 0
                     }
