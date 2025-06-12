@@ -17,13 +17,12 @@ import org.koin.compose.koinInject
 @Composable
 fun CodingScreen(fileRepository: FileRepository = koinInject()) {
     val selectedEntryPath by fileRepository.selectedEntryPath.collectAsStateWithLifecycle()
-    Text("CodingScreen is not implemented yet")
     var entry by remember(selectedEntryPath) { mutableStateOf<Entry?>(null) }
     LaunchedEffect(selectedEntryPath) {
-        if (selectedEntryPath != null) {
-            entry = fileRepository.getEntryByPath(selectedEntryPath!!)
+        entry = if (selectedEntryPath != null) {
+            fileRepository.getEntryByPath(selectedEntryPath!!)
         } else {
-            entry = null
+            null
         }
     }
     when (entry) {

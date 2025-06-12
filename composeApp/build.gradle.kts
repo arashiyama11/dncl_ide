@@ -65,6 +65,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.io)
             implementation(libs.navigation.compose)
+            implementation(libs.kotlinx.atomicfu)
 
             implementation(libs.arrow.core)
             implementation(libs.arrow.fx.coroutines)

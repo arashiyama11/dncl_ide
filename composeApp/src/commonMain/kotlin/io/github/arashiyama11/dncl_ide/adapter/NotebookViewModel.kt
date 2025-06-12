@@ -22,6 +22,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -134,10 +136,9 @@ class NotebookViewModel(
     val errorChannel = Channel<String>()
 
     private var stdoutChannel = Channel<String>(capacity = 1024)
-    val mutex = Mutex()
 
     private val notebookMutex = Mutex()
-    var pendingCount = 0
+    val pendingCount = atomic(0)
 
     private var notebookFile: NotebookFile? = null
     private var selectCellId: String? = null
@@ -207,15 +208,11 @@ class NotebookViewModel(
                     onStdout = { outputStr ->
                         if (!stdoutChannel.isClosedForSend)
                             stdoutChannel.send(outputStr)
-                        mutex.withLock {
-                            pendingCount++
-                        }
+                        pendingCount.incrementAndGet()
                     }, onClear = {
                         if (!stdoutChannel.isClosedForSend)
                             stdoutChannel.send("\u0000")
-                        mutex.withLock {
-                            pendingCount++
-                        }
+                        pendingCount.incrementAndGet()
                     }, onImport = { importPath ->
                         // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
@@ -276,15 +273,16 @@ class NotebookViewModel(
                     println("stdout channel closed, exiting watchStdoutChannel")
                     return
                 }
+                atomic {
 
-                mutex.withLock {
-                    pendingCount--
-                    if (stdoutChannel.isEmpty || pendingCount < 0) {
-                        pendingCount = 0
-                    }
                 }
 
-                val x = 4L - pendingCount.toLong()
+                pendingCount.decrementAndGet()
+                if (stdoutChannel.isEmpty || pendingCount.value < 0) {
+                    pendingCount.update { 0 }
+                }
+
+                val x = 4L - pendingCount.value.toLong()
                 val t = x * x * x + x * 10L
                 if (t > 0) {
                     delay(t)
@@ -296,9 +294,7 @@ class NotebookViewModel(
                     withContext(Dispatchers.Main.immediate) {
                         updateNotebook(stdoutLines.joinToString("\n"))
                     }
-                    mutex.withLock {
-                        pendingCount = 0
-                    }
+                    pendingCount.update { 0 }
                 }
 
                 // busy開始時
@@ -319,7 +315,7 @@ class NotebookViewModel(
 
                 val text = stdoutLines.joinToString("\n")
                 if (isBusy) {
-                    if (pendingCount < 20)
+                    if (pendingCount.value < 20)
                         scope.launch(Dispatchers.Main) {
                             updateNotebook(text)
                         }
@@ -704,7 +700,7 @@ class NotebookViewModel(
             }
             println("stdout !!! end !!!")
 
-            pendingCount = 0
+            pendingCount.update { 0 }
         }
     }
 
@@ -741,13 +737,12 @@ class NotebookViewModel(
 
     private suspend inline fun updateLocalNotebook(transform: (Notebook) -> Notebook): Notebook? =
         notebookMutex.withLock {
-            println("blocking...")
             _localState.value.notebook?.let { notebook ->
                 transform(notebook).also { nb ->
                     _localState.update {
                         it.copy(notebook = nb)
                     }
                 }
-            }.also { println("kaiho") }
+            }
         }
 }
