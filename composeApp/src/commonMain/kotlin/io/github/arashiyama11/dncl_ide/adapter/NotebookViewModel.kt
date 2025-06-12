@@ -36,13 +36,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -176,7 +174,11 @@ class NotebookViewModel(
                                 errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
                                 return@coroutineScope
                             }.getOrNull()!!
-                        updateLocalNotebook(notebook)
+                        notebookMutex.withLock {
+                            _localState.update {
+                                it.copy(notebook = notebook)
+                            }
+                        }
 
                         awaitAll(*notebook.cells.map { cell ->
                             async {
@@ -189,6 +191,7 @@ class NotebookViewModel(
                                 ).join()
                             }
                         }.toTypedArray())
+
 
                         _localState.update { it.copy(loading = false) }
                     } else {
@@ -237,11 +240,28 @@ class NotebookViewModel(
     private suspend fun watchStdoutChannel() {
         try {
             println("starting watchStdoutChannel stdout")
-            var notebookCache = _localState.value.notebook
             val channel = stdoutChannel
             //busy時はcacheを使う
             var isBusy = false
             var i = 0
+            val stdoutLines = mutableListOf<String>()
+
+            suspend fun updateNotebook(text: String) = notebookMutex.withLock {
+                val nb = notebookFileUseCase.modifyNotebookOutput(
+                    _localState.value.notebook!!,
+                    selectCellId!!,
+                    listOf(Output("stream", "stdout", listOf(text)))
+                )
+
+                withContext(Dispatchers.Main.immediate) {
+                    _localState.update {
+                        it.copy(
+                            notebook = nb
+                        )
+                    }
+                }
+            }
+
             for (outputStr in channel) {
                 if (channel.isClosedForReceive || !coroutineContext.isActive || !scope.coroutineContext.isActive || scope.coroutineContext.job.isCancelled) {
                     println("stdout channel closed or coroutine context is not active, exiting watchStdoutChannel")
@@ -274,7 +294,7 @@ class NotebookViewModel(
                     println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
-                        updateLocalNotebook(notebookCache ?: return@withContext)
+                        updateNotebook(stdoutLines.joinToString("\n"))
                     }
                     mutex.withLock {
                         pendingCount = 0
@@ -285,41 +305,30 @@ class NotebookViewModel(
                 if (!stdoutChannel.isEmpty && !isBusy) {
                     println("start busy")
                     isBusy = true
-                    notebookCache = _localState.value.notebook
                 }
 
                 if (outputStr == "\u0000") {
-                    notebookCache = notebookFileUseCase.clearCellOutput(
-                        notebookFile ?: continue,
-                        notebookCache ?: continue,
-                        selectCellId ?: continue
-                    )
+                    stdoutLines.clear()
                     // busy時は出力消去アップデートをしない
                     if (!isBusy) withContext(Dispatchers.Main) {
-                        updateLocalNotebook(notebookCache)
+                        updateNotebook("")
                     }
                     continue
                 }
-                val newOutput = Output("stream", "stdout", listOf(outputStr))
-                notebookCache = notebookFileUseCase.appendOutput(
-                    notebookFile ?: continue,
-                    notebookCache ?: continue,
-                    selectCellId ?: continue,
-                    newOutput
-                )
+                stdoutLines.add(outputStr)
 
+                val text = stdoutLines.joinToString("\n")
                 if (isBusy) {
                     if (pendingCount < 20)
-                        scope.launch(Dispatchers.Main.immediate) {
-                            updateLocalNotebook(notebookCache ?: return@launch)
+                        scope.launch(Dispatchers.Main) {
+                            updateNotebook(text)
                         }
                 } else {
-                    withContext(Dispatchers.Main.immediate) {
-                        updateLocalNotebook(notebookCache)
+                    withContext(Dispatchers.Main) {
+                        updateNotebook(text)
                     }
                 }
             }
-
         } finally {
             println("watchStdoutChannel finished, closing stdoutChannel")
         }
@@ -331,7 +340,6 @@ class NotebookViewModel(
     fun addCellAfter(afterCellId: String?, cellType: CellType) {
         viewModelScope.launch {
             val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
             // 新しいセルIDとデフォルトソースを生成
             val cellId = generateCellId()
             val defaultSource =
@@ -344,12 +352,15 @@ class NotebookViewModel(
                 outputs = if (cellType == CellType.CODE) emptyList() else null
             )
             // セル挿入と保存
-            val updatedNotebook = notebookFileUseCase.insertCellAndSave(
-                file,
-                notebook,
-                newCell,
-                afterCellId
-            )
+            updateLocalNotebook { nb ->
+                notebookFileUseCase.insertCellAndSave(
+                    file,
+                    nb,
+                    newCell,
+                    afterCellId
+                )
+            }
+
 
             when (cellType) {
                 CellType.CODE -> {
@@ -369,7 +380,6 @@ class NotebookViewModel(
 
 
             // UIステートの更新
-            updateLocalNotebook(updatedNotebook)
             _localState.update {
                 it.copy(selectedCellId = cellId)
             }
@@ -382,13 +392,15 @@ class NotebookViewModel(
     fun deleteCell(cellId: String) {
         viewModelScope.launch {
             val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
             // セル削除と保存
-            val updatedNotebook = notebookFileUseCase.deleteCellAndSave(
-                file,
-                notebook,
-                cellId
-            )
+            val notebook = updateLocalNotebook { nb ->
+                notebookFileUseCase.deleteCellAndSave(
+                    file,
+                    nb,
+                    cellId
+                )
+            } ?: return@launch
+
             // 次に選択するセルを決定
             val cells = notebook.cells
             val cellIndex = cells.indexOfFirst { it.id == cellId }
@@ -400,7 +412,6 @@ class NotebookViewModel(
             // CodeCellStateMapから削除
             val updatedStateMap = _localState.value.codeCellStateMap - cellId
             // UIステートの更新
-            updateLocalNotebook(updatedNotebook)
             _localState.update {
                 it.copy(
                     selectedCellId = nextSelected,
@@ -424,22 +435,21 @@ class NotebookViewModel(
                 )
 
                 val file = notebookFile ?: return@launch
-                val notebook = _localState.value.notebook ?: return@launch
 
-                notebookFileUseCase.appendOutput(
-                    file,
-                    notebook,
-                    cellId,
-                    output ?: return@launch
-                ).also { updatedNotebook ->
-                    updateLocalNotebook(updatedNotebook)
-                    // UIステートの更新
-                    _localState.update {
-                        it.copy(
-                            selectedCellId = cellId,
-                            focusedCellId = cellId
-                        )
-                    }
+
+                updateLocalNotebook { nb ->
+                    notebookFileUseCase.appendOutput(
+                        file,
+                        nb,
+                        cellId,
+                        output ?: return@launch
+                    )
+                }
+                _localState.update {
+                    it.copy(
+                        selectedCellId = cellId,
+                        focusedCellId = cellId
+                    )
                 }
             }
         }
@@ -448,15 +458,13 @@ class NotebookViewModel(
     fun clearCellOutput(cellId: String): Job {
         return viewModelScope.launch {
             val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
-            // 出力クリアと保存
-            val updatedNotebook = notebookFileUseCase.clearCellOutput(
-                file,
-                notebook,
-                cellId
-            )
-            // UIステートの更新
-            updateLocalNotebook(updatedNotebook)
+            updateLocalNotebook { nb ->
+                notebookFileUseCase.clearCellOutput(
+                    file,
+                    nb,
+                    cellId
+                )
+            }
         }
     }
 
@@ -464,24 +472,19 @@ class NotebookViewModel(
      * Execute all cells in the notebook
      */
     fun executeAllCells() {
-        // Cancel any ongoing execution
-        // Launch new execution job
         viewModelScope.launch {
             cancelExecution().join()
 
 
             executeScope.launch {
+                val clearedNotebook = updateLocalNotebook { nb ->
+                    nb.copy(
+                        cells = nb.cells.map { cell ->
+                            cell.copy(outputs = emptyList(), executionCount = 0)
+                        }
+                    )
+                } ?: return@launch
 
-                val notebook = _localState.value.notebook ?: return@launch
-
-                // すべてのセルの出力をクリア
-                val clearedNotebook = notebook.copy(
-                    cells = notebook.cells.map { cell ->
-                        cell.copy(outputs = emptyList(), executionCount = 0)
-                    }
-                )
-
-                updateLocalNotebook(clearedNotebook)
 
                 // 各セルを順番に実行
                 for (cell in clearedNotebook.cells) {
@@ -513,16 +516,18 @@ class NotebookViewModel(
      */
     fun changeCellType(cellId: String, newType: CellType) {
         viewModelScope.launch {
+
             val file = notebookFile ?: return@launch
-            val notebook = _localState.value.notebook ?: return@launch
-            // タイプ変更と保存
-            val updatedNotebook = notebookFileUseCase.changeCellTypeAndSave(
-                file,
-                notebook,
-                cellId,
-                newType
-            )
-            updateLocalNotebook(updatedNotebook)
+
+            val notebook = updateLocalNotebook { nb ->
+                notebookFileUseCase.changeCellTypeAndSave(
+                    file,
+                    nb,
+                    cellId,
+                    newType
+                )
+            } ?: return@launch
+
             _localState.update {
                 it.copy(
                     selectedCellId = cellId,
@@ -603,13 +608,12 @@ class NotebookViewModel(
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
                 delay(SAVE_DELAY_MS)
-                val saved = notebookFileUseCase.updateCellAndSave(
-                    file,
-                    _localState.value.notebook ?: return@launch,
-                    cellId
-                ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
-                withContext(Dispatchers.Main) {
-                    updateLocalNotebook(saved)
+                updateLocalNotebook { nb ->
+                    notebookFileUseCase.updateCellAndSave(
+                        file,
+                        nb,
+                        cellId
+                    ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
                 }
             }
         }
@@ -620,22 +624,22 @@ class NotebookViewModel(
         newSource: List<String>
     ) {
         viewModelScope.launch {
+            updateLocalNotebook { nb ->
+                nb.copy(cells = nb.cells.map {
+                    if (it.id == cellId) it.copy(
+                        source = newSource
+                    ) else it
+                })
+            }
             val file = notebookFile ?: return@launch
-            // Update UI state
-            val updatedNotebook = (_localState.value.notebook
-                ?: return@launch).copy(cells = _localState.value.notebook!!.cells.map {
-                if (it.id == cellId) it.copy(
-                    source = newSource
-                ) else it
-            })
-            updateLocalNotebook(updatedNotebook)
+
             // Debounce saving markdown cell
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
                 delay(SAVE_DELAY_MS)
                 notebookFileUseCase.updateCellAndSave(
                     file,
-                    updatedNotebook,
+                    _localState.value.notebook ?: return@launch,
                     cellId
                 ) { oldCell -> oldCell.copy(source = newSource) }
             }
@@ -735,11 +739,15 @@ class NotebookViewModel(
         }
     }
 
-    private suspend fun updateLocalNotebook(notebook: Notebook) {
+    private suspend inline fun updateLocalNotebook(transform: (Notebook) -> Notebook): Notebook? =
         notebookMutex.withLock {
-            _localState.update {
-                it.copy(notebook = notebook)
-            }
+            println("blocking...")
+            _localState.value.notebook?.let { notebook ->
+                transform(notebook).also { nb ->
+                    _localState.update {
+                        it.copy(notebook = nb)
+                    }
+                }
+            }.also { println("kaiho") }
         }
-    }
 }
