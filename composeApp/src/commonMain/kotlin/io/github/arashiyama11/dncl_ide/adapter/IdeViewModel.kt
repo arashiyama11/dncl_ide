@@ -116,7 +116,6 @@ class IdeViewModel(
         _localState,
         appStateStore.state
     ) { localState, appState ->
-        appStateStore
         IdeUiState(
             codeTextFieldValue = localState.codeTextFieldValue,
             dnclError = localState.dnclError,
@@ -146,7 +145,6 @@ class IdeViewModel(
     private var inputChannel: Channel<String>? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
     private var stdoutChannel = Channel<String>(capacity = 1024)
-    private val outputMutex = Mutex()
     private val pendingOutputCount = atomic(0)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -177,7 +175,9 @@ class IdeViewModel(
                     when (programFile) {
                         is ProgramFile -> {
                             if (prePath != null) saveFile(prePath)
-
+                            _localState.updateOnMain {
+                                it.copy(output = "")
+                            }
                             onTextChanged(
                                 TextFieldValue(
                                     fileUseCase.getFileContent(programFile).value,
@@ -218,7 +218,7 @@ class IdeViewModel(
             var isBusy = false
             val stdoutBuilder = StringBuilder() // Changed from mutableListOf<String>()
 
-            suspend fun updateOutputView(text: String) = outputMutex.withLock {
+            suspend fun updateOutputView(text: String) {
                 withContext(Dispatchers.Main.immediate) {
                     _localState.update {
                         it.copy(

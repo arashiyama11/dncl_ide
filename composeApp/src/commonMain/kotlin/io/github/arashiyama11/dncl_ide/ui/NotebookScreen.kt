@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
@@ -75,9 +78,14 @@ fun NotebookScreen(
         if (uiState.notebook == null || uiState.loading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
-            NotebookContent(
-                notebookViewModel
-            )
+            CompositionLocalProvider(
+                LocalMarkdownColors provides rememberMarkdownColors(),
+                LocalMarkdownTypography provides rememberMarkdownTypography()
+            ) {
+                NotebookContent(
+                    notebookViewModel = notebookViewModel,
+                )
+            }
         }
     }
 }
@@ -111,7 +119,8 @@ fun NotebookContent(
                     isSelected = cell.id == uiState.selectedCellId,
                     onAction = notebookViewModel::handleAction,
                     codeCellStateMap = uiState.codeCellStateMap,
-                    suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList()
+                    suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList(),
+                    fontSize = uiState.fontSize
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -150,7 +159,7 @@ fun NotebookToolbar(
                 Text("Run All")
             }
             Text(selectedEntryPath?.value?.lastOrNull()?.value.orEmpty().removeSuffix(".dnclnb"))
-            
+
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onCancelExecution, enabled = running) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
@@ -169,7 +178,8 @@ fun CellComponent(
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     codeCellStateMap: Map<String, CodeCellState>,
-    suggestions: List<Definition> = emptyList()
+    suggestions: List<Definition> = emptyList(),
+    fontSize: Int
 ) {
     val borderColor = if (isSelected)
         MaterialTheme.colorScheme.primary
@@ -236,10 +246,16 @@ fun CellComponent(
                 cell,
                 onAction,
                 codeCellStateMap[cell.id] ?: CodeCellState(),
-                suggestions
+                suggestions,
+                fontSize
             )
 
-            CellType.MARKDOWN -> MarkdownCellContent(cell, isSelected, onAction)
+            CellType.MARKDOWN -> MarkdownCellContent(
+                cell,
+                isSelected,
+                onAction,
+                fontSize
+            ) // Pass fontSize
         }
     }
 }
@@ -249,7 +265,8 @@ fun CodeCellContent(
     cell: Cell,
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState,
-    suggestions: List<Definition> = emptyList()
+    suggestions: List<Definition> = emptyList(),
+    fontSize: Int
 ) {
     var localTfv by remember(cell.id) {
         mutableStateOf(codeCellState.textFieldValue)
@@ -276,7 +293,7 @@ fun CodeCellContent(
             Modifier.clickable {
                 onAction(NotebookAction.SelectCell(cell.id))
             },
-            14,
+            fontSize,
             { newTextFieldValue ->
                 localTfv = newTextFieldValue
             },
@@ -319,13 +336,18 @@ fun CodeCellContent(
         }
 
         cell.outputs?.forEach { output ->
-            OutputDisplay(output)
+            OutputDisplay(output, fontSize)
         }
     }
 }
 
 @Composable
-fun MarkdownCellContent(cell: Cell, isSelected: Boolean, onAction: (NotebookAction) -> Unit) {
+fun MarkdownCellContent(
+    cell: Cell,
+    isSelected: Boolean,
+    onAction: (NotebookAction) -> Unit,
+    fontSize: Int = 16
+) {
     var text by remember(cell.id) {
         mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
     }
@@ -340,22 +362,26 @@ fun MarkdownCellContent(cell: Cell, isSelected: Boolean, onAction: (NotebookActi
         if (isSelected) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { newValue -> text = newValue },   // ← ここで保持している Value を更新するだけ
+                onValueChange = { newValue -> text = newValue },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = fontSize.sp,
+                    lineHeight = fontSize.sp
+                ), // Use fontSize
                 singleLine = false,
                 maxLines = Int.MAX_VALUE
             )
         } else {
+
             Markdown(
                 content = cell.source.joinToString("\n"),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp),
-                colors = rememberMarkdownColors(),
-                typography = rememberMarkdownTypography()
+                colors = LocalMarkdownColors.current,// rememberMarkdownColors(),
+                typography = LocalMarkdownTypography.current//rememberMarkdownTypography()
             )
         }
     }
@@ -364,7 +390,7 @@ fun MarkdownCellContent(cell: Cell, isSelected: Boolean, onAction: (NotebookActi
 }
 
 @Composable
-fun OutputDisplay(output: Output) {
+fun OutputDisplay(output: Output, fontSize: Int) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -377,7 +403,10 @@ fun OutputDisplay(output: Output) {
                 output.text?.let { textLines ->
                     Text(
                         text = textLines.joinToString("\n"),
-                        style = LocalCodeTypography.current.bodyMedium,
+                        style = LocalCodeTypography.current.bodyMedium.copy(
+                            fontSize = fontSize.sp,
+                            lineHeight = (fontSize + 2).sp
+                        ),
                     )
                 }
             }
@@ -386,20 +415,29 @@ fun OutputDisplay(output: Output) {
                 Text(
                     text = "Error: ${output.ename ?: "Unknown error"}",
                     color = MaterialTheme.colorScheme.error,
-                    style = LocalCodeTypography.current.bodyMedium,
+                    style = LocalCodeTypography.current.bodyMedium.copy(
+                        fontSize = fontSize.sp,
+                        lineHeight = fontSize.sp
+                    ),
                 )
 
                 Text(
                     text = output.evalue.orEmpty(),
                     color = MaterialTheme.colorScheme.error,
-                    style = LocalCodeTypography.current.bodyMedium,
+                    style = LocalCodeTypography.current.bodyMedium.copy(
+                        fontSize = fontSize.sp,
+                        lineHeight = fontSize.sp
+                    ),
                 )
             }
 
             else -> {
                 Text(
                     text = "Output: ${output.outputType}",
-                    style = LocalCodeTypography.current.bodyMedium,
+                    style = LocalCodeTypography.current.bodyMedium.copy(
+                        fontSize = fontSize.sp,
+                        lineHeight = fontSize.sp
+                    ),
                 )
             }
         }

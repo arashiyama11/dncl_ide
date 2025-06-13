@@ -66,7 +66,7 @@ data class NotebookUiState(
     val fontSize: Int = 16,
     val selectedEntryPath: EntryPath? = null,
     val unsavedChanges: Boolean = false,
-    val running: Boolean = false // Add this property
+    val running: Boolean = false,
 )
 
 data class CodeCellState(
