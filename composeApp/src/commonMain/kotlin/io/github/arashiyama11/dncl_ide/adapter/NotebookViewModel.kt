@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
+import io.github.arashiyama11.dncl_ide.common.Action // Add this import
+import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.onAction
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -32,7 +34,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -50,7 +51,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import kotlin.coroutines.coroutineContext
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -65,7 +65,8 @@ data class NotebookUiState(
     val cellSuggestionsMap: Map<String, List<Definition>> = emptyMap(),
     val fontSize: Int = 16,
     val selectedEntryPath: EntryPath? = null,
-    val unsavedChanges: Boolean = false
+    val unsavedChanges: Boolean = false,
+    val running: Boolean = false // Add this property
 )
 
 data class CodeCellState(
@@ -97,7 +98,7 @@ class NotebookViewModel(
     private val notebookFileUseCase: NotebookFileUseCase,
     private val syntaxHighLighter: SyntaxHighLighter,
     private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore<StatePermission.Read>
+    private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     companion object {
         private const val SAVE_DELAY_MS = 1000L
@@ -129,7 +130,8 @@ class NotebookViewModel(
             cellSuggestionsMap = localState.cellSuggestionsMap,
             fontSize = appState.fontSize,
             selectedEntryPath = appState.selectedEntryPath,
-            unsavedChanges = localState.unsavedChanges
+            unsavedChanges = localState.unsavedChanges,
+            running = appState.running // Map from appState
         )
     }.stateIn(
         viewModelScope,
@@ -405,8 +407,8 @@ class NotebookViewModel(
      */
     fun executeCell(cellId: String) {
         selectCellId = cellId
-        cancelExecution().invokeOnCompletion {
-
+        cancelExecution().invokeOnCompletion { cause ->
+            appStateStore.onAction(Action.SetRunning(true)) // Set running to true
             notebookFileUseCase.saveNotebookFile(
                 notebookFile ?: return@invokeOnCompletion,
                 with(notebookFileUseCase) {
@@ -423,6 +425,7 @@ class NotebookViewModel(
                 val output = notebookFileUseCase.executeCell(
                     uiState.value.notebook!!, cellId, environment
                 )
+                appStateStore.onAction(Action.SetRunning(false)) // Set running to false after execution
 
                 val file = notebookFile ?: return@launch
 
@@ -463,6 +466,7 @@ class NotebookViewModel(
      */
     fun executeAllCells() {
         viewModelScope.launch {
+            appStateStore.onAction(Action.SetRunning(true)) // Set running to true
             cancelExecution().join()
 
 
@@ -480,7 +484,7 @@ class NotebookViewModel(
                 for (cell in clearedNotebook.cells) {
                     if (cell.type == CellType.CODE) {
                         selectCellId = cell.id
-                        // コードセルの実行
+                        // ��ードセルの実行
                         delay(100) // UIの更新を待つ
                         notebookFileUseCase.executeCell(
                             uiState.value.notebook!!,
@@ -490,6 +494,7 @@ class NotebookViewModel(
                         delay(200) // 実行完了を少し待つ
                     }
                 }
+                appStateStore.onAction(Action.SetRunning(false)) // Set running to false after all cells execute
             }
         }
     }
@@ -692,9 +697,9 @@ class NotebookViewModel(
             //watchJob?.cancelAndJoin()
 
             println("stdout !!! canceling executeScope !!!")
-            executeScope.coroutineContext.job.cancelAndJoin()
+            val currentExecuteScopeJob = executeScope.coroutineContext.job
+            currentExecuteScopeJob.cancelAndJoin()
             println("stdout !!! executeScope canceled !!!")
-            executeScope.cancel()
             executeScope = CoroutineScope(Dispatchers.Default + Job())
             //if (!stdoutChannel.isEmpty) {
             stdoutChannel.close()
@@ -706,6 +711,10 @@ class NotebookViewModel(
             println("stdout !!! end !!!")
 
             pendingCount.update { 0 }
+            // Only set running to false if there was an active job to cancel
+            if (currentExecuteScopeJob.isCancelled) {
+                appStateStore.onAction(Action.SetRunning(false))
+            }
         }
     }
 
