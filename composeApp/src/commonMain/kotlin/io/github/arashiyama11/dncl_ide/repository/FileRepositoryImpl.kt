@@ -14,8 +14,9 @@ import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,7 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
+import kotlin.time.Duration.Companion.seconds
 
 class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScope: AppScope) :
     FileRepository {
@@ -116,11 +118,16 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) {
-        appScope.launch(Dispatchers.IO) {
-            SystemFileSystem.sink(programFile.path.toPath()).buffered().use {
+    ): Job {
+        return appScope.launch(Dispatchers.IO) {
+            val tmpPath = programFile.path.copy(
+                value = programFile.path.value.let { it.dropLast(1) + FileName(it.last().value + ".tmp") }
+            ).toPath()
+            SystemFileSystem.sink(tmpPath).buffered().use {
                 it.writeString(fileContent.value)
             }
+
+            SystemFileSystem.atomicMove(tmpPath, programFile.path.toPath())
             updateRootFolder()
         }
     }
@@ -129,11 +136,19 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) {
-        appScope.launch(Dispatchers.IO) {
-            SystemFileSystem.sink(entryPath.toPath()).buffered().use {
+    ): Job {
+        return appScope.launch(Dispatchers.IO) {
+            val tmpPath = entryPath.copy(
+                value = entryPath.value.let { it.dropLast(1) + FileName(it.last().value + ".tmp") }
+            ).toPath()
+
+            SystemFileSystem.sink(tmpPath).buffered().use {
                 it.writeString(fileContent.value)
             }
+
+
+            SystemFileSystem.atomicMove(tmpPath, entryPath.toPath())
+
             updateRootFolder()
         }
     }

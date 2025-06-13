@@ -26,6 +26,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.collections.plus
@@ -152,8 +153,8 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         notebookFile: NotebookFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) {
-        fileRepository.saveFile(notebookFile.path, fileContent, cursorPosition)
+    ): Job {
+        return fileRepository.saveFile(notebookFile.path, fileContent, cursorPosition)
     }
 
     suspend fun getNotebook(notebookFile: NotebookFile): Notebook {

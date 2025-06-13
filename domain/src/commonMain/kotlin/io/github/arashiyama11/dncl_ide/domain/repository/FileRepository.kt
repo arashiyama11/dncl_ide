@@ -7,6 +7,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 
 interface FileRepository {
@@ -20,13 +21,13 @@ interface FileRepository {
         programFile: ProgramFile,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    )
+    ): Job
 
     fun saveFile(
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    )
+    ): Job
 
     suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent
 

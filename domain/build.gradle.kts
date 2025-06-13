@@ -10,6 +10,10 @@ kotlin {
 // Target declarations - add or remove as needed below. These define
 // which platforms this KMP module supports.
 // See: https://kotlinlang.org/docs/multiplatform-discover-project.html#targets
+    compilerOptions {
+        freeCompilerArgs.add("-Xcontext-parameters")
+    }
+    
     jvmToolchain(17)
     androidLibrary {
         namespace = "io.github.arashiyama11.dncl_ide.domain"
