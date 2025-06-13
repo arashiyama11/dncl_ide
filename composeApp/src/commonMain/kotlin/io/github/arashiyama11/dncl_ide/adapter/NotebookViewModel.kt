@@ -236,7 +236,6 @@ class NotebookViewModel(
             val channel = stdoutChannel
             //busy時はcacheを使う
             var isBusy = false
-            var i = 0
             val stdoutLines = mutableListOf<String>()
 
             suspend fun updateNotebook(text: String) = notebookMutex.withLock {
@@ -261,16 +260,10 @@ class NotebookViewModel(
                     println("condition: ${channel.isClosedForReceive} ${coroutineContext.isActive} ${scope.coroutineContext.isActive} ${scope.coroutineContext.job.isCancelled}")
                     return
                 }
-                if (i++ > 100) {
-                    i = 0
-                    yield()
-                }
+
                 if (channel.isClosedForReceive) {
                     println("stdout channel closed, exiting watchStdoutChannel")
                     return
-                }
-                atomic {
-
                 }
 
                 pendingCount.decrementAndGet()
