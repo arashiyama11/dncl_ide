@@ -87,7 +87,7 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
                     )
                     Button(
                         onClick = { viewModel.onSendInputClicked() },
-                        enabled = uiState.isExecuting // Should always be true if waiting for input
+                        enabled = uiState.running// Should always be true if waiting for input
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "送信")
                     }

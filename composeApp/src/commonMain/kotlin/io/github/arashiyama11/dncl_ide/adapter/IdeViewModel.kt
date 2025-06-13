@@ -6,7 +6,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
+import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.onAction
 import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
@@ -65,14 +67,14 @@ data class IdeUiState(
     val currentEnvironment: Environment? = null,
     val isStepMode: Boolean = false,
     val isLineMode: Boolean = false,
-    val isExecuting: Boolean = false,
     val isWaitingForInput: Boolean = false,
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
     val isFocused: Boolean = false,
-    val selectedEntryPath: EntryPath? = null
+    val selectedEntryPath: EntryPath? = null,
+    val running: Boolean = false
 )
 
 enum class TextFieldType {
@@ -85,7 +87,7 @@ class IdeViewModel(
     private val fileUseCase: FileUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore<StatePermission.Read>
+    private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     private val _localState = MutableStateFlow(
         LocalIdeState(
@@ -101,7 +103,6 @@ class IdeViewModel(
             currentEnvironment = null,
             isStepMode = false,
             isLineMode = false,
-            isExecuting = false,
             isWaitingForInput = false,
             isDarkTheme = false,
             textSuggestions = emptyList(),
@@ -128,14 +129,14 @@ class IdeViewModel(
             currentEnvironment = localState.currentEnvironment,
             isStepMode = localState.isStepMode,
             isLineMode = localState.isLineMode,
-            isExecuting = localState.isExecuting,
             isWaitingForInput = localState.isWaitingForInput,
             debugMode = appState.debugModeEnabled,
             debugRunningMode = appState.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
-            selectedEntryPath = appState.selectedEntryPath
+            selectedEntryPath = appState.selectedEntryPath,
+            running = appState.running
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -357,6 +358,8 @@ class IdeViewModel(
             saveFile()
         }
 
+        appStateStore.onAction(Action.SetRunning(true))
+
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
         executeScope.coroutineContext.job.cancel().also {
@@ -378,7 +381,6 @@ class IdeViewModel(
                     isError = false,
                     errorRange = null,
                     currentEvaluatingLine = null,
-                    isExecuting = true,
                     dnclError = null,
                     isWaitingForInput = false
                 )
@@ -394,20 +396,22 @@ class IdeViewModel(
                     is DnclOutput.RuntimeError -> {
                         _localState.updateOnMain {
                             it.copy(
-                                // output = it.output + "\\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
+                                // output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
                                 isError = true,
                                 errorRange = output.value.astNode.range
                             )
                         }
+                        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
                     }
 
                     is DnclOutput.Error -> {
                         _localState.updateOnMain {
                             it.copy(
-                                // output = "${it.output}\\n${output.value}", // Output is handled by watchStdoutChannel
+                                // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
                                 isError = true
                             )
                         }
+                        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
                     }
 
                     is DnclOutput.Stdout -> {
@@ -447,7 +451,8 @@ class IdeViewModel(
                 }
             }
             delay(50)
-            _localState.updateOnMain { it.copy(currentEvaluatingLine = null, isExecuting = false) }
+            _localState.updateOnMain { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) } // isExecuting controlled by AppState
+            appStateStore.onAction(Action.SetRunning(false)) // Removed cast
             onTextChanged(uiState.value.codeTextFieldValue)
         }
     }
@@ -462,7 +467,8 @@ class IdeViewModel(
                 watchStdoutChannel()
             }
         }
-        _localState.update { it.copy(currentEvaluatingLine = null, isExecuting = false) }
+        _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) } // isExecuting controlled by AppState
+        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
     }
 
     fun onStepButtonClicked() {
@@ -614,7 +620,6 @@ class IdeViewModel(
         val currentEnvironment: Environment?,
         val isStepMode: Boolean,
         val isLineMode: Boolean,
-        val isExecuting: Boolean,
         val isWaitingForInput: Boolean,
         val isDarkTheme: Boolean,
         val textSuggestions: List<Definition>,

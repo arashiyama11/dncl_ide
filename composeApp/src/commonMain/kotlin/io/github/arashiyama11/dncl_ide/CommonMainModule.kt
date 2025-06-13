@@ -15,6 +15,7 @@ import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val commonMainModule = module {
@@ -25,13 +26,10 @@ val commonMainModule = module {
 
 
     single<AppStateStore<StatePermission.Write>> {
+        println("create write")
         AppStateStore(get(), get(), get())
-    }
+    }.bind<AppStateStore<StatePermission.Read>>()
 
-    single<AppStateStore<StatePermission.Read>> {
-        @Suppress("UNCHECKED_CAST")
-        get<AppStateStore<StatePermission.Write>>() as AppStateStore<StatePermission.Read>
-    }
     singleOf(::AppScope)
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
