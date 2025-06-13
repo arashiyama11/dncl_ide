@@ -14,6 +14,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -352,15 +353,16 @@ Int[...] が実行されようとしました""", runtimeError.value.message
             programFile: ProgramFile,
             fileContent: FileContent,
             cursorPosition: CursorPosition
-        ) {
+        ): Job {
+            return Job()
         }
 
         override fun saveFile(
             entryPath: EntryPath,
             fileContent: FileContent,
             cursorPosition: CursorPosition
-        ) {
-
+        ): Job {
+            return Job()
         }
 
         override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {

@@ -10,6 +10,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.model.ValidationError
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -119,14 +120,16 @@ class MockFileRepository : FileRepository {
         programFile: ProgramFile,
         fileContent: io.github.arashiyama11.dncl_ide.domain.model.FileContent,
         cursorPosition: io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
-    ) {
+    ): Job {
+        return Job()
     }
 
     override fun saveFile(
         entryPath: EntryPath,
         fileContent: FileContent,
         cursorPosition: CursorPosition
-    ) {
+    ): Job {
+        return Job()
     }
 
     override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {

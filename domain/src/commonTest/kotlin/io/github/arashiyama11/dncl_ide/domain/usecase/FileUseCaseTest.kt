@@ -9,6 +9,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -58,6 +59,7 @@ class FileUseCaseTest {
             calledWithFile = file
             calledWithContent = content
             calledWithPosition = position
+            Job()
         }
         fileUseCase.saveFile(programFile, fileContent, cursorPosition)
         assertEquals(programFile, calledWithFile)
@@ -88,6 +90,7 @@ class FileUseCaseTest {
             savedFile = file
             savedContent = content
             savedPosition = position
+            Job()
         }
         fileUseCase.createFile(parentPath, fileName)
         assertNotNull(savedFile)
@@ -161,7 +164,7 @@ class FileUseCaseTest {
         }
         var mockGetEntryByPath: (EntryPath) -> io.github.arashiyama11.dncl_ide.domain.model.Entry? =
             { null }
-        var mockSaveFile: (ProgramFile, FileContent, CursorPosition) -> Unit = { _, _, _ -> }
+        var mockSaveFile: (ProgramFile, FileContent, CursorPosition) -> Job = { _, _, _ -> Job() }
         var mockCreateFolder: (EntryPath) -> Unit = { }
         var mockSelectFile: (EntryPath) -> Unit = { selectedEntryPathFlow.value = it }
         var mockGetFileContent: (ProgramFile) -> FileContent = { FileContent("") }
@@ -178,7 +181,8 @@ class FileUseCaseTest {
             entryPath: EntryPath,
             fileContent: FileContent,
             cursorPosition: CursorPosition
-        ) {
+        ): Job {
+            return Job()
         }
 
 
