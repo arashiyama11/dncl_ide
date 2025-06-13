@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +21,7 @@ data class SettingsUiState(
 
 class SettingsScreenViewModel(
     private val settingsUseCase: SettingsUseCase,
-    private val appStateStore: AppStateStore
+    private val appStateStore: AppStateStore<StatePermission.Read>
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = appStateStore.state.map { appState ->
         SettingsUiState(

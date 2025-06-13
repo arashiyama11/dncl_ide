@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -96,7 +97,7 @@ class NotebookViewModel(
     private val notebookFileUseCase: NotebookFileUseCase,
     private val syntaxHighLighter: SyntaxHighLighter,
     private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore
+    private val appStateStore: AppStateStore<StatePermission.Read>
 ) : ViewModel() {
     companion object {
         private const val SAVE_DELAY_MS = 1000L

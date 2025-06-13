@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 // 統合された状態を表すデータクラス
 data class AppState(
@@ -26,7 +27,16 @@ data class AppState(
     val running: Boolean = false,
 )
 
-class AppStateStore(
+sealed interface Action {
+    data class SetRunning(val running: Boolean) : Action
+}
+
+sealed interface StatePermission {
+    sealed interface Read : StatePermission
+    sealed interface Write : Read
+}
+
+class AppStateStore<T : StatePermission>(
     private val settingsUseCase: SettingsUseCase,
     private val fileRepository: FileRepository,
     private val appScope: AppScope
@@ -61,6 +71,14 @@ class AppStateStore(
         jobs += appScope.launch {
             val rootFolder = fileRepository.getRootFolder()
             _state.update { it.copy(rootFolder = rootFolder) }
+        }
+    }
+
+    fun AppStateStore<StatePermission.Write>.onAction(action: Action) {
+        when (action) {
+            is Action.SetRunning -> {
+                _state.update { it.copy(running = action.running) }
+            }
         }
     }
 

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
@@ -84,7 +85,7 @@ class IdeViewModel(
     private val fileUseCase: FileUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore
+    private val appStateStore: AppStateStore<StatePermission.Read>
 ) : ViewModel() {
     private val _localState = MutableStateFlow(
         LocalIdeState(
@@ -112,6 +113,7 @@ class IdeViewModel(
         _localState,
         appStateStore.state
     ) { localState, appState ->
+        appStateStore
         IdeUiState(
             codeTextFieldValue = localState.codeTextFieldValue,
             dnclError = localState.dnclError,

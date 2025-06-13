@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileNameValidationUseCase
@@ -15,7 +16,7 @@ import kotlinx.coroutines.launch
 class SelectFileScreenViewModel(
     fileUseCase: FileUseCase,
     fileNameValidationUseCase: FileNameValidationUseCase,
-    appStateStore: AppStateStore
+    appStateStore: AppStateStore<StatePermission.Read>
 ) : BaseSelectViewModel(fileUseCase, fileNameValidationUseCase, appStateStore) {
 
     override val uiState: StateFlow<SelectUiState> = combine(

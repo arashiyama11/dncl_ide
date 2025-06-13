@@ -7,6 +7,7 @@ import io.github.arashiyama11.dncl_ide.adapter.SelectNotebookScreenViewModel
 import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
 import io.github.arashiyama11.dncl_ide.common.AppScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
@@ -21,8 +22,17 @@ val commonMainModule = module {
     singleOf(::SelectFileScreenViewModel)
     singleOf(::SelectNotebookScreenViewModel)
     singleOf(::IdeViewModel)
+
+
+    single<AppStateStore<StatePermission.Write>> {
+        AppStateStore(get(), get(), get())
+    }
+
+    single<AppStateStore<StatePermission.Read>> {
+        @Suppress("UNCHECKED_CAST")
+        get<AppStateStore<StatePermission.Write>>() as AppStateStore<StatePermission.Read>
+    }
     singleOf(::AppScope)
-    singleOf(::AppStateStore)
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }

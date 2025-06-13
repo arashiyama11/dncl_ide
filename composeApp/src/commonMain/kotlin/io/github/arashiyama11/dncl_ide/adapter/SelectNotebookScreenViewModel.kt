@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.adapter
 
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
@@ -19,7 +20,7 @@ class SelectNotebookScreenViewModel(
     fileUseCase: FileUseCase,
     fileNameValidationUseCase: FileNameValidationUseCase,
     private val notebookFileUseCase: NotebookFileUseCase,
-    appStateStore: AppStateStore
+    appStateStore: AppStateStore<StatePermission.Read>
 ) : BaseSelectViewModel(fileUseCase, fileNameValidationUseCase, appStateStore) {
 
     override val uiState: StateFlow<SelectUiState> = combine(

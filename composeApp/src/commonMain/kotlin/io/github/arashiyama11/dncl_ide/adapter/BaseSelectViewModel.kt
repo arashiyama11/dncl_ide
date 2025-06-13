@@ -4,6 +4,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
@@ -34,7 +35,7 @@ data class SelectUiState(
 abstract class BaseSelectViewModel(
     protected val fileUseCase: FileUseCase,
     protected val fileNameValidationUseCase: FileNameValidationUseCase,
-    protected val appStateStore: AppStateStore
+    protected val appStateStore: AppStateStore<StatePermission.Read>
 ) : ViewModel() {
     protected val _localState = MutableStateFlow(
         SelectLocalState(
