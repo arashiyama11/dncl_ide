@@ -236,22 +236,14 @@ class NotebookViewModel(
             val channel = stdoutChannel
             //busy時はcacheを使う
             var isBusy = false
-            val stdoutLines = mutableListOf<String>()
+            val stdoutBuilder = StringBuilder() // Changed from mutableListOf<String>()
 
-            suspend fun updateNotebook(text: String) = notebookMutex.withLock {
-                val nb = notebookFileUseCase.modifyNotebookOutput(
-                    _localState.value.notebook!!,
+            suspend fun updateNotebook(text: String) = updateLocalNotebook {
+                notebookFileUseCase.modifyNotebookOutput(
+                    it,
                     selectCellId!!,
                     listOf(Output("stream", "stdout", listOf(text)))
                 )
-
-                withContext(Dispatchers.Main.immediate) {
-                    _localState.update {
-                        it.copy(
-                            notebook = nb
-                        )
-                    }
-                }
             }
 
             for (outputStr in channel) {
@@ -281,7 +273,7 @@ class NotebookViewModel(
                     println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
-                        updateNotebook(stdoutLines.joinToString("\n"))
+                        updateNotebook(stdoutBuilder.toString()) // Changed from stdoutLines.joinToString("\n")
                     }
                     pendingCount.update { 0 }
                 }
@@ -293,16 +285,17 @@ class NotebookViewModel(
                 }
 
                 if (outputStr == "\u0000") {
-                    stdoutLines.clear()
+                    stdoutBuilder.clear() // Changed from stdoutLines.clear()
                     // busy時は出力消去アップデートをしない
                     if (!isBusy) withContext(Dispatchers.Main) {
                         updateNotebook("")
                     }
                     continue
                 }
-                stdoutLines.add(outputStr)
 
-                val text = stdoutLines.joinToString("\n")
+                stdoutBuilder.append(outputStr + "\n") // Changed from stdoutLines.add(outputStr)
+
+                val text = stdoutBuilder.toString() // Changed from stdoutLines.joinToString("\n")
                 if (isBusy) {
                     if (pendingCount.value < 20)
                         scope.launch(Dispatchers.Main) {
