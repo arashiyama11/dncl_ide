@@ -249,12 +249,16 @@ fun IdeViewModel.IdeSideButtons(
         ) {
             IconButton(
                 onClick = ::onRunButtonClicked,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
             }
 
-            IconButton(onClick = { onCancelButtonClicked() }, modifier = Modifier.fillMaxWidth()) {
+            IconButton(
+                onClick = { onCancelButtonClicked() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = uiState.running // Disable Stop when not running
+            ) {
                 Icon(Icons.Outlined.Close, contentDescription = "Stop")
             }
 

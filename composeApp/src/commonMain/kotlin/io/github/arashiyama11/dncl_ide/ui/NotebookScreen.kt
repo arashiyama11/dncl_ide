@@ -95,7 +95,8 @@ fun NotebookContent(
             onExecuteAllCells = { notebookViewModel.handleAction(NotebookAction.ExecuteAllCells) },
             onCancelExecution = { notebookViewModel.handleAction(NotebookAction.CancelExecution) },
             unsavedChanges = uiState.unsavedChanges,
-            onSave = { notebookViewModel.saveNotebook() }
+            onSave = { notebookViewModel.saveNotebook() },
+            running = uiState.running // Pass running state
         )
 
         // Cells
@@ -130,7 +131,8 @@ fun NotebookToolbar(
     onExecuteAllCells: () -> Unit,
     onCancelExecution: () -> Unit,
     unsavedChanges: Boolean,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    running: Boolean // Add running as a parameter
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -147,15 +149,14 @@ fun NotebookToolbar(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Run All")
             }
-            Spacer(modifier = Modifier.weight(1f))
             Text(selectedEntryPath?.value?.lastOrNull()?.value.orEmpty().removeSuffix(".dnclnb"))
-            IconButton(onClick = onCancelExecution) {
+            
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onCancelExecution, enabled = running) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
             }
-            if (unsavedChanges) {
-                IconButton(onClick = onSave) {
-                    Icon(Icons.Outlined.Save, contentDescription = "Save")
-                }
+            IconButton(onClick = onSave, enabled = unsavedChanges) {
+                Icon(Icons.Outlined.Save, contentDescription = "Save")
             }
         }
     }
