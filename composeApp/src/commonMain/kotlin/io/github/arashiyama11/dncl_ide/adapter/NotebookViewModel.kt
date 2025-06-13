@@ -9,7 +9,7 @@ import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.common.Action // Add this import
-import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.onAction
+import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
@@ -408,7 +408,7 @@ class NotebookViewModel(
     fun executeCell(cellId: String) {
         selectCellId = cellId
         cancelExecution().invokeOnCompletion { cause ->
-            appStateStore.onAction(Action.SetRunning(true)) // Set running to true
+            appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
             notebookFileUseCase.saveNotebookFile(
                 notebookFile ?: return@invokeOnCompletion,
                 with(notebookFileUseCase) {
@@ -425,7 +425,7 @@ class NotebookViewModel(
                 val output = notebookFileUseCase.executeCell(
                     uiState.value.notebook!!, cellId, environment
                 )
-                appStateStore.onAction(Action.SetRunning(false)) // Set running to false after execution
+                appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after execution
 
                 val file = notebookFile ?: return@launch
 
@@ -466,7 +466,7 @@ class NotebookViewModel(
      */
     fun executeAllCells() {
         viewModelScope.launch {
-            appStateStore.onAction(Action.SetRunning(true)) // Set running to true
+            appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
             cancelExecution().join()
 
 
@@ -494,7 +494,7 @@ class NotebookViewModel(
                         delay(200) // 実行完了を少し待つ
                     }
                 }
-                appStateStore.onAction(Action.SetRunning(false)) // Set running to false after all cells execute
+                appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after all cells execute
             }
         }
     }
@@ -657,7 +657,11 @@ class NotebookViewModel(
             is NotebookAction.ExecuteCell -> executeCell(action.cellId)
             is NotebookAction.DeleteCell -> deleteCell(action.cellId)
             is NotebookAction.ExecuteAllCells -> executeAllCells()
-            is NotebookAction.CancelExecution -> cancelExecution()
+            is NotebookAction.CancelExecution -> {
+                cancelExecution()
+                saveNotebook()
+            }
+
             is NotebookAction.AddCellAfter -> addCellAfter(action.cellId, action.cellType)
             is NotebookAction.ChangeCellType -> changeCellType(action.cellId, action.cellType)
             is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(
@@ -713,7 +717,7 @@ class NotebookViewModel(
             pendingCount.update { 0 }
             // Only set running to false if there was an active job to cancel
             if (currentExecuteScopeJob.isCancelled) {
-                appStateStore.onAction(Action.SetRunning(false))
+                appStateStore.dispatch(Action.SetRunning(false))
             }
         }
     }

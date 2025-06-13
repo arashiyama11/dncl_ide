@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
-import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.onAction
+import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
 import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
@@ -89,6 +89,8 @@ class IdeViewModel(
     private val suggestionUseCase: SuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
+    private val appState by appStateStore
+
     private val _localState = MutableStateFlow(
         LocalIdeState(
             codeTextFieldValue = TextFieldValue(""),
@@ -358,7 +360,7 @@ class IdeViewModel(
             saveFile()
         }
 
-        appStateStore.onAction(Action.SetRunning(true))
+        appStateStore.dispatch(Action.SetRunning(true))
 
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
@@ -390,7 +392,7 @@ class IdeViewModel(
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
                 inputChannel!!,
-                settingsUseCase.arrayOriginIndex.value,
+                appState.arrayOriginIndex,
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
@@ -401,7 +403,7 @@ class IdeViewModel(
                                 errorRange = output.value.astNode.range
                             )
                         }
-                        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
+                        appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
                     is DnclOutput.Error -> {
@@ -411,7 +413,7 @@ class IdeViewModel(
                                 isError = true
                             )
                         }
-                        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
+                        appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
                     is DnclOutput.Stdout -> {
@@ -452,7 +454,7 @@ class IdeViewModel(
             }
             delay(50)
             _localState.updateOnMain { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) } // isExecuting controlled by AppState
-            appStateStore.onAction(Action.SetRunning(false)) // Removed cast
+            appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
             onTextChanged(uiState.value.codeTextFieldValue)
         }
     }
@@ -467,8 +469,8 @@ class IdeViewModel(
                 watchStdoutChannel()
             }
         }
-        _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) } // isExecuting controlled by AppState
-        appStateStore.onAction(Action.SetRunning(false)) // Removed cast
+        _localState.update { it.copy(currentEvaluatingLine = null) }
+        appStateStore.dispatch(Action.SetRunning(false))
     }
 
     fun onStepButtonClicked() {
@@ -582,7 +584,7 @@ class IdeViewModel(
     }
 
     private suspend fun saveFile(entryPath: EntryPath? = null) {
-        val path = entryPath ?: fileUseCase.selectedEntryPath.value ?: run {
+        val path = entryPath ?: appState.selectedEntryPath ?: run {
             errorChannel.send("ファイルが選択されていません")
             return
         }

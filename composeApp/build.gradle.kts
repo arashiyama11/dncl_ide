@@ -64,6 +64,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlinx.io)
+            implementation(libs.kotlinx.coroutines.core)
             implementation(libs.navigation.compose)
             implementation(libs.kotlinx.atomicfu)
 
