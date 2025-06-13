@@ -47,7 +47,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import kotlin.coroutines.coroutineContext
 
 
@@ -206,13 +205,13 @@ class IdeViewModel(
         }
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
+    @OptIn(DelicateCoroutinesApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private suspend fun watchStdoutChannel() {
         try {
             println("starting watchStdoutChannel stdout for IdeViewModel")
             val channel = stdoutChannel
             var isBusy = false
-            val stdoutLines = mutableListOf<String>()
+            val stdoutBuilder = StringBuilder() // Changed from mutableListOf<String>()
 
             suspend fun updateOutputView(text: String) = outputMutex.withLock {
                 withContext(Dispatchers.Main.immediate) {
@@ -250,7 +249,7 @@ class IdeViewModel(
                     println("end busy for IdeViewModel")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
-                        updateOutputView(stdoutLines.joinToString("\\n"))
+                        updateOutputView(stdoutBuilder.toString()) // Changed from stdoutLines.joinToString("\\n")
                     }
                     pendingOutputCount.update { 0 }
                 }
@@ -261,15 +260,15 @@ class IdeViewModel(
                 }
 
                 if (outputStr == "\\u0000") {
-                    stdoutLines.clear()
+                    stdoutBuilder.clear() // Changed from stdoutLines.clear()
                     if (!isBusy) withContext(Dispatchers.Main) {
                         updateOutputView("")
                     }
                     continue
                 }
-                stdoutLines.add(outputStr)
+                stdoutBuilder.append(outputStr + "\n") // Changed from stdoutLines.add(outputStr)
 
-                val text = stdoutLines.joinToString("\\n")
+                val text = stdoutBuilder.toString() // Changed from stdoutLines.joinToString("\\n")
                 if (isBusy) {
                     if (pendingOutputCount.value < 20)
                         executeScope.launch(Dispatchers.Main) {
