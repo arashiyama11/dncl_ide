@@ -42,7 +42,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
 
-    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output? =
+    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
         withContext(
             Dispatchers.Default
         ) {
@@ -118,7 +118,11 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                     )
                 }
 
-                else -> null
+                else -> Output(
+                    outputType = "stream",
+                    name = "stdout",
+                    text = listOf()
+                )
             }
         }
 
@@ -222,13 +226,6 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             executionCount = executionCount,
             outputs = outputs
         )
-    }
-
-    /**
-     * ノートブックファイルからノートブックコンテンツを取得する（getNotebookのエイリアス）
-     */
-    suspend fun getNotebookFileContent(notebookFile: NotebookFile): Notebook {
-        return getNotebook(notebookFile)
     }
 
     /**

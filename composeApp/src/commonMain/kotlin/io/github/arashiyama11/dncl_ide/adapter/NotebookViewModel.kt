@@ -40,7 +40,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -52,6 +54,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -101,7 +104,7 @@ class NotebookViewModel(
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     companion object {
-        private const val SAVE_DELAY_MS = 1000L
+        private const val SAVE_DELAY_MS = 500L
     }
 
     private val saveJobs = mutableMapOf<String, Job>()
@@ -142,6 +145,8 @@ class NotebookViewModel(
     val errorChannel = Channel<String>()
 
     private var stdoutChannel = Channel<String>(capacity = 1024)
+
+    private val saveReqChannel = Channel<Unit>(capacity = 64)
 
     private val notebookMutex = Mutex()
     val pendingCount = atomic(0)
@@ -226,6 +231,18 @@ class NotebookViewModel(
                 ))
         }
 
+        viewModelScope.launch {
+            saveReqChannel.consumeAsFlow().collectLatest {
+                delay(SAVE_DELAY_MS)
+                val file = notebookFile ?: return@collectLatest
+                val content =
+                    with(notebookFileUseCase) { _localState.value.notebook?.toFileContent() }
+                        ?: return@collectLatest
+                notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
+                _localState.update { it.copy(unsavedChanges = false) }
+            }
+        }
+
         executeScope.launch {
             watchStdoutChannel()
         }
@@ -250,6 +267,7 @@ class NotebookViewModel(
             }
 
             for (outputStr in channel) {
+                println("stdout received: $outputStr")
                 if (channel.isClosedForReceive || !coroutineContext.isActive || !scope.coroutineContext.isActive || scope.coroutineContext.job.isCancelled) {
                     println("stdout channel closed or coroutine context is not active, exiting watchStdoutChannel")
                     println("condition: ${channel.isClosedForReceive} ${coroutineContext.isActive} ${scope.coroutineContext.isActive} ${scope.coroutineContext.job.isCancelled}")
@@ -408,23 +426,22 @@ class NotebookViewModel(
     fun executeCell(cellId: String) {
         selectCellId = cellId
         cancelExecution().invokeOnCompletion { cause ->
-            appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
-            notebookFileUseCase.saveNotebookFile(
-                notebookFile ?: return@invokeOnCompletion,
-                with(notebookFileUseCase) {
-                    _localState.value.notebook?.toFileContent() ?: return@invokeOnCompletion
-                },
-                CursorPosition(0)
-            )
-
-            _localState.update { it.copy(unsavedChanges = false) }
 
             executeScope.launch {
-                clearCellOutput(cellId).join()
+                appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
+
+                //_localState.update { it.copy(unsavedChanges = false) }
+
+                //clearCellOutput(cellId).join()
+
+                saveNotebook()
+
                 delay(100) //await clear
+
                 val output = notebookFileUseCase.executeCell(
                     uiState.value.notebook!!, cellId, environment
                 )
+
                 appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after execution
 
                 val file = notebookFile ?: return@launch
@@ -435,7 +452,7 @@ class NotebookViewModel(
                         file,
                         nb,
                         cellId,
-                        output ?: return@launch
+                        output ?: return@launch println("warning: output is null")
                     )
                 }
                 _localState.update {
@@ -542,10 +559,11 @@ class NotebookViewModel(
         }
     }
 
+    //existsChangeだめっぽい。確定とかの話
     fun onUpdateCodeCell(
         cellId: String,
         textFieldValue: TextFieldValue,
-        existsChange: Boolean = uiState.value.codeCellStateMap[cellId]?.textFieldValue?.text != textFieldValue.text
+        existsChange: Boolean? = null//uiState.value.codeCellStateMap[cellId]?.textFieldValue?.text != textFieldValue.text
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
             // インデント調整
@@ -601,18 +619,32 @@ class NotebookViewModel(
                     codeCellStateMap = newCodeMap,
                     cellSuggestionsMap = newSugMap,
                     unsavedChanges = existsChange
+                        ?: (state.unsavedChanges || newText != (state.notebook?.cells?.firstOrNull { it.id == cellId }?.source?.joinToString(
+                            "\n"
+                        ))),
                 )
+            }
+            updateLocalNotebook { nb ->
+                notebookFileUseCase.modifyNotebookCell(
+                    nb,
+                    cellId,
+                ) { oldCell ->
+                    println("update sorce: $newText")
+                    oldCell.copy(source = newText.split("\n"))
+                }
             }
             // Debounce saving cell to file
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
-                delay(SAVE_DELAY_MS)
-                updateLocalNotebook { nb ->
+                //delay(SAVE_DELAY_MS)
+                /*updateLocalNotebook { nb ->
                     notebookFileUseCase.modifyNotebookCell(
                         nb,
                         cellId,
-                    ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
-                }
+                    ) { oldCell ->
+                        oldCell.copy(source = newText.split("\n"))
+                    }
+                }*/
             }
         }
     }
@@ -625,31 +657,32 @@ class NotebookViewModel(
         viewModelScope.launch {
             _localState.update { it.copy(unsavedChanges = existsChange) }
             updateLocalNotebook { nb ->
-                nb.copy(cells = nb.cells.map {
-                    if (it.id == cellId) it.copy(
-                        source = newSource
-                    ) else it
-                })
+                notebookFileUseCase.modifyNotebookCell(
+                    nb,
+                    cellId,
+                ) { oldCell ->
+                    oldCell.copy(source = newSource, type = CellType.MARKDOWN)
+                }
             }
 
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
-                delay(SAVE_DELAY_MS)
-                notebookFileUseCase.modifyNotebookCell(
-                    _localState.value.notebook ?: return@launch,
-                    cellId
-                ) { oldCell -> oldCell.copy(source = newSource) }
+                /*  delay(SAVE_DELAY_MS)
+                  notebookFileUseCase.modifyNotebookCell(
+                      _localState.value.notebook ?: return@launch,
+                      cellId
+                  ) { oldCell -> oldCell.copy(source = newSource) }*/
             }
         }
     }
 
-    fun saveNotebook() = viewModelScope.launch {
+    fun saveNotebook() = saveReqChannel.trySend(Unit)/*viewModelScope.launch {
         val file = notebookFile ?: return@launch
         val content = with(notebookFileUseCase) { _localState.value.notebook?.toFileContent() }
             ?: return@launch
-        notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0))
+        notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
         _localState.update { it.copy(unsavedChanges = false) }
-    }
+    }*/
 
     fun handleAction(action: NotebookAction) {
         when (action) {
@@ -697,22 +730,16 @@ class NotebookViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun cancelExecution(): Job {
         return viewModelScope.launch(Dispatchers.Default) {
-            println("!!!!!cancelExecution called stdout!!!!!")
-            //watchJob?.cancelAndJoin()
+            stdoutChannel.close()
 
-            println("stdout !!! canceling executeScope !!!")
             val currentExecuteScopeJob = executeScope.coroutineContext.job
             currentExecuteScopeJob.cancelAndJoin()
-            println("stdout !!! executeScope canceled !!!")
             executeScope = CoroutineScope(Dispatchers.Default + Job())
             //if (!stdoutChannel.isEmpty) {
-            stdoutChannel.close()
             stdoutChannel = Channel(capacity = 1024)
-            println("stdout !!! creating new stdout channel !!!")
             executeScope.launch {
                 watchStdoutChannel()
             }
-            println("stdout !!! end !!!")
 
             pendingCount.update { 0 }
             // Only set running to false if there was an active job to cancel
@@ -753,14 +780,19 @@ class NotebookViewModel(
         }
     }
 
-    private suspend inline fun updateLocalNotebook(transform: (Notebook) -> Notebook): Notebook? =
-        notebookMutex.withLock {
-            _localState.value.notebook?.let { notebook ->
+    private suspend inline fun updateLocalNotebook(transform: (Notebook) -> Notebook): Notebook? {
+        println("Updating local notebook state")
+        return notebookMutex.withLock {
+            println("save start")
+            val res = _localState.value.notebook?.let { notebook ->
                 transform(notebook).also { nb ->
                     _localState.update {
                         it.copy(notebook = nb)
                     }
                 }
             }
+            println("save end")
+            res
         }
+    }
 }

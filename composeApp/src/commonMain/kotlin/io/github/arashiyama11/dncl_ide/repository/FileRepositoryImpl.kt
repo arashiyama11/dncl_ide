@@ -17,6 +17,7 @@ import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -147,7 +148,10 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
             }
 
 
-            SystemFileSystem.atomicMove(tmpPath, entryPath.toPath())
+
+            runCatching {
+                SystemFileSystem.atomicMove(tmpPath, entryPath.toPath())
+            }.onFailure { println(it) }
 
             updateRootFolder()
         }
