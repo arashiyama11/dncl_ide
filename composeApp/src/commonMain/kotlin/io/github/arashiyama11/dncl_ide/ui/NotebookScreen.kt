@@ -15,20 +15,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -52,10 +48,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.model.MarkdownColors
-import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
@@ -63,8 +55,10 @@ import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
-import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
+import com.mikepenz.markdown.compose.Markdown
+import com.mikepenz.markdown.model.MarkdownColors
+import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -76,8 +70,7 @@ fun NotebookScreen(
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
     Box(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier.fillMaxSize()
     ) {
         if (uiState.notebook == null || uiState.loading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -100,7 +93,9 @@ fun NotebookContent(
         NotebookToolbar(
             selectedEntryPath = uiState.selectedEntryPath,
             onExecuteAllCells = { notebookViewModel.handleAction(NotebookAction.ExecuteAllCells) },
-            onCancelExecution = { notebookViewModel.handleAction(NotebookAction.CancelExecution) }
+            onCancelExecution = { notebookViewModel.handleAction(NotebookAction.CancelExecution) },
+            unsavedChanges = uiState.unsavedChanges,
+            onSave = { notebookViewModel.saveNotebook() }
         )
 
         // Cells
@@ -133,7 +128,9 @@ fun NotebookContent(
 fun NotebookToolbar(
     selectedEntryPath: EntryPath?,
     onExecuteAllCells: () -> Unit,
-    onCancelExecution: () -> Unit
+    onCancelExecution: () -> Unit,
+    unsavedChanges: Boolean,
+    onSave: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -154,6 +151,11 @@ fun NotebookToolbar(
             Text(selectedEntryPath?.value?.lastOrNull()?.value.orEmpty().removeSuffix(".dnclnb"))
             IconButton(onClick = onCancelExecution) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel Execution")
+            }
+            if (unsavedChanges) {
+                IconButton(onClick = onSave) {
+                    Icon(Icons.Outlined.Save, contentDescription = "Save")
+                }
             }
         }
     }

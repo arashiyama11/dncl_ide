@@ -171,6 +171,17 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         return notebook.copy(cells = updatedCells)
     }
 
+    fun modifyNotebookCell(
+        notebook: Notebook,
+        cellId: String,
+        transform: (Cell) -> Cell
+    ): Notebook {
+        val updatedCells = notebook.cells.map { cell ->
+            if (cell.id == cellId) transform(cell) else cell
+        }
+        return notebook.copy(cells = updatedCells)
+    }
+
     fun modifyNotebookOutput(
         notebook: Notebook,
         cellId: String,

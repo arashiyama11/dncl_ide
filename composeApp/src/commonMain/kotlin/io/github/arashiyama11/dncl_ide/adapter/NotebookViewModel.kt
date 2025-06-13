@@ -63,7 +63,8 @@ data class NotebookUiState(
     val focusedCellId: String? = null,
     val cellSuggestionsMap: Map<String, List<Definition>> = emptyMap(),
     val fontSize: Int = 16,
-    val selectedEntryPath: EntryPath? = null
+    val selectedEntryPath: EntryPath? = null,
+    val unsavedChanges: Boolean = false
 )
 
 data class CodeCellState(
@@ -109,7 +110,8 @@ class NotebookViewModel(
             codeCellStateMap = emptyMap(),
             loading = true,
             focusedCellId = null,
-            cellSuggestionsMap = emptyMap()
+            cellSuggestionsMap = emptyMap(),
+            unsavedChanges = false
         )
     )
 
@@ -125,7 +127,8 @@ class NotebookViewModel(
             focusedCellId = localState.focusedCellId,
             cellSuggestionsMap = localState.cellSuggestionsMap,
             fontSize = appState.fontSize,
-            selectedEntryPath = appState.selectedEntryPath
+            selectedEntryPath = appState.selectedEntryPath,
+            unsavedChanges = localState.unsavedChanges
         )
     }.stateIn(
         viewModelScope,
@@ -155,15 +158,7 @@ class NotebookViewModel(
         appStateStore.state.onEach { appState ->
             val entryPath = appState.selectedEntryPath
 
-            run {
-                notebookFileUseCase.saveNotebookFile(
-                    notebookFile ?: return@run,
-                    with(notebookFileUseCase) {
-                        _localState.value.notebook?.toFileContent() ?: return@run
-                    },
-                    CursorPosition(0)
-                )
-            }
+            saveNotebook()
 
             coroutineScope {
                 if (entryPath?.isNotebookFile() == true) {
@@ -188,7 +183,8 @@ class NotebookViewModel(
                                     TextFieldValue(
                                         text = cell.source.joinToString("\n"),
                                         selection = TextRange(0)
-                                    )
+                                    ),
+                                    false
                                 ).join()
                             }
                         }.toTypedArray())
@@ -423,6 +419,17 @@ class NotebookViewModel(
     fun executeCell(cellId: String) {
         selectCellId = cellId
         cancelExecution().invokeOnCompletion {
+
+            notebookFileUseCase.saveNotebookFile(
+                notebookFile ?: return@invokeOnCompletion,
+                with(notebookFileUseCase) {
+                    _localState.value.notebook?.toFileContent() ?: return@invokeOnCompletion
+                },
+                CursorPosition(0)
+            )
+
+            _localState.update { it.copy(unsavedChanges = false) }
+
             executeScope.launch {
                 clearCellOutput(cellId).join()
                 delay(100) //await clear
@@ -545,7 +552,8 @@ class NotebookViewModel(
 
     fun onUpdateCodeCell(
         cellId: String,
-        textFieldValue: TextFieldValue
+        textFieldValue: TextFieldValue,
+        existsChange: Boolean = uiState.value.codeCellStateMap[cellId]?.textFieldValue?.text != textFieldValue.text
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
             // インデント調整
@@ -585,7 +593,6 @@ class NotebookViewModel(
             }
 
             // Capture file and current state
-            val file = notebookFile ?: return@launch
             val currentState = _localState.value
             // Update UI code cell state and suggestions
             val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
@@ -598,17 +605,20 @@ class NotebookViewModel(
                 this[cellId] = suggestions
             }
             _localState.update { state ->
-                state.copy(codeCellStateMap = newCodeMap, cellSuggestionsMap = newSugMap)
+                state.copy(
+                    codeCellStateMap = newCodeMap,
+                    cellSuggestionsMap = newSugMap,
+                    unsavedChanges = existsChange
+                )
             }
             // Debounce saving cell to file
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
                 delay(SAVE_DELAY_MS)
                 updateLocalNotebook { nb ->
-                    notebookFileUseCase.updateCellAndSave(
-                        file,
+                    notebookFileUseCase.modifyNotebookCell(
                         nb,
-                        cellId
+                        cellId,
                     ) { oldCell -> oldCell.copy(source = newText.split("\n")) }
                 }
             }
@@ -617,9 +627,11 @@ class NotebookViewModel(
 
     fun onUpdateMarkdownCell(
         cellId: String,
-        newSource: List<String>
+        newSource: List<String>,
+        existsChange: Boolean = _localState.value.notebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
     ) {
         viewModelScope.launch {
+            _localState.update { it.copy(unsavedChanges = existsChange) }
             updateLocalNotebook { nb ->
                 nb.copy(cells = nb.cells.map {
                     if (it.id == cellId) it.copy(
@@ -627,19 +639,24 @@ class NotebookViewModel(
                     ) else it
                 })
             }
-            val file = notebookFile ?: return@launch
 
-            // Debounce saving markdown cell
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
                 delay(SAVE_DELAY_MS)
-                notebookFileUseCase.updateCellAndSave(
-                    file,
+                notebookFileUseCase.modifyNotebookCell(
                     _localState.value.notebook ?: return@launch,
                     cellId
                 ) { oldCell -> oldCell.copy(source = newSource) }
             }
         }
+    }
+
+    fun saveNotebook() = viewModelScope.launch {
+        val file = notebookFile ?: return@launch
+        val content = with(notebookFileUseCase) { _localState.value.notebook?.toFileContent() }
+            ?: return@launch
+        notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0))
+        _localState.update { it.copy(unsavedChanges = false) }
     }
 
     fun handleAction(action: NotebookAction) {
@@ -669,7 +686,8 @@ class NotebookViewModel(
         val codeCellStateMap: Map<String, CodeCellState>,
         val loading: Boolean,
         val focusedCellId: String?,
-        val cellSuggestionsMap: Map<String, List<Definition>>
+        val cellSuggestionsMap: Map<String, List<Definition>>,
+        val unsavedChanges: Boolean
     )
 
     /**
