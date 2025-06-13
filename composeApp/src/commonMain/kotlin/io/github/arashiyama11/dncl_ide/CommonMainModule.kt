@@ -26,7 +26,6 @@ val commonMainModule = module {
 
 
     single<AppStateStore<StatePermission.Write>> {
-        println("create write")
         AppStateStore(get(), get(), get())
     }.bind<AppStateStore<StatePermission.Read>>()
 
