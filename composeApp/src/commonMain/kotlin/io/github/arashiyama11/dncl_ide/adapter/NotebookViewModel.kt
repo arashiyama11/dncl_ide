@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -163,48 +164,49 @@ class NotebookViewModel(
     fun onStart() {
         if (started) return
         started = true
-        appStateStore.state.onEach { appState ->
-            val entryPath = appState.selectedEntryPath
+        appStateStore.state.distinctUntilChangedBy { it.selectedEntryPath }
+            .onEach { appState ->
+                val entryPath = appState.selectedEntryPath
 
-            saveNotebook()
+                saveNotebook()
 
-            coroutineScope {
-                if (entryPath?.isNotebookFile() == true) {
-                    val notebookFile = fileUseCase.getEntryByPath(entryPath)
-                    if (notebookFile is NotebookFile) {
-                        this@NotebookViewModel.notebookFile = notebookFile
-                        val notebook =
-                            runCatching { notebookFileUseCase.getNotebook(notebookFile) }.onFailure {
-                                errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
-                                return@coroutineScope
-                            }.getOrNull()!!
-                        notebookMutex.withLock {
-                            _localState.update {
-                                it.copy(notebook = notebook)
+                coroutineScope {
+                    if (entryPath?.isNotebookFile() == true) {
+                        val notebookFile = fileUseCase.getEntryByPath(entryPath)
+                        if (notebookFile is NotebookFile) {
+                            this@NotebookViewModel.notebookFile = notebookFile
+                            val notebook =
+                                runCatching { notebookFileUseCase.getNotebook(notebookFile) }.onFailure {
+                                    errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
+                                    return@coroutineScope
+                                }.getOrNull()!!
+                            notebookMutex.withLock {
+                                _localState.update {
+                                    it.copy(notebook = notebook)
+                                }
                             }
+
+                            awaitAll(*notebook.cells.map { cell ->
+                                async {
+                                    onUpdateCodeCell(
+                                        cell.id,
+                                        TextFieldValue(
+                                            text = cell.source.joinToString("\n"),
+                                            selection = TextRange(0)
+                                        ),
+                                        false
+                                    ).join()
+                                }
+                            }.toTypedArray())
+
+
+                            _localState.update { it.copy(loading = false) }
+                        } else {
+                            errorChannel.send("ノートブックを開くことができません: $notebookFile")
                         }
-
-                        awaitAll(*notebook.cells.map { cell ->
-                            async {
-                                onUpdateCodeCell(
-                                    cell.id,
-                                    TextFieldValue(
-                                        text = cell.source.joinToString("\n"),
-                                        selection = TextRange(0)
-                                    ),
-                                    false
-                                ).join()
-                            }
-                        }.toTypedArray())
-
-
-                        _localState.update { it.copy(loading = false) }
-                    } else {
-                        errorChannel.send("ノートブックを開くことができません: $notebookFile")
                     }
                 }
-            }
-        }.launchIn(viewModelScope)
+            }.launchIn(viewModelScope)
 
         viewModelScope.launch(Dispatchers.Default) {
             environment = Environment(
