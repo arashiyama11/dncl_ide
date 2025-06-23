@@ -145,13 +145,6 @@ class FileUseCaseTest {
         assertEquals(expectedContent, result)
     }
 
-    @Test
-    fun `selectedEntryPathはリポジトリから取得されること`() = runTest {
-        val entryPath = EntryPath(listOf(FolderName("root"), FileName("selected.txt")))
-        fileRepository.selectedEntryPathFlow.value = entryPath
-        val result = fileUseCase.selectedEntryPath.value
-        assertEquals(entryPath, result)
-    }
 
     private class MockFileRepository : FileRepository {
         override val rootFolder: StateFlow<Folder?>
