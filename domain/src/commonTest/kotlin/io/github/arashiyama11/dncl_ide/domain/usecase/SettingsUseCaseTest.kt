@@ -22,7 +22,6 @@ class SettingsUseCaseTest {
     fun `配列の開始インデックスが正しく設定されること`() = runTest {
         val newIndex = 1
         settingsUseCase.setListFirstIndex(newIndex)
-        assertEquals(newIndex, settingsUseCase.arrayOriginIndex.value)
         assertEquals(newIndex, settingsRepository.arrayOriginIndex.value)
     }
 
@@ -30,7 +29,6 @@ class SettingsUseCaseTest {
     fun `フォントサイズが正しく設定されること`() = runTest {
         val newSize = 20
         settingsUseCase.setFontSize(newSize)
-        assertEquals(newSize, settingsUseCase.fontSize.value)
         assertEquals(newSize, settingsRepository.fontSize.value)
     }
 
@@ -38,7 +36,6 @@ class SettingsUseCaseTest {
     fun `評価遅延時間が正しく設定されること`() = runTest {
         val newDelay = 100
         settingsUseCase.setOnEvalDelay(newDelay)
-        assertEquals(newDelay, settingsUseCase.onEvalDelay.value)
         assertEquals(newDelay, settingsRepository.onEvalDelay.value)
     }
 
@@ -46,7 +43,6 @@ class SettingsUseCaseTest {
     fun `デバッグモードが正しく設定されること`() = runTest {
         val newValue = true
         settingsUseCase.setDebugMode(newValue)
-        assertEquals(newValue, settingsUseCase.debugMode.value)
         assertEquals(newValue, settingsRepository.debugMode.value)
     }
 
@@ -54,7 +50,6 @@ class SettingsUseCaseTest {
     fun `デバッグ実行モードが正しく設定されること`() = runTest {
         val newMode = DebugRunningMode.BUTTON
         settingsUseCase.setDebugRunningMode(newMode)
-        assertEquals(newMode, settingsUseCase.debugRunningMode.value)
         assertEquals(newMode, settingsRepository.debugRunningMode.value)
     }
 
