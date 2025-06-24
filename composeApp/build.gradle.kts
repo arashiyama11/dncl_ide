@@ -81,6 +81,10 @@ kotlin {
             implementation(libs.material.icons.core)
             implementation(libs.aboutlibraries.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.markdown.renderer)
             implementation(libs.markdown.renderer.m3)
 

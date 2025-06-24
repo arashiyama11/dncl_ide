@@ -11,8 +11,12 @@ import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.CodeCompletionRepository
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
+import io.github.arashiyama11.dncl_ide.repository.GeminiCompletionRepository
+import io.ktor.client.HttpClient
+import io.github.arashiyama11.dncl_ide.network.NetworkClient
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
@@ -32,6 +36,8 @@ val commonMainModule = module {
     singleOf(::AppScope)
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
+    single<HttpClient> { NetworkClient.httpClient }
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
+    singleOf(::GeminiCompletionRepository) { binds(listOf(CodeCompletionRepository::class)) }
 }

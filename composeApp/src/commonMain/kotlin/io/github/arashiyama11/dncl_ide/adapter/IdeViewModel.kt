@@ -30,6 +30,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.CodeCompletionUseCase
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +88,7 @@ class IdeViewModel(
     private val fileUseCase: FileUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
+    private val completionUseCase: CodeCompletionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     private val appState by appStateStore
@@ -334,7 +336,7 @@ class IdeViewModel(
             }
 
             // Use the shared results for text suggestions
-            val suggestions = if (parsedProgram?.isRight() == true) {
+            val baseSuggestions = if (parsedProgram?.isRight() == true) {
                 suggestionUseCase.suggestWithParsedData(
                     indentedText.text,
                     indentedText.selection.end,
@@ -344,6 +346,11 @@ class IdeViewModel(
             } else {
                 emptyList()
             }
+            val llmSuggestions = completionUseCase.fetch(
+                indentedText.text,
+                indentedText.selection.end
+            )
+            val suggestions = (baseSuggestions + llmSuggestions).distinctBy { it.literal }
 
             _localState.updateOnMain {
                 it.copy(
