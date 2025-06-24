@@ -28,8 +28,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
@@ -40,6 +42,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val windowInfo = LocalWindowInfo.current
+    val isLandscape = windowInfo.containerSize.width > windowInfo.containerSize.height
 
 
     Column(
@@ -57,95 +61,137 @@ fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewMod
         }
 
         HorizontalDivider()
-        CodeEditor(
-            codeText = uiState.codeTextFieldValue,
-            annotatedCodeText = uiState.annotatedString,
-            onCodeChange = { viewModel.onTextChanged(it) },
-            modifier = Modifier
-                .weight(2f),
-            fontSize = uiState.fontSize,
-            currentEvaluatingLine = uiState.currentEvaluatingLine,
-            onFocused = { viewModel.onCodeEditorFocused(it) },
-            verticalScroll = true
-        )
 
-        // Conditionally display Input Row when isWaitingForInput is true
-        if (uiState.isWaitingForInput) {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = uiState.currentInput,
-                        onValueChange = { viewModel.onCurrentInputChanged(it) },
+        if (isLandscape) {
+            Row(Modifier.weight(1f)) {
+                Column(Modifier.weight(2f).fillMaxHeight()) {
+                    CodeEditor(
+                        codeText = uiState.codeTextFieldValue,
+                        annotatedCodeText = uiState.annotatedString,
+                        onCodeChange = { viewModel.onTextChanged(it) },
                         modifier = Modifier.weight(1f),
-                        label = { Text("入力待ち...") },
+                        fontSize = uiState.fontSize,
+                        currentEvaluatingLine = uiState.currentEvaluatingLine,
+                        onFocused = { viewModel.onCodeEditorFocused(it) },
+                        verticalScroll = true
                     )
-                    Button(
-                        onClick = { viewModel.onSendInputClicked() },
-                        enabled = uiState.running// Should always be true if waiting for input
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "送信")
+
+                    InputRow(uiState, viewModel)
+
+                    AnimatedVisibility(uiState.isFocused) {
+                        SuggestionListView(
+                            uiState.textSuggestions,
+                            modifier = Modifier.height(48.dp)
+                        ) { viewModel.onConfirmTextSuggestion(it) }
                     }
                 }
+
+                OutputPanel(
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxHeight().weight(1f, fill = true)
+                )
+            }
+        } else {
+            CodeEditor(
+                codeText = uiState.codeTextFieldValue,
+                annotatedCodeText = uiState.annotatedString,
+                onCodeChange = { viewModel.onTextChanged(it) },
+                modifier = Modifier.weight(2f),
+                fontSize = uiState.fontSize,
+                currentEvaluatingLine = uiState.currentEvaluatingLine,
+                onFocused = { viewModel.onCodeEditorFocused(it) },
+                verticalScroll = true
+            )
+
+            InputRow(uiState, viewModel)
+
+            OutputPanel(
+                uiState = uiState,
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth().weight(1f, fill = true)
+            )
+
+            AnimatedVisibility(uiState.isFocused) {
+                SuggestionListView(
+                    uiState.textSuggestions,
+                    modifier = Modifier.height(48.dp)
+                ) { viewModel.onConfirmTextSuggestion(it) }
             }
         }
+    }
+}
 
+@Composable
+private fun InputRow(uiState: IdeUiState, viewModel: IdeViewModel) {
+    if (!uiState.isWaitingForInput) return
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true),
-            horizontalArrangement = Arrangement.Start
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            when (uiState.textFieldType) {
-                TextFieldType.DEBUG_OUTPUT -> {
-                    uiState.currentEnvironment?.let { environment ->
-                        EnvironmentDebugView(
-                            environment = environment,
-                            modifier = Modifier
-                                .fillMaxSize().weight(1f, fill = true)
-                        )
-                    } ?: run {
-                        // Fallback if environment is null
-                        val textFieldDesc = "デバッグ出力"
-                        OutlinedTextField(
-                            value = uiState.output, // Debug output shows general output when env is null
-                            onValueChange = { }, // ReadOnly
-                            modifier = Modifier.weight(1f, fill = true)
-                                .fillMaxHeight(),
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            label = { Text(textFieldDesc) },
-                            readOnly = true
-                        )
-                    }
-                }
+            OutlinedTextField(
+                value = uiState.currentInput,
+                onValueChange = { viewModel.onCurrentInputChanged(it) },
+                modifier = Modifier.weight(1f),
+                label = { Text("入力待ち...") },
+            )
+            Button(
+                onClick = { viewModel.onSendInputClicked() },
+                enabled = uiState.running
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "送信")
+            }
+        }
+    }
+}
 
-                TextFieldType.OUTPUT -> {
-                    val textFieldDesc = "出力"
+@Composable
+private fun OutputPanel(uiState: IdeUiState, viewModel: IdeViewModel, modifier: Modifier = Modifier) {
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        when (uiState.textFieldType) {
+            TextFieldType.DEBUG_OUTPUT -> {
+                uiState.currentEnvironment?.let { environment ->
+                    EnvironmentDebugView(
+                        environment = environment,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f, fill = true)
+                    )
+                } ?: run {
+                    val textFieldDesc = "デバッグ出力"
                     OutlinedTextField(
                         value = uiState.output,
-                        onValueChange = { }, // ReadOnly
-                        modifier = Modifier.weight(1f, fill = true).fillMaxSize(),
-                        textStyle = LocalCodeTypography.current.bodyLarge,
+                        onValueChange = { },
+                        modifier = Modifier.weight(1f, fill = true).fillMaxHeight(),
+                        textStyle = MaterialTheme.typography.bodyLarge,
                         label = { Text(textFieldDesc) },
-                        readOnly = true,
+                        readOnly = true
                     )
                 }
             }
-            with(viewModel) {
-                IdeSideButtons(Modifier.fillMaxHeight())
+
+            TextFieldType.OUTPUT -> {
+                val textFieldDesc = "出力"
+                OutlinedTextField(
+                    value = uiState.output,
+                    onValueChange = { },
+                    modifier = Modifier.weight(1f, fill = true).fillMaxSize(),
+                    textStyle = LocalCodeTypography.current.bodyLarge,
+                    label = { Text(textFieldDesc) },
+                    readOnly = true,
+                )
             }
         }
 
-        AnimatedVisibility(uiState.isFocused) {
-            SuggestionListView(
-                uiState.textSuggestions,
-                modifier = Modifier.height(48.dp)
-            ) { viewModel.onConfirmTextSuggestion(it) }
+        with(viewModel) {
+            IdeSideButtons(Modifier.fillMaxHeight())
         }
     }
 }
