@@ -20,6 +20,7 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.AiSuggestionUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
@@ -102,6 +103,7 @@ class NotebookViewModel(
     private val notebookFileUseCase: NotebookFileUseCase,
     private val syntaxHighLighter: SyntaxHighLighter,
     private val suggestionUseCase: SuggestionUseCase,
+    private val aiSuggestionUseCase: AiSuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     companion object {
@@ -604,6 +606,10 @@ class NotebookViewModel(
                 }
             }
 
+            val aiWords = aiSuggestionUseCase(newText, newTextFieldValue.selection.end)
+            val aiSuggestions = aiWords.map { Definition(it, null, false) }
+            val finalSuggestions = suggestions + aiSuggestions
+
             // Capture file and current state
             val currentState = _localState.value
             // Update UI code cell state and suggestions
@@ -614,7 +620,7 @@ class NotebookViewModel(
                 )
             }
             val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
-                this[cellId] = suggestions
+                this[cellId] = finalSuggestions
             }
             _localState.update { state ->
                 state.copy(

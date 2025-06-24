@@ -6,6 +6,7 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.AiSuggestionUseCase
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
@@ -15,5 +16,6 @@ val domainModule = module {
     singleOf(::FileUseCase)
     singleOf(::SettingsUseCase)
     singleOf(::SuggestionUseCase)
+    singleOf(::AiSuggestionUseCase)
     singleOf(::NotebookFileUseCase)
 }

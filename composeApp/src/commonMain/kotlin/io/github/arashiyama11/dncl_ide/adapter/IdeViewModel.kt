@@ -30,6 +30,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.AiSuggestionUseCase
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +88,7 @@ class IdeViewModel(
     private val fileUseCase: FileUseCase,
     private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
+    private val aiSuggestionUseCase: AiSuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
     private val appState by appStateStore
@@ -345,10 +347,14 @@ class IdeViewModel(
                 emptyList()
             }
 
+            val aiWords = aiSuggestionUseCase(indentedText.text, indentedText.selection.end)
+            val aiSuggestions = aiWords.map { Definition(it, null, false) }
+            val finalSuggestions = suggestions + aiSuggestions
+
             _localState.updateOnMain {
                 it.copy(
                     annotatedString = annotatedString,
-                    textSuggestions = suggestions
+                    textSuggestions = finalSuggestions
                 )
             }
         }

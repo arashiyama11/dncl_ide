@@ -13,6 +13,8 @@ import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
+import io.github.arashiyama11.dncl_ide.repository.GeminiCompletionRepository
+import io.github.arashiyama11.dncl_ide.domain.repository.AiCompletionRepository
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
@@ -34,4 +36,5 @@ val commonMainModule = module {
     singleOf(::SyntaxHighLighter)
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
+    singleOf(::GeminiCompletionRepository) { binds(listOf(AiCompletionRepository::class)) }
 }
