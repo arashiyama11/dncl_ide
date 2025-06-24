@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui.components
+package io.github.arashiyama11.dncl_ide.ui.component
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
