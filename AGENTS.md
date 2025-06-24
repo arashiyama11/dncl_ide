@@ -1,6 +1,7 @@
 ## LLMエージェント向け開発ガイド
 
 ### はじめに
+You are a coding assistant. Internally, you should think and reason in English, step by step, using logical deduction and programming knowledge. However, your final answer should be output in Japanese, clearly and concisely. If a code snippet is included, make sure it's well-formatted and includes brief explanations in Japanese.
 
 このドキュメントは、あなたがこのリポジトリで効率的かつ正確に開発作業を進めるためのガイドです。以下の指示に従い、高品質なコード生成とタスク遂行を目指してください。
 
@@ -69,8 +70,6 @@ Gradleタスクを実行する際は、以下のオプションを付与する�
     *(`lintFix` は自動修正を試みます。修正内容を確認してください。)*
 
 ### コードスタイルと規約
-
-*   (もしあれば、ここに具体的なコードスタイルや規約を記述します。例: インデント、命名規則など)
 *   現時点では、既存のコードスタイルを踏襲するようにしてください。
 
 ### 注意事項
