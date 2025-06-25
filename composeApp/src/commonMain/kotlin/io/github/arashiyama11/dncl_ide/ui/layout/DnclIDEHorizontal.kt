@@ -107,7 +107,7 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
             }
         }
 
-        Column(
+        Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
@@ -119,14 +119,14 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
                             environment = environment,
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxWidth()
+                                .fillMaxHeight()
                         )
                     } ?: run {
                         val textFieldDesc = "デバッグ出力"
                         OutlinedTextField(
                             value = uiState.output,
                             onValueChange = { },
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
                             textStyle = MaterialTheme.typography.bodyLarge,
                             label = { Text(textFieldDesc) },
                             readOnly = true
@@ -139,7 +139,7 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
                     OutlinedTextField(
                         value = uiState.output,
                         onValueChange = { },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                         textStyle = LocalCodeTypography.current.bodyLarge,
                         label = { Text(textFieldDesc) },
                         readOnly = true,
@@ -147,7 +147,7 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
                 }
             }
             with(viewModel) {
-                IdeSideButtons(Modifier.fillMaxWidth())
+                IdeSideButtons(Modifier.fillMaxHeight())
             }
         }
     }
