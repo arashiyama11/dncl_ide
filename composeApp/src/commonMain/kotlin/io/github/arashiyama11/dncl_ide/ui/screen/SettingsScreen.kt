@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui
+package io.github.arashiyama11.dncl_ide.ui.screen
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement

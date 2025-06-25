@@ -7,7 +7,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.arashiyama11.dncl_ide.domain.domainModule
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
-import io.github.arashiyama11.dncl_ide.ui.App
+import io.github.arashiyama11.dncl_ide.ui.app.App
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
 import org.koin.core.context.startKoin
 import org.koin.dsl.bind

@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui
+package io.github.arashiyama11.dncl_ide.ui.screen
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,6 +63,8 @@ import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import org.koin.compose.viewmodel.koinViewModel
 
 
