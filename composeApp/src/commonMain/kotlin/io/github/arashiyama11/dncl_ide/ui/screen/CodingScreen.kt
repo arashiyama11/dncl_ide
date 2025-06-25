@@ -12,7 +12,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.Entry
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
-import io.github.arashiyama11.dncl_ide.ui.layout.DnclIDEVertical
+import io.github.arashiyama11.dncl_ide.ui.layout.DnclIDE
 import org.koin.compose.koinInject
 
 @Composable
@@ -28,7 +28,7 @@ fun CodingScreen(fileRepository: FileRepository = koinInject()) {
     }
     when (entry) {
         is NotebookFile -> NotebookScreen()
-        is ProgramFile -> DnclIDEVertical()
+        is ProgramFile -> DnclIDE()
         else -> {
             Text("No file selected or unsupported file type")
         }
