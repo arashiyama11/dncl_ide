@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui
+package io.github.arashiyama11.dncl_ide.ui.layout
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -33,12 +33,15 @@ import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
+import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import org.koin.compose.viewmodel.koinViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DnclIDE(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
+fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
 

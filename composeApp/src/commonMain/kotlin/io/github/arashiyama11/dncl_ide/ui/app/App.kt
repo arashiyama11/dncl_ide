@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui
+package io.github.arashiyama11.dncl_ide.ui.app
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -73,6 +73,13 @@ import io.github.arashiyama11.dncl_ide.adapter.SelectNotebookScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.ui.components.rememberDarkThemeStateFlow
+import io.github.arashiyama11.dncl_ide.ui.screen.CodingScreen
+import io.github.arashiyama11.dncl_ide.ui.screen.SelectFileScreen
+import io.github.arashiyama11.dncl_ide.ui.screen.SelectNotebookScreen
+import io.github.arashiyama11.dncl_ide.ui.screen.SettingsScreen
+import io.github.arashiyama11.dncl_ide.ui.screen.LicencesScreen
+import io.github.arashiyama11.dncl_ide.ui.screen.SingleLicenseScreen
+import io.github.arashiyama11.dncl_ide.ui.DnclIdeTheme
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 

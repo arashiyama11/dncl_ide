@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.ui
+package io.github.arashiyama11.dncl_ide.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
