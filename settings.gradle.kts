@@ -42,3 +42,4 @@ plugins {
 include(":composeApp")
 include(":domain")
 include(":interpreter")
+include(":language_server")
