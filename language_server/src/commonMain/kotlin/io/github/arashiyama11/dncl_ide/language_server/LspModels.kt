@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.language_server
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class JsonRpcRequest(
@@ -87,60 +88,65 @@ data class CompletionOptions(
 
 @Serializable
 data class DidOpenTextDocumentParams(
-    val textDocument: TextDocumentItem
+    @SerialName("textDocument") val textDocument: TextDocumentItem
 )
 
 @Serializable
 data class TextDocumentItem(
-    val uri: String,
-    val languageId: String,
-    val version: Int,
-    val text: String
+    @SerialName("uri") val uri: String,
+    @SerialName("languageId") val languageId: String,
+    @SerialName("version") val version: Int,
+    @SerialName("text") val text: String
 )
 
 @Serializable
 data class DidChangeTextDocumentParams(
-    val textDocument: VersionedTextDocumentIdentifier,
-    val contentChanges: List<TextDocumentContentChangeEvent>
+    @SerialName("textDocument") val textDocument: VersionedTextDocumentIdentifier,
+    @SerialName("contentChanges") val contentChanges: List<TextDocumentContentChangeEvent>
 )
 
 @Serializable
 data class VersionedTextDocumentIdentifier(
-    val uri: String,
-    val version: Int
+    @SerialName("uri") val uri: String,
+    @SerialName("version") val version: Int
 )
 
 @Serializable
 data class TextDocumentContentChangeEvent(
-    val range: Range? = null,
-    val rangeLength: Int? = null,
-    val text: String
+    @SerialName("range") val range: Range? = null,
+    @SerialName("rangeLength") val rangeLength: Int? = null,
+    @SerialName("text") val text: String
+)
+
+@Serializable
+data class DidCloseTextDocumentParams(
+    val textDocument: TextDocumentIdentifier
 )
 
 @Serializable
 data class PublishDiagnosticsParams(
-    val uri: String,
-    val diagnostics: List<Diagnostic>
+    @SerialName("uri") val uri: String,
+    @SerialName("diagnostics") val diagnostics: List<Diagnostic>
 )
 
 @Serializable
 data class Diagnostic(
-    val range: Range,
-    val severity: Int, // 1: Error, 2: Warning, 3: Information, 4: Hint
-    val message: String,
-    val source: String? = null
+    @SerialName("range") val range: Range,
+    @SerialName("severity") val severity: Int, // 1: Error, 2: Warning, 3: Information, 4: Hint
+    @SerialName("message") val message: String,
+    @SerialName("source") val source: String? = null
 )
 
 @Serializable
 data class Range(
-    val start: Position,
-    val end: Position
+    @SerialName("start") val start: Position,
+    @SerialName("end") val end: Position
 )
 
 @Serializable
 data class Position(
-    val line: Int,
-    val character: Int
+    @SerialName("line") val line: Int,
+    @SerialName("character") val character: Int
 )
 
 @Serializable
@@ -181,12 +187,12 @@ data class CodeActionContext(
 
 @Serializable
 data class CodeAction(
-    val title: String,
-    val kind: String? = null,
-    val diagnostics: List<Diagnostic>? = null,
-    val isPreferred: Boolean? = null,
-    val edit: WorkspaceEdit? = null,
-    val command: Command? = null
+    @SerialName("title") val title: String,
+    @SerialName("kind") val kind: String? = null,
+    @SerialName("diagnostics") val diagnostics: List<Diagnostic>? = null,
+    @SerialName("isPreferred") val isPreferred: Boolean? = null,
+    @SerialName("edit") val edit: WorkspaceEdit? = null,
+    @SerialName("command") val command: Command? = null
 )
 
 @Serializable
@@ -229,8 +235,8 @@ data class TextDocumentEdit(
 
 @Serializable
 data class TextEdit(
-    val range: Range,
-    val newText: String
+    @SerialName("range") val range: Range,
+    @SerialName("newText") val newText: String
 )
 
 @Serializable

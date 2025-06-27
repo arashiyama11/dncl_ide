@@ -11,12 +11,18 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
 class DNCLLanguageServer {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        prettyPrint = true
+        isLenient = false
+        ignoreUnknownKeys = true // ignoreUnknownKeysをtrueに戻す
+        encodeDefaults = true
+    }
     private val outputChannel = Channel<String>(1024)
     val output: ReceiveChannel<String> = outputChannel
     private val documentContents = mutableMapOf<String, MutableMap<String, String>>()
@@ -100,8 +106,7 @@ class DNCLLanguageServer {
     }
 
     private suspend fun handleDidOpen(request: JsonRpcRequest) {
-        val params =
-            request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
+        val params = request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
             val notebookCellUri = NotebookCellUri.parse(it.uri)
             if (notebookCellUri != null) {
@@ -117,8 +122,7 @@ class DNCLLanguageServer {
     }
 
     private suspend fun handleDidChange(request: JsonRpcRequest) {
-        val params =
-            request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
+        val params = request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
                 val notebookCellUri = NotebookCellUri.parse(docId.uri)
