@@ -9,13 +9,22 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
+internal data class LsState(
+    val initialized: Boolean = false,
+    val rootUri: String? = null,
+    val capabilities: ClientCapabilities? = null
+)
+
 class DNCLLanguageServer {
+    private val state = MutableStateFlow(LsState())
 
     private val json = Json {
         prettyPrint = true
@@ -48,7 +57,7 @@ class DNCLLanguageServer {
         } catch (e: Exception) {
             outputChannel.send(
                 json.encodeToString(
-                    JsonRpcResponse(
+                    JsonRpcErrorResponse(
                         id = jsonRpcRequest.id,
                         error = JsonRpcError(
                             code = -32603,
@@ -68,7 +77,7 @@ class DNCLLanguageServer {
             // Handle parsing errors or other exceptions
             outputChannel.send(
                 json.encodeToString(
-                    JsonRpcResponse(
+                    JsonRpcErrorResponse(
                         id = null,
                         error = JsonRpcError(
                             code = -32700,
@@ -82,12 +91,20 @@ class DNCLLanguageServer {
 
     private suspend fun handleInitialize(request: JsonRpcRequest) {
         val params = request.params?.let { json.decodeFromJsonElement<InitializeParams>(it) }
-        // For now, just acknowledge initialization
+
+        state.update {
+            it.copy(
+                initialized = true,
+                rootUri = params?.rootUri ?: it.rootUri,
+                capabilities = params?.capabilities ?: it.capabilities
+            )
+        }
+
         val capabilities = ServerCapabilities(
             textDocumentSync = 1, // Full text document synchronization
             completionProvider = CompletionOptions(
                 resolveProvider = false,
-                triggerCharacters = listOf("：")
+                triggerCharacters = listOf(":", "=", "(", "[", " ")
             ),
             hoverProvider = true
         )
@@ -106,7 +123,8 @@ class DNCLLanguageServer {
     }
 
     private suspend fun handleDidOpen(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
+        val params =
+            request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
             val notebookCellUri = NotebookCellUri.parse(it.uri)
             if (notebookCellUri != null) {
@@ -122,7 +140,8 @@ class DNCLLanguageServer {
     }
 
     private suspend fun handleDidChange(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
+        val params =
+            request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
                 val notebookCellUri = NotebookCellUri.parse(docId.uri)
@@ -586,7 +605,7 @@ class DNCLLanguageServer {
     private suspend fun sendErrorResponse(id: Long?, code: Int, message: String) {
         println("[Info] Sending error response: code=$code, message=$message")
         val error = JsonRpcError(code = code, message = message)
-        val response = JsonRpcResponse(id = id, error = error)
+        val response = JsonRpcErrorResponse(id = id, error = error)
         outputChannel.send(json.encodeToString(response))
     }
 }

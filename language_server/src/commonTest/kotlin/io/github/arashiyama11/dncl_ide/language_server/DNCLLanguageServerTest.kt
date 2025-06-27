@@ -44,7 +44,7 @@ class DNCLLanguageServerTest {
         assertNotNull(initializeResult.capabilities.completionProvider)
         assertEquals(false, initializeResult.capabilities.completionProvider.resolveProvider)
         assertEquals(
-            listOf("："),
+            listOf(":", "=", "(", "[", " "),
             initializeResult.capabilities.completionProvider.triggerCharacters
         )
         assertEquals(true, initializeResult.capabilities.hoverProvider)

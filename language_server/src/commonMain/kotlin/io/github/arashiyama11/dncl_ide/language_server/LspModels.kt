@@ -17,6 +17,13 @@ data class JsonRpcResponse(
     val jsonrpc: String = "2.0",
     val id: Long?,
     val result: JsonElement? = null,
+)
+
+
+@Serializable
+data class JsonRpcErrorResponse(
+    val jsonrpc: String = "2.0",
+    val id: Long?,
     val error: JsonRpcError? = null
 )
 
