@@ -25,6 +25,9 @@ kotlin {
         }
     }
 
+    jvm("desktop")
+    
+
     // For iOS targets, this is also where you should
     // configure native binary output. For more information, see:
     // https://kotlinlang.org/docs/multiplatform-build-native-binaries.html#build-xcframeworks
@@ -72,32 +75,5 @@ kotlin {
                 implementation(libs.kotlin.test)
             }
         }
-
-        androidMain {
-            dependencies {
-                // Add Android-specific dependencies here. Note that this source set depends on
-                // commonMain by default and will correctly pull the Android artifacts of any KMP
-                // dependencies declared in commonMain.
-            }
-        }
-
-        getByName("androidDeviceTest") {
-            dependencies {
-                implementation(libs.androidx.runner)
-                implementation(libs.androidx.core)
-                implementation(libs.androidx.test.junit)
-            }
-        }
-
-        iosMain {
-            dependencies {
-                // Add iOS-specific dependencies here. This a source set created by Kotlin Gradle
-                // Plugin (KGP) that each specific iOS target (e.g., iosX64) depends on as
-                // part of KMP’s default source set hierarchy. Note that this source set depends
-                // on common by default and will correctly pull the iOS artifacts of any
-                // KMP dependencies declared in commonMain.
-            }
-        }
     }
-
 }

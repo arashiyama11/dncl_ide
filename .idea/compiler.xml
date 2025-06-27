@@ -7,6 +7,9 @@
       <module name="dncl_ide.core.dncl_interpreter.main" target="11" />
       <module name="dncl_ide.core.dncl_interpreter.test" target="11" />
       <module name="dncl_ide.langage_server" target="21" />
+      <module name="dncl_ide.language_server.desktopDev" target="21" />
+      <module name="dncl_ide.language_server.desktopMain" target="21" />
+      <module name="dncl_ide.language_server.desktopTest" target="21" />
       <module name="dncl_ide.shared" target="21" />
     </bytecodeTargetLevel>
   </component>
