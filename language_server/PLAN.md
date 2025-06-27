@@ -10,31 +10,31 @@
 
 ### 🟩 フェーズ0: 通信基盤
 
-- [ ] `initialize`, `initialized`, `shutdown`, `textDocument/didOpen` の基本ハンドリング
-- [ ] JSON-RPC の入出力とログ処理
+- [x] `initialize`, `initialized`, `shutdown`, `textDocument/didOpen` の基本ハンドリング
+- [x] JSON-RPC の入出力とログ処理
 
 ### 🟩 フェーズ1: 基本機能
 
-- [ ] Diagnostics（構文・意味エラー表示）
-- [ ] Completion（予約語・関数補完。domain/~~/SuggestionUseCaseを参考に)
-- [ ] Hover（関数・キーワードの説明）
+- [x] Diagnostics（構文・意味エラー表示）
+- [x] Completion（予約語・関数補完。domain/~~/SuggestionUseCaseを参考に)
+- [x] Hover（関数・キーワードの説明）
 
 ### 🟨 フェーズ2: 高度な機能
 
-- [ ] Go to Definition
-- [ ] Find References
-- [ ] Rename Symbol
-- [ ] Format
-- [ ] Code Actions / Quick Fix
+- [x] Go to Definition
+- [x] Find References
+- [x] Rename Symbol
+- [x] Format
+- [x] Code Actions / Quick Fix
 
 ### 🟦 フェーズ3: Notebook 対応と拡張
 
-- [ ] `.dnclnb` ファイル対応（セル単位のURI仕様）
-- [ ] Semantic Tokens（ハイライト高速化）
+- [x] `.dnclnb` ファイル対応（セル単位のURI仕様）
+- [x] Semantic Tokens（ハイライト高速化）
 
 ### 🟪 フェーズ4: Server実装
 
-- [ ] Ktor などを用いた HTTP/WebSocket サーバー機能追加
+- [x] Ktor などを用いた HTTP/WebSocket サーバー機能追加
 
 ## ✅ 3. 技術スタックと方針
 

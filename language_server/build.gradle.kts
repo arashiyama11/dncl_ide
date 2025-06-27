@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -26,7 +28,7 @@ kotlin {
     }
 
     jvm("desktop")
-    
+
 
     // For iOS targets, this is also where you should
     // configure native binary output. For more information, see:
@@ -66,7 +68,10 @@ kotlin {
                 implementation(libs.kotlin.stdlib)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.arrow.core)
+                implementation(libs.arrow.fx.coroutines)
                 implementation(project(":interpreter"))
+                implementation(project(":domain"))
             }
         }
 
@@ -76,4 +81,25 @@ kotlin {
             }
         }
     }
+}
+
+
+val runJsonRpcServer by tasks.registering(JavaExec::class) {
+    group = "application"
+    description = "Run stdio-based JSON-RPC 2.0 server (Main.kt entrypoint)"
+
+    // KMP の 'desktop' JVM ターゲットの main コンパイル結果と依存をクラスパスに含める
+    val desktopMain = kotlin.targets
+        .getByName("desktop")
+        .compilations
+        .getByName("main") as KotlinJvmCompilation
+
+    classpath = files(
+        desktopMain.runtimeDependencyFiles,      // ライブラリ依存
+        desktopMain.output.allOutputs            // コンパイルされた .class
+    )
+
+    mainClass.set("io.github.arashiyama11.dncl_ide.language_server.MainKt")
+    standardInput = System.`in`
+    standardOutput = System.out
 }
