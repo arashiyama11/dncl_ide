@@ -19,7 +19,7 @@ enum class SymbolKind {
     UNKNOWN
 }
 
-class SymbolTable(private val outer: SymbolTable? = null) {
+class SymbolTable(val outer: SymbolTable? = null) {
     private val store: MutableMap<String, Symbol> = mutableMapOf()
 
     fun define(symbol: Symbol) {

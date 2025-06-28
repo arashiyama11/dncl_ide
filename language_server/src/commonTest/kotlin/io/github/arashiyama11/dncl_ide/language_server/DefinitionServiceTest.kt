@@ -109,7 +109,8 @@ class DefinitionServiceTest {
 
         // 関数内のxは関数内の定義へジャンプすべき
         val innerXPosition =
-            code.indexOf("x)", code.indexOf("表示する(x)", code.indexOf("関数 test")))
+            code.indexOf("x", code.indexOf("表示する", code.indexOf("関数 test")))
+        println("near" + code.substring(innerXPosition - 2, innerXPosition + 3))
         val innerLocation =
             definitionService.getDefinitionLocation("test://file.dncl", code, innerXPosition)
 
@@ -120,6 +121,7 @@ class DefinitionServiceTest {
 
         // 関数外のxはグローバルの定義へジャンプすべ��
         val outerXPosition = code.lastIndexOf("x)")
+        astInfoService.findSymbolAtOffset(outerXPosition)
         val outerLocation =
             definitionService.getDefinitionLocation("test://file.dncl", code, outerXPosition)
 

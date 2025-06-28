@@ -10,6 +10,7 @@ class DefinitionService(
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
 
+        println("offset: $offset")
         // カーソル位置のシンボルを取得
         val symbol = astInfoService.findSymbolAtOffset(offset)
             ?: return null
@@ -17,10 +18,12 @@ class DefinitionService(
         // シンボルの定義位置を取得
         val definitionNode = symbol.definitionNode
 
+        println("definitionNode: $symbol $definitionNode")
+
         // Use the symbol's own range as the definition range, or fallback to the definition node
-        val defRange = when {
-            definitionNode is AstNode.FunctionStatement -> definitionNode.name.range
-            definitionNode is AstNode.Identifier -> definitionNode.range
+        val defRange = when (definitionNode) {
+            is AstNode.FunctionStatement -> definitionNode.name.range
+            is AstNode.Identifier -> definitionNode.range
             else -> symbol.range
         }
 
