@@ -51,7 +51,6 @@ class DNCLLanguageServer(
     }
     private val outputChannel = Channel<String>(1024)
     val output: ReceiveChannel<String> = outputChannel
-    private val documentContents = mutableMapOf<String, MutableMap<String, String>>()
 
     suspend fun handleMessage(jsonRpcRequest: JsonRpcRequest) {
         try {
@@ -145,7 +144,7 @@ class DNCLLanguageServer(
         val params =
             request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
-            documentManager.setDocument(it.uri, it.text)
+            documentManager.updateState(it.uri, it.text)
             astInfoService.parseAndAnalyze(it.text)
             publishDiagnostics(it.uri, it.text)
         }
@@ -156,7 +155,7 @@ class DNCLLanguageServer(
             request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
-                documentManager.setDocument(docId.uri, change.text)
+                documentManager.updateState(docId.uri, change.text)
                 astInfoService.parseAndAnalyze(change.text)
                 publishDiagnostics(docId.uri, change.text)
             }
@@ -164,7 +163,7 @@ class DNCLLanguageServer(
     }
 
     private suspend fun publishDiagnostics(uri: String, text: String) {
-        val diagnostics = DiagnosticService().getDiagnostics(uri, text)
+        val diagnostics = diagnosticService.getDiagnostics(uri, text)
         sendNotification(
             "textDocument/publishDiagnostics",
             PublishDiagnosticsParams(uri, diagnostics)
@@ -190,87 +189,104 @@ class DNCLLanguageServer(
         outputChannel.send(json.encodeToString(notification))
     }
 
-    private suspend fun handleCompletion(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<CompletionParams>(it) }
+    // 共通処理のヘルパー関数を追加
+    private suspend inline fun <reified T, R> handleWithDocument(
+        request: JsonRpcRequest,
+        crossinline handler: (code: String, offset: Int, params: T) -> R?
+    ) {
+        val params = request.params?.let { json.decodeFromJsonElement<T>(it) }
         params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset =
-                documentManager.calculateOffset(code, it.position.line, it.position.character)
-            val completionItems = completionService.getCompletionItems(code, offset)
-            sendResponse(
-                request.id,
-                json.encodeToJsonElement(
-                    CompletionList.serializer(),
-                    CompletionList(isIncomplete = false, items = completionItems)
+            val textDocument = when (it) {
+                is CompletionParams -> it.textDocument
+                is HoverParams -> it.textDocument
+                is DefinitionParams -> it.textDocument
+                is ReferenceParams -> it.textDocument
+                is RenameParams -> it.textDocument
+                else -> null
+            } ?: return
+
+            val position = when (it) {
+                is CompletionParams -> it.position
+                is HoverParams -> it.position
+                is DefinitionParams -> it.position
+                is ReferenceParams -> it.position
+                is RenameParams -> it.position
+                else -> null
+            } ?: return
+
+            val code = documentManager.getDocument(textDocument.uri) ?: return
+            val offset = DocumentManager.calculateOffset(code, position.line, position.character)
+            val result = handler(code, offset, it)
+
+            when (result) {
+                is CompletionList -> sendResponse(
+                    request.id,
+                    json.encodeToJsonElement(CompletionList.serializer(), result)
                 )
-            )
+
+                is Hover -> sendResponse(
+                    request.id,
+                    json.encodeToJsonElement(Hover.serializer(), result)
+                )
+
+                is Location -> sendResponse(
+                    request.id,
+                    json.encodeToJsonElement(Location.serializer(), result)
+                )
+
+                is List<*> -> {
+                    when {
+                        result.firstOrNull() is Location -> sendResponse(
+                            request.id,
+                            json.encodeToJsonElement(
+                                ListSerializer(Location.serializer()),
+                                result as List<Location>
+                            )
+                        )
+
+                        else -> sendResponse(request.id, null)
+                    }
+                }
+
+                is WorkspaceEdit -> sendResponse(
+                    request.id,
+                    json.encodeToJsonElement(WorkspaceEdit.serializer(), result)
+                )
+
+                null -> sendResponse(request.id, null)
+                else -> sendResponse(request.id, null)
+            }
+        }
+    }
+
+    private suspend fun handleCompletion(request: JsonRpcRequest) {
+        handleWithDocument<CompletionParams, CompletionList>(request) { code, offset, _ ->
+            val completionItems = completionService.getCompletionItems(code, offset)
+            CompletionList(isIncomplete = false, items = completionItems)
         }
     }
 
     private suspend fun handleHover(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<HoverParams>(it) }
-        params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset =
-                documentManager.calculateOffset(code, it.position.line, it.position.character)
-
-            val hover = hoverService.getHover(code, offset)
-            if (hover != null) {
-                sendResponse(request.id, json.encodeToJsonElement(Hover.serializer(), hover))
-            } else {
-                sendResponse(request.id, null)
-            }
+        handleWithDocument<HoverParams, Hover?>(request) { code, offset, _ ->
+            hoverService.getHover(code, offset)
         }
     }
 
     private suspend fun handleDefinition(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<DefinitionParams>(it) }
-        params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset =
-                documentManager.calculateOffset(code, it.position.line, it.position.character)
-
-            val definitionLocation =
-                definitionService.getDefinitionLocation(it.textDocument.uri, code, offset)
-            sendResponse(
-                request.id,
-                definitionLocation?.let { json.encodeToJsonElement(Location.serializer(), it) })
+        handleWithDocument<DefinitionParams, Location?>(request) { code, offset, params ->
+            definitionService.getDefinitionLocation(params.textDocument.uri, code, offset)
         }
     }
 
     private suspend fun handleReferences(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<ReferenceParams>(it) }
-        params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset =
-                documentManager.calculateOffset(code, it.position.line, it.position.character)
-
-            val references = referenceService.getReferences(it.textDocument.uri, code, offset)
-            sendResponse(
-                request.id,
-                json.encodeToJsonElement(ListSerializer(Location.serializer()), references)
-            )
+        handleWithDocument<ReferenceParams, List<Location>>(request) { code, offset, params ->
+            referenceService.getReferences(params.textDocument.uri, code, offset)
         }
     }
 
     private suspend fun handleRename(request: JsonRpcRequest) {
-        val params = request.params?.let { json.decodeFromJsonElement<RenameParams>(it) }
-        params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset =
-                documentManager.calculateOffset(code, it.position.line, it.position.character)
-            val newName = it.newName
-
-            val workspaceEdit =
-                renameService.getRenameEdits(it.textDocument.uri, code, offset, newName)
-            if (workspaceEdit != null) {
-                sendResponse(
-                    request.id,
-                    json.encodeToJsonElement(WorkspaceEdit.serializer(), workspaceEdit)
-                )
-            } else {
-                sendResponse(request.id, null)
-            }
+        handleWithDocument<RenameParams, WorkspaceEdit?>(request) { code, offset, params ->
+            renameService.getRenameEdits(params.textDocument.uri, code, offset, params.newName)
         }
     }
 

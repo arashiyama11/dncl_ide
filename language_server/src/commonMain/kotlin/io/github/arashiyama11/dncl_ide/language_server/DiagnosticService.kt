@@ -8,23 +8,19 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 class DiagnosticService {
 
     fun getDiagnostics(uri: String, text: String): List<Diagnostic> {
-        val diagnostics = mutableListOf<Diagnostic>()
         val lexer = Lexer(text)
         val parser: Parser = when (val parserResult = Parser(lexer)) {
             is Either.Left -> {
-                diagnostics.add(parserResult.value.toDiagnostic(text))
-                return diagnostics
+                return listOf(parserResult.value.toDiagnostic(text))
             }
 
             is Either.Right -> parserResult.value
         }
 
-        when (val programResult = parser.parseProgram()) {
-            is Either.Left -> diagnostics.add(programResult.value.toDiagnostic(text))
-            is Either.Right -> { /* Success, no diagnostics from parser */
-            }
+        return when (val programResult = parser.parseProgram()) {
+            is Either.Left -> listOf(programResult.value.toDiagnostic(text))
+            is Either.Right -> emptyList()
         }
-        return diagnostics
     }
 
     private fun DnclError.toDiagnostic(program: String): Diagnostic {
