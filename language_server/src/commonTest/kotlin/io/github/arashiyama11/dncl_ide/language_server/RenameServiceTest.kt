@@ -19,8 +19,8 @@ class RenameServiceTest {
         // Red: 変数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            y ← x + 5
+            x = 10
+            y = x + 5
             表示(x)
         """.trimIndent()
 
@@ -51,10 +51,10 @@ class RenameServiceTest {
         val (renameService, _, astInfoService) = createServices()
         val code = """
             関数 add(a, b)
-                戻り値 ← a + b
+                戻り値(a + b)
             関数終了
             
-            結果 ← add(1, 2)
+            結果 = add(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -75,12 +75,12 @@ class RenameServiceTest {
         // Red: スコープを考慮した変数リネームのテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            関数 test()
-                x ← 20
-                表示(x)
-            関数終了
-            表示(x)
+            x = 10
+            関数 test()を:
+                x = 20
+                表示する(x)
+            と定義する
+            表示する(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -115,11 +115,11 @@ class RenameServiceTest {
         // Red: 関数パラメータのリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            関数 calc(num1, num2)
-                結果 ← num1 + num2
-                表示(num1)
-                戻り値 ← 結果
-            関数終了
+            関数 calc(num1, num2)を:
+                結果 = num1 + num2
+                表示する(num1)
+                戻り値(結果)
+            と定義する
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -144,7 +144,7 @@ class RenameServiceTest {
         // Green: 無効な位置でのリネーム試行テスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            表示("hello")
+            表示する("hello")
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -162,13 +162,13 @@ class RenameServiceTest {
         // Green: 組み込み関数のリネーム試行テスト（失敗すべき）
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            表示("hello")
+            表示する("hello")
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // 組み込み関数「表示」のリネーム試行
-        val displayPosition = code.indexOf("表示")
+        val displayPosition = code.indexOf("表示する")
         val workspaceEdit =
             renameService.getRenameEdits("test://file.dncl", code, displayPosition, "show")
 

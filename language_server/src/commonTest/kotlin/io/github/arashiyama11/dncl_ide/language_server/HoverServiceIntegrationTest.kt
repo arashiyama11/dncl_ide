@@ -15,15 +15,15 @@ class HoverServiceIntegrationTest {
         val hoverService = HoverService(diagnosticService, astInfoService)
 
         val code = """
-            x ← 10
-            表示(x)
+            x = 10
+            表示する(x)
         """.trimIndent()
 
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
 
         // 2行目の変数xの位置でホバーテスト
-        val xPosition = code.indexOf("x", code.indexOf("表示"))
+        val xPosition = code.indexOf("x", code.indexOf("表示する"))
         val hover = hoverService.getHover(code, xPosition)
 
         assertNotNull(hover, "変数xのホバー情報が取得できるはずです")
@@ -43,10 +43,10 @@ class HoverServiceIntegrationTest {
 
         val code = """
             関数 add(a, b)
-                戻り値 ← a + b
+                戻り値(a + b)
             関数終了
             
-            結果 ← add(1, 2)
+            結果 = add(1, 2)
         """.trimIndent()
 
         // ASTを解析
@@ -78,19 +78,19 @@ class HoverServiceIntegrationTest {
         val astInfoService = AstInfoService()
         val hoverService = HoverService(diagnosticService, astInfoService)
 
-        val code = "表示(\"Hello World\")"
+        val code = "表示する(\"Hello World\")"
 
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
 
         // 表示関数の位置でホバーテスト
-        val displayPosition = code.indexOf("表示")
+        val displayPosition = code.indexOf("表示する")
         val hover = hoverService.getHover(code, displayPosition)
 
-        assertNotNull(hover, "組み込み関数「表示」のホバー情報が取得できるはずです")
+        assertNotNull(hover, "組み込み関数「表示する」のホバー情報が取得できるはずです")
         assertTrue(
-            hover.contents.value.contains("表示"),
-            "ホバー内容に「表示」という文字が含まれるはずです"
+            hover.contents.value.contains("表示する"),
+            "ホバー内容に「表示する」という文字が含まれるはずです"
         )
     }
 }

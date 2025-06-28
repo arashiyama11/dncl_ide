@@ -19,15 +19,15 @@ class DefinitionServiceTest {
         // Red: 変数定義へのジャンプをテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            y ← x + 5
+            x = 10
+            y = x + 5
             表示(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // 2行目のxの位置から1行目の定義へのジャンプをテスト
-        val xUsagePosition = code.indexOf("x", code.indexOf("y ←"))
+        val xUsagePosition = code.indexOf("x", code.indexOf("y ="))
         val location =
             definitionService.getDefinitionLocation("test://file.dncl", code, xUsagePosition)
 
@@ -44,11 +44,11 @@ class DefinitionServiceTest {
         // Red: 関数定義へのジャンプをテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
-            関数 myFunc(a, b)
-                戻り値 ← a + b
-            関数終了
+            関数 myFunc(a, b)を:
+                戻り値 = a + b
+            と定義する
             
-            結果 ← myFunc(1, 2)
+            結果 = myFunc(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -71,16 +71,16 @@ class DefinitionServiceTest {
         // Red: パラメータ定義へのジャンプをテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
-            関数 calc(num1, num2)
-                結果 ← num1 + num2
-                戻り値 ← 結果
-            関数終了
+            関数 calc(num1, num2)を:
+                結果 = num1 + num2
+                戻り値(結果)
+            と定義する
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // ���数内でのnum1使用から関数パラメータ定義へのジャンプをテスト
-        val paramUsagePosition = code.indexOf("num1", code.indexOf("結果 ←"))
+        val paramUsagePosition = code.indexOf("num1", code.indexOf("結果)"))
         val location =
             definitionService.getDefinitionLocation("test://file.dncl", code, paramUsagePosition)
 
@@ -97,24 +97,25 @@ class DefinitionServiceTest {
         // Red: スコープを考慮した変数定義へのジャンプをテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            関数 test()
-                x ← 20
-                表示(x)
-            関数終了
+            x = 10
+            関数 test() を:
+                x = 20
+                表示する(x)
+            と定義する
             表示(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // 関数内のxは関数内の定義へジャンプすべき
-        val innerXPosition = code.indexOf("x)", code.indexOf("表示(x)", code.indexOf("関数 test")))
+        val innerXPosition =
+            code.indexOf("x)", code.indexOf("表示する(x)", code.indexOf("関数 test")))
         val innerLocation =
             definitionService.getDefinitionLocation("test://file.dncl", code, innerXPosition)
 
         assertNotNull(innerLocation)
         // 関数内のx定義（3行目）を期待
-        val innerXDefLine = code.substring(0, code.indexOf("x ← 20")).count { it == '\n' }
+        val innerXDefLine = code.substring(0, code.indexOf("x = 20")).count { it == '\n' }
         assertEquals(innerXDefLine, innerLocation.range.start.line)
 
         // 関数外のxはグローバルの定義へジャンプすべき
@@ -132,7 +133,7 @@ class DefinitionServiceTest {
         // Green: 定義が見つからない場合のテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
-            表示(undefinedVar)
+            表示する(undefinedVar)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)

@@ -17,7 +17,19 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes initialize request and sends capabilities`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         val initializeRequest = JsonRpcRequest(
             id = 1,
             method = "initialize",
@@ -55,7 +67,19 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes textDocument_formatting request`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -65,7 +89,7 @@ class DNCLLanguageServerTest {
                         uri = "file:///a.dncl",
                         languageId = "dncl",
                         version = 1,
-                        text = "表示 x\n  計算 y\n終わり"
+                        text = "表示(x)\n  計算(y)\n"
                     )
                 )
             )
@@ -99,13 +123,25 @@ class DNCLLanguageServerTest {
         val textEdits =
             json.decodeFromJsonElement(ListSerializer(TextEdit.serializer()), response.result)
         assertEquals(1, textEdits.size)
-        assertEquals("表示 x\n計算 y\n終わり", textEdits.first().newText)
+        assertEquals("表示(x)\n  計算(y)\n", textEdits.first().newText)
     }
 
     @Test
     fun `handleMessage processes textDocument_codeAction request`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         // First, open the document with an error
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -162,7 +198,19 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes textDocument_semanticTokens_full request`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -207,7 +255,19 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes textDocument_hover request`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -217,7 +277,7 @@ class DNCLLanguageServerTest {
                         uri = "file:///a.dncl",
                         languageId = "dncl",
                         version = 1,
-                        text = "表示する x"
+                        text = "表示する(x)"
                     )
                 )
             )
@@ -251,51 +311,64 @@ class DNCLLanguageServerTest {
     }
 
     @Test
-    fun `handleMessage processes textDocument_hover request for user-defined variable`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
-        // First, open the document
-        val didOpenNotification = JsonRpcRequest(
-            method = "textDocument/didOpen",
-            params = json.encodeToJsonElement(
-                DidOpenTextDocumentParams(
-                    textDocument = TextDocumentItem(
-                        uri = "file:///b.dncl",
-                        languageId = "dncl",
-                        version = 1,
-                        text = "変数 x = 10\n表示 x"
+    fun `handleMessage processes textDocument_hover request for user-defined variable`() =
+        runBlocking {
+            val astInfoService = AstInfoService()
+            val server = DNCLLanguageServer(
+                DocumentManager(),
+                DiagnosticService(),
+                CompletionService(),
+                HoverService(DiagnosticService(), astInfoService),
+                DefinitionService(DiagnosticService()),
+                ReferenceService(DiagnosticService()),
+                RenameService(DiagnosticService()),
+                FormattingService(),
+                CodeActionService(),
+                SemanticTokensService(DiagnosticService()),
+                astInfoService
+            )
+            // First, open the document
+            val didOpenNotification = JsonRpcRequest(
+                method = "textDocument/didOpen",
+                params = json.encodeToJsonElement(
+                    DidOpenTextDocumentParams(
+                        textDocument = TextDocumentItem(
+                            uri = "file:///b.dncl",
+                            languageId = "dncl",
+                            version = 1,
+                            text = "変数 x = 10\n表示 x"
+                        )
                     )
                 )
             )
-        )
-        server.handleMessage(json.encodeToString(didOpenNotification))
-        server.output.receive() // Consume diagnostics from didOpen
+            server.handleMessage(json.encodeToString(didOpenNotification))
+            server.output.receive() // Consume diagnostics from didOpen
 
-        val hoverRequest = JsonRpcRequest(
-            id = 12,
-            method = "textDocument/hover",
-            params = json.encodeToJsonElement(
-                HoverParams(
-                    textDocument = TextDocumentIdentifier("file:///b.dncl"),
-                    position = Position(1, 3) // Position at 'x' in "表示 x"
+            val hoverRequest = JsonRpcRequest(
+                id = 12,
+                method = "textDocument/hover",
+                params = json.encodeToJsonElement(
+                    HoverParams(
+                        textDocument = TextDocumentIdentifier("file:///b.dncl"),
+                        position = Position(1, 3) // Position at 'x' in "表示 x"
+                    )
                 )
             )
-        )
-        val requestJson = json.encodeToString(hoverRequest)
-        server.handleMessage(requestJson)
+            val requestJson = json.encodeToString(hoverRequest)
+            server.handleMessage(requestJson)
 
-        val responseJson = server.output.receive()
-        val response = json.decodeFromString<JsonRpcResponse>(responseJson)
+            val responseJson = server.output.receive()
+            val response = json.decodeFromString<JsonRpcResponse>(responseJson)
 
-        assertNotNull(response.id)
-        assertEquals(12, response.id)
-        val hover = if (response.result != null) {
-            json.decodeFromJsonElement(Hover.serializer(), response.result)
-        } else {
-            null
+            assertNotNull(response.id)
+            assertEquals(12, response.id)
+            val hover = if (response.result != null) {
+                json.decodeFromJsonElement(Hover.serializer(), response.result)
+            } else {
+                null
+            }
+            assertEquals("変数: x", hover?.contents?.value)
         }
-        assertEquals("変数: x", hover?.contents?.value)
-    }
 
 //    @Test
 //    fun `handleMessage processes textDocument_completion request`() = runBlocking {
@@ -347,7 +420,19 @@ class DNCLLanguageServerTest {
     fun `handleMessage processes textDocument_didChange request and publishes diagnostics`() =
         runBlocking {
             val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+            val server = DNCLLanguageServer(
+                DocumentManager(),
+                DiagnosticService(),
+                CompletionService(),
+                HoverService(DiagnosticService(), astInfoService),
+                DefinitionService(DiagnosticService()),
+                ReferenceService(DiagnosticService()),
+                RenameService(DiagnosticService()),
+                FormattingService(),
+                CodeActionService(),
+                SemanticTokensService(DiagnosticService()),
+                astInfoService
+            )
             // First, open the document
             val didOpenNotification = JsonRpcRequest(
                 method = "textDocument/didOpen",
@@ -402,7 +487,19 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes textDocument_definition request`() = runBlocking {
         val astInfoService = AstInfoService()
-        val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService(), astInfoService), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()), astInfoService)
+        val server = DNCLLanguageServer(
+            DocumentManager(),
+            DiagnosticService(),
+            CompletionService(),
+            HoverService(DiagnosticService(), astInfoService),
+            DefinitionService(DiagnosticService()),
+            ReferenceService(DiagnosticService()),
+            RenameService(DiagnosticService()),
+            FormattingService(),
+            CodeActionService(),
+            SemanticTokensService(DiagnosticService()),
+            astInfoService
+        )
         // First, open the document with a definition and its usage
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",

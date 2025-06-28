@@ -18,10 +18,10 @@ class ReferenceServiceTest {
         // Red: 変数の全参照箇所を検索するテスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            y ← x + 5
-            表示(x)
-            z ← x * 2
+            x = 10
+            y = x + 5
+            表示する(x)
+            z = x * 2
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -66,8 +66,8 @@ class ReferenceServiceTest {
         // Red: 関数の全参照箇所を検索するテスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            関数 add(a, b)
-                戻り値 ← a + b
+            関数 add(a, b)を:
+                戻り値(a + b)
             関数終了
             
             結果1 ← add(1, 2)
@@ -90,12 +90,12 @@ class ReferenceServiceTest {
         // Red: スコープを考慮した変数参照の検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            関数 test()
-                x ← 20
-                表示(x)
-            関数終了
-            表示(x)
+            x = 10
+            関数 test()を:
+                x = 20
+                表示する(x)
+            と定義する
+            表示する(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -109,7 +109,7 @@ class ReferenceServiceTest {
         assertEquals(2, globalReferences.size, "グローバル変数xの参照は2箇所あるはずです")
 
         // 関数内のxの参照を検索
-        val localXPosition = code.indexOf("x ← 20")
+        val localXPosition = code.indexOf("x = 20")
         val localReferences =
             referenceService.getReferences("test://file.dncl", code, localXPosition)
 
@@ -122,11 +122,11 @@ class ReferenceServiceTest {
         // Red: 関数パラメータの参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            関数 calc(num1, num2)
-                結果 ← num1 + num2
+            関数 calc(num1, num2)を
+                結果 = num1 + num2
                 表示(num1)
-                戻り値 ← 結果
-            関数終了
+                戻り値(結果)
+            と定義する
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -144,7 +144,7 @@ class ReferenceServiceTest {
         // Green: 未定義シンボルに対する参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            表示("hello")
+            表示する("hello")
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)

@@ -18,7 +18,7 @@ class HoverServiceTest {
     fun test_hover_on_builtin_function() {
         // Red: テストが失敗することを確認
         val (hoverService, _, astInfoService) = createServices()
-        val code = "表示(\"Hello World\")"
+        val code = "表示する(\"Hello World\")"
 
         astInfoService.parseAndAnalyze(code)
         val hover = hoverService.getHover(code, 1) // "表示" の位置
@@ -33,13 +33,13 @@ class HoverServiceTest {
         // Red: ユーザー定義変数に対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
-            x ← 10
-            表示(x)
+            x = 10
+            表示する(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
         val hover =
-            hoverService.getHover(code, code.indexOf("x)", code.indexOf("表示"))) // 2行目のxの位置
+            hoverService.getHover(code, code.indexOf("x)", code.indexOf("表示する"))) // 2行目のxの位置
 
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
@@ -51,11 +51,11 @@ class HoverServiceTest {
         // Red: 関数定��に対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
-            関数 myFunc(a, b)
-                戻り値 ← a + b
-            関数終了
+            関数 myFunc(a, b)を:
+                戻り値(a + b)
+            と定義する
             
-            結果 ← myFunc(1, 2)
+            結果 = myFunc(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -86,9 +86,9 @@ class HoverServiceTest {
         // Red: 関数パラメータに対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
-            関数 myFunc(param1, param2)
-                表示(param1)
-            関数終了
+            関数 myFunc(param1, param2)を:
+                表示する(param1)
+            と定義する
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
