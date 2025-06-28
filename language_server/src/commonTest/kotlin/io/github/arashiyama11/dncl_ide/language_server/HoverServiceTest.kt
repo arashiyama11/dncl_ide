@@ -95,6 +95,7 @@ class HoverServiceTest {
         val hover =
             hoverService.getHover(code, code.indexOf("param1", code.indexOf("表示"))) // 関数内のparam1
 
+        println("Hover result: $hover")
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
         // パラメータparam1の情報が含まれることを期待

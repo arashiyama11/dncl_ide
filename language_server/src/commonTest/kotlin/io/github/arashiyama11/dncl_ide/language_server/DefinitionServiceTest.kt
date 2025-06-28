@@ -45,7 +45,7 @@ class DefinitionServiceTest {
         val (definitionService, _, astInfoService) = createServices()
         val code = """
             関数 myFunc(a, b)を:
-                戻り値 = a + b
+                戻り値(a + b)
             と定義する
             
             res = myFunc(1, 2)
@@ -79,8 +79,8 @@ class DefinitionServiceTest {
 
         astInfoService.parseAndAnalyze(code)
 
-        // ���数内でのnum1使用から関数パラメータ定義へのジャンプをテスト
-        val paramUsagePosition = code.indexOf("num1", code.indexOf("res)"))
+        // 関数内でのnum1使用から関数パラメータ定義へのジャンプをテスト
+        val paramUsagePosition = code.indexOf("num1", code.indexOf("res ="))
         val location =
             definitionService.getDefinitionLocation("test://file.dncl", code, paramUsagePosition)
 
@@ -118,7 +118,7 @@ class DefinitionServiceTest {
         val innerXDefLine = code.substring(0, code.indexOf("x = 20")).count { it == '\n' }
         assertEquals(innerXDefLine, innerLocation.range.start.line)
 
-        // 関数外のxはグローバルの定義へジャンプすべき
+        // 関数外のxはグローバルの定義へジャンプすべ��
         val outerXPosition = code.lastIndexOf("x)")
         val outerLocation =
             definitionService.getDefinitionLocation("test://file.dncl", code, outerXPosition)

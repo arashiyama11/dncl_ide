@@ -42,6 +42,7 @@ class AstInfoService {
             currentSymbolTable = symbolTable
 
             println("Successfully parsed AST with ${program.statements.size} statements")
+            println("Symbol table created with ${symbolTable.allSymbols().map { it.name }} symbols")
         } catch (e: Exception) {
             println("Exception during parsing: ${e.message}")
             e.printStackTrace()
@@ -61,7 +62,7 @@ class AstInfoService {
 
         // If it's an identifier, try to resolve it from the symbol table
         if (node is AstNode.Identifier) {
-            return symbolTable.resolve(node.value, offset)
+            return symbolTable.resolve(node.value, offset).also { println("ident: $it") }
         }
 
         // Also check if we're in a function name or parameter position
