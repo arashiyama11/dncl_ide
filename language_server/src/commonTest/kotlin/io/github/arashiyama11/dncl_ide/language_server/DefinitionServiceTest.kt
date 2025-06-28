@@ -48,13 +48,13 @@ class DefinitionServiceTest {
                 戻り値 = a + b
             と定義する
             
-            結果 = myFunc(1, 2)
+            res = myFunc(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // 関数呼び出し部分のmyFuncから関数定義へのジャンプをテスト
-        val funcCallPosition = code.indexOf("myFunc", code.indexOf("結果"))
+        val funcCallPosition = code.indexOf("myFunc", code.indexOf("res"))
         val location =
             definitionService.getDefinitionLocation("test://file.dncl", code, funcCallPosition)
 
@@ -72,15 +72,15 @@ class DefinitionServiceTest {
         val (definitionService, _, astInfoService) = createServices()
         val code = """
             関数 calc(num1, num2)を:
-                結果 = num1 + num2
-                戻り値(結果)
+                res = num1 + num2
+                戻り値(res)
             と定義する
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
 
         // ���数内でのnum1使用から関数パラメータ定義へのジャンプをテスト
-        val paramUsagePosition = code.indexOf("num1", code.indexOf("結果)"))
+        val paramUsagePosition = code.indexOf("num1", code.indexOf("res)"))
         val location =
             definitionService.getDefinitionLocation("test://file.dncl", code, paramUsagePosition)
 

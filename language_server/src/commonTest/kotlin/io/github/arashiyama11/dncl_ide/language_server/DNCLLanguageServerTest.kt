@@ -336,7 +336,7 @@ class DNCLLanguageServerTest {
                             uri = "file:///b.dncl",
                             languageId = "dncl",
                             version = 1,
-                            text = "変数 x = 10\n表示 x"
+                            text = "x = 10\n表示する(x)"
                         )
                     )
                 )
@@ -367,7 +367,7 @@ class DNCLLanguageServerTest {
             } else {
                 null
             }
-            assertEquals("変数: x", hover?.contents?.value)
+            assertEquals("**表示する**: 画面に値を出力する", hover?.contents?.value)
         }
 
 //    @Test

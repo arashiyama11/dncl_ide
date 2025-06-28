@@ -42,19 +42,20 @@ class HoverServiceIntegrationTest {
         val hoverService = HoverService(diagnosticService, astInfoService)
 
         val code = """
-            関数 add(a, b)
+            関数 add(a, b) を:
                 戻り値(a + b)
-            関数終了
+            と定義する
             
-            結果 = add(1, 2)
+            res = add(1, 2)
         """.trimIndent()
 
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
 
         // 関数呼び出し部分のaddの位置でホバーテスト
-        val addPosition = code.indexOf("add", code.indexOf("結果"))
+        val addPosition = code.indexOf("add", code.indexOf("res"))
         val hover = hoverService.getHover(code, addPosition)
+        println("hover: $hover")
 
         assertNotNull(hover, "関数addのホバー情報が取得できるはずです")
         assertTrue(

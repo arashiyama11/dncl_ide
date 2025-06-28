@@ -68,12 +68,12 @@ class ReferenceFinder(private val targetSymbol: Symbol) {
             is AstNode.FunctionStatement -> {
                 // 関数定義自体はSymbolTableBuilderで処理済み
                 // 関数名が参照されているかチェック
-                if (targetSymbol.kind == SymbolKind.FUNCTION && targetSymbol.name == statement.name) {
+                if (targetSymbol.kind == SymbolKind.FUNCTION && targetSymbol.name == statement.name.literal) {
                     references.add(statement.range) // 関数定義の範囲も参照として追加
                 }
                 statement.parameters.forEach { param ->
                     // パラメータも参照としてチェック
-                    if (targetSymbol.kind == SymbolKind.PARAMETER && targetSymbol.name == param) {
+                    if (targetSymbol.kind == SymbolKind.PARAMETER && targetSymbol.name == param.literal) {
                         // TODO: パラメータのrangeを正確に取得する方法を検討
                         // references.add(paramのrange) // 現状はIdentifierではないので、rangeは取得できない
                     }
@@ -108,7 +108,7 @@ class ReferenceFinder(private val targetSymbol: Symbol) {
             is AstNode.ArrayLiteral -> expression.elements.forEach { visitExpression(it) }
             is AstNode.FunctionLiteral -> {
                 expression.parameters.forEach { param ->
-                    if (targetSymbol.kind == SymbolKind.PARAMETER && targetSymbol.name == param) {
+                    if (targetSymbol.kind == SymbolKind.PARAMETER && targetSymbol.name == param.literal) {
                         // TODO: パラメータのrangeを正確に取得する方法を検討
                         // references.add(paramのrange) // 現状はIdentifierではないので、rangeは取得できない
                     }
@@ -125,7 +125,7 @@ class ReferenceFinder(private val targetSymbol: Symbol) {
 
     private fun checkReference(identifier: AstNode.Identifier) {
         // 現在のスコープで識別子が解決できるか確認し、解決されたシンボルがターゲットシンボルと一致するか確認
-        val resolvedSymbol = currentScope?.resolve(identifier.value)
+        val resolvedSymbol = currentScope?.resolve(identifier.value, identifier.range.first)
         if (resolvedSymbol == targetSymbol) {
             references.add(identifier.range)
         }

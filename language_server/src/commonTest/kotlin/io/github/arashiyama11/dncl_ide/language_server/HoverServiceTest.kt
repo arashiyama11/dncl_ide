@@ -55,13 +55,13 @@ class HoverServiceTest {
                 戻り値(a + b)
             と定義する
             
-            結果 = myFunc(1, 2)
+            res = myFunc(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
         val hover = hoverService.getHover(
             code,
-            code.indexOf("myFunc", code.indexOf("結果"))
+            code.indexOf("myFunc", code.indexOf("res"))
         ) // 関数呼び出しのmyFunc
 
         assertNotNull(hover)

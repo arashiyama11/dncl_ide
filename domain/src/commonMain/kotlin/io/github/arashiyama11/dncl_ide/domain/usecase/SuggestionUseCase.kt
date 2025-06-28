@@ -128,12 +128,12 @@ class SuggestionUseCase() {
                 }
 
                 is AstNode.FunctionStatement -> {
-                    result.add(Definition(stmt.name, stmt.range.first, true))
+                    result.add(Definition(stmt.name.literal, stmt.name.range.first, true))
                     if (stmt.range.contains(limitPosition)) {
                         result.addAll(stmt.parameters.map {
                             Definition(
-                                it,
-                                stmt.range.first,
+                                it.literal,
+                                it.range.first,
                                 false
                             )
                         })

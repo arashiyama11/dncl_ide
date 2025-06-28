@@ -50,11 +50,11 @@ class RenameServiceTest {
         // Red: 関数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            関数 add(a, b)
+            関数 add(a, b):
                 戻り値(a + b)
-            関数終了
+            と定義する
             
-            結果 = add(1, 2)
+            res = add(1, 2)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -116,9 +116,9 @@ class RenameServiceTest {
         val (renameService, _, astInfoService) = createServices()
         val code = """
             関数 calc(num1, num2)を:
-                結果 = num1 + num2
+                res = num1 + num2
                 表示する(num1)
-                戻り値(結果)
+                戻り値(res)
             と定義する
         """.trimIndent()
 

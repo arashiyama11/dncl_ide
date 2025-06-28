@@ -4,12 +4,16 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 
 class HoverService(
     private val diagnosticService: DiagnosticService,
     private val astInfoService: AstInfoService
 ) {
     fun getHover(code: String, offset: Int): Hover? {
+        // First parse and analyze the code
+        astInfoService.parseAndAnalyze(code)
+
         val lexer = Lexer(code)
         val tokens = lexer.toList().mapNotNull { it.getOrNull() }
 
@@ -18,12 +22,7 @@ class HoverService(
         }
 
         val hoverContent = when (hoveredToken) {
-            is Token.Japanese -> {
-                // 組み込み関数のホバー情報
-                builtInFunctionDescriptions[hoveredToken.literal]
-            }
-
-            is Token.Identifier -> {
+            is Token.Japanese, is Token.Identifier -> {
                 // ユーザー定義シンボルのホバー情報
                 val symbol = astInfoService.findSymbolAtOffset(offset)
                 if (symbol != null) {
@@ -36,7 +35,8 @@ class HoverService(
 
                         SymbolKind.FUNCTION -> {
                             val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
-                            val params = functionNode?.parameters?.joinToString(", ") ?: ""
+                            val params =
+                                functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
                             "**関数**: `${symbol.name}($params)`\n\n" +
                                     "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
                                     if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
@@ -57,7 +57,12 @@ class HoverService(
                             "**不明なシンボル**: `${symbol.name}`"
                         }
                     }
-                } else null
+                } else if (builtInFunctionDescriptions.containsKey(hoveredToken.literal)) {
+                    // 組み込み関数のホバー情報
+                    builtInFunctionDescriptions[hoveredToken.literal]
+                } else {
+                    null
+                }
             }
 
             else -> null

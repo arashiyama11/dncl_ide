@@ -89,7 +89,7 @@ sealed interface AstNode {
 
 
     data class ForStatement(
-        val loopCounter: Token.Identifier,
+        val loopCounter: Identifier,
         val start: Expression,
         val end: Expression,
         val step: Expression,
@@ -135,13 +135,13 @@ sealed interface AstNode {
     }
 
     data class FunctionStatement(
-        val name: String,
-        val parameters: List<String>,
+        val name: Token,
+        val parameters: List<Token>,
         val block: BlockStatement,
         override val range: IntRange
     ) : Statement {
         override val literal: String
-            get() = "function ${name}(${parameters.joinToString(separator = ", ") { it }}) ${block.literal}"
+            get() = "function ${name.literal}(${parameters.joinToString(separator = ", ") { it.literal }}) ${block.literal}"
 
         /*override val range: IntRange
             get() = block.range.first - 1..block.range.last + 1*/
@@ -191,11 +191,11 @@ sealed interface AstNode {
     }
 
     data class FunctionLiteral(
-        val parameters: List<String>,
+        val parameters: List<Token>,
         val body: BlockStatement
     ) : Expression {
         override val literal: String
-            get() = "function(${parameters.joinToString(separator = ", ") { it }}) ${body.literal}"
+            get() = "function(${parameters.joinToString(separator = ", ") { it.literal }}) ${body.literal}"
 
         override val range: IntRange
             get() = body.range

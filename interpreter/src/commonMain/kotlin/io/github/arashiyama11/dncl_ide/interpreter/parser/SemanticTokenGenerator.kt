@@ -151,13 +151,13 @@ class SemanticTokenGenerator(
                         addToken(token, tokenTypes.indexOf("keyword"))
                     }
                 // 関数名
-                tokens.firstOrNull { it.range.first == statement.range.first + 3 && (it is Token.Identifier || it is Token.Japanese) && it.literal == statement.name }
+                tokens.firstOrNull { it.range.first == statement.range.first + 3 && (it is Token.Identifier || it is Token.Japanese) && it.literal == statement.name.literal }
                     ?.let { token ->
                         addToken(token, tokenTypes.indexOf("function"))
                     }
                 statement.parameters.forEach { paramName ->
                     // パラメータ
-                    tokens.firstOrNull { it.literal == paramName && it.range.first > statement.range.first && it.range.last < statement.block.range.first }
+                    tokens.firstOrNull { it.literal == paramName.literal && it.range.first > statement.range.first && it.range.last < statement.block.range.first }
                         ?.let { token ->
                             addToken(token, tokenTypes.indexOf("parameter"))
                         }
@@ -184,7 +184,7 @@ class SemanticTokenGenerator(
         when (expression) {
             is AstNode.Identifier -> {
                 getTokenAtRange(expression.range)?.let { token ->
-                    val symbol = currentScope.resolve(expression.value)
+                    val symbol = currentScope.resolve(expression.value, expression.range.first)
                     if (symbol != null) {
                         addToken(token, tokenTypes.indexOf(getTokenType(symbol)))
                     } else {
@@ -259,7 +259,7 @@ class SemanticTokenGenerator(
                     }
                 expression.parameters.forEach { paramName ->
                     // パラメータ
-                    tokens.firstOrNull { it.literal == paramName && it.range.first > expression.range.first && it.range.last < expression.body.range.first }
+                    tokens.firstOrNull { it.literal == paramName.literal && it.range.first > expression.range.first && it.range.last < expression.body.range.first }
                         ?.let { token ->
                             addToken(token, tokenTypes.indexOf("parameter"))
                         }

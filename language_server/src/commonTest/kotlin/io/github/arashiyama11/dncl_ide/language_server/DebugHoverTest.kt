@@ -15,7 +15,7 @@ class DebugHoverTest {
                 戻り値(a + b)
             と定義する
             
-            結果 = myFunc(1, 2)
+            res = myFunc(1, 2)
         """.trimIndent()
 
         println("Code to parse:")
@@ -24,7 +24,7 @@ class DebugHoverTest {
 
         astInfoService.parseAndAnalyze(code)
 
-        val targetIndex = code.indexOf("myFunc", code.indexOf("結果"))
+        val targetIndex = code.indexOf("myFunc", code.indexOf("res"))
         println("Target index: $targetIndex")
         println("Character at target: '${code[targetIndex]}'")
 

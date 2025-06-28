@@ -7,23 +7,32 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolTable
 
 class SymbolTableBuilder {
     private val globalSymbolTable = SymbolTable()
-    private var currentScope: SymbolTable = globalSymbolTable
+    private val scopes: MutableList<Pair<SymbolTable, IntRange>> = mutableListOf()
+
+    init {
+        scopes.add(globalSymbolTable to IntRange(0, Int.MAX_VALUE))
+    }
 
     fun build(program: AstNode.Program): SymbolTable {
         visitProgram(program)
         return globalSymbolTable
     }
 
-    private fun enterScope() {
-        currentScope = currentScope.createChildScope()
+    private fun currentScope(): SymbolTable = scopes.last().first
+    private fun currentScopeRange(): IntRange = scopes.last().second
+
+    private fun enterScope(range: IntRange) {
+        scopes.add(currentScope().createChildScope() to range)
     }
 
     private fun exitScope() {
-        // TODO: 親スコープに戻る仕組み����実装する必要がある
-        // 現在の実装では簡略化
+        if (scopes.size > 1) {
+            scopes.removeLast()
+        }
     }
 
     private fun visitProgram(program: AstNode.Program) {
+        scopes[0] = scopes[0].first to program.range
         program.statements.forEach { visitStatement(it) }
     }
 
@@ -32,11 +41,12 @@ class SymbolTableBuilder {
             is AstNode.AssignStatement -> {
                 statement.assignments.forEach { (assignable, expression) ->
                     if (assignable is AstNode.Identifier) {
-                        currentScope.define(
+                        currentScope().define(
                             Symbol(
                                 name = assignable.value,
                                 kind = SymbolKind.VARIABLE,
                                 range = assignable.range,
+                                scopeRange = currentScopeRange(),
                                 definitionNode = assignable
                             )
                         )
@@ -48,23 +58,24 @@ class SymbolTableBuilder {
             is AstNode.ExpressionStatement -> visitExpression(statement.expression)
             is AstNode.IfStatement -> {
                 visitExpression(statement.condition)
-                enterScope()
+                enterScope(statement.consequence.range)
                 visitStatement(statement.consequence)
                 exitScope()
                 statement.alternative?.let {
-                    enterScope()
+                    enterScope(it.range)
                     visitStatement(it)
                     exitScope()
                 }
             }
 
             is AstNode.ForStatement -> {
-                enterScope()
-                currentScope.define(
+                enterScope(statement.block.range)
+                currentScope().define(
                     Symbol(
                         name = statement.loopCounter.literal,
                         kind = SymbolKind.VARIABLE,
-                        range = statement.loopCounter.range
+                        range = statement.loopCounter.range,
+                        scopeRange = statement.block.range
                     )
                 )
                 visitExpression(statement.start)
@@ -76,27 +87,29 @@ class SymbolTableBuilder {
 
             is AstNode.WhileStatement -> {
                 visitExpression(statement.condition)
-                enterScope()
+                enterScope(statement.block.range)
                 visitStatement(statement.block)
                 exitScope()
             }
 
             is AstNode.FunctionStatement -> {
-                currentScope.define(
+                currentScope().define(
                     Symbol(
-                        name = statement.name,
+                        name = statement.name.literal,
                         kind = SymbolKind.FUNCTION,
-                        range = statement.range,
+                        range = statement.name.range,
+                        scopeRange = currentScopeRange(),
                         definitionNode = statement
                     )
                 )
-                enterScope()
+                enterScope(statement.block.range)
                 statement.parameters.forEach { param ->
-                    currentScope.define(
+                    currentScope().define(
                         Symbol(
-                            name = param,
+                            name = param.literal,
                             kind = SymbolKind.PARAMETER,
-                            range = statement.range // パラメータの正確なrangeは後で改善
+                            range = param.range, // パラメータの正確なrangeは後で改善
+                            scopeRange = statement.block.range
                         )
                     )
                 }
@@ -130,13 +143,14 @@ class SymbolTableBuilder {
 
             is AstNode.ArrayLiteral -> expression.elements.forEach { visitExpression(it) }
             is AstNode.FunctionLiteral -> {
-                enterScope()
+                enterScope(expression.body.range)
                 expression.parameters.forEach { param ->
-                    currentScope.define(
+                    currentScope().define(
                         Symbol(
-                            name = param,
+                            name = param.literal,
                             kind = SymbolKind.PARAMETER,
-                            range = expression.range // パラメータの正確なrangeは後で改善
+                            range = param.range, // パラメータの正確なrangeは後で改善
+                            scopeRange = expression.body.range
                         )
                     )
                 }

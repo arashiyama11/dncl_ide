@@ -4,11 +4,14 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolTable
-import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 
 class AstVisitor {
     private val globalSymbolTable = SymbolTable()
-    private val scopes: MutableList<SymbolTable> = mutableListOf(globalSymbolTable)
+    private val scopes: MutableList<Pair<SymbolTable, IntRange>> = mutableListOf()
+
+    init {
+        scopes.add(globalSymbolTable to IntRange(0, Int.MAX_VALUE))
+    }
 
     fun visit(node: AstNode): SymbolTable {
         when (node) {
@@ -37,10 +40,11 @@ class AstVisitor {
         return globalSymbolTable
     }
 
-    private fun currentScope(): SymbolTable = scopes.last()
+    private fun currentScope(): SymbolTable = scopes.last().first
+    private fun currentScopeRange(): IntRange = scopes.last().second
 
-    private fun enterScope() {
-        scopes.add(currentScope().createChildScope())
+    private fun enterScope(range: IntRange) {
+        scopes.add(currentScope().createChildScope() to range)
     }
 
     private fun exitScope() {
@@ -50,11 +54,12 @@ class AstVisitor {
     }
 
     private fun visitProgram(program: AstNode.Program) {
+        scopes[0] = scopes[0].first to program.range
         program.statements.forEach { visit(it) }
     }
 
     private fun visitBlockStatement(block: AstNode.BlockStatement) {
-        enterScope()
+        enterScope(block.range)
         block.statements.forEach { visit(it) }
         exitScope()
     }
@@ -68,6 +73,7 @@ class AstVisitor {
                             name = assignable.value,
                             kind = SymbolKind.VARIABLE,
                             range = assignable.range,
+                            scopeRange = currentScopeRange(),
                             definitionNode = assignable
                         )
                     )
@@ -85,22 +91,22 @@ class AstVisitor {
     private fun visitFunctionStatement(functionStmt: AstNode.FunctionStatement) {
         currentScope().define(
             Symbol(
-                name = functionStmt.name,
+                name = functionStmt.name.literal,
                 kind = SymbolKind.FUNCTION,
-                range = functionStmt.range,
+                range = functionStmt.name.range,
+                scopeRange = currentScopeRange(),
                 definitionNode = functionStmt
             )
         )
-        enterScope()
-        functionStmt.parameters.forEach { paramName ->
-            // パラメータはIdentifierではないため、ダミーのAstNode.Identifierを作成してrangeを渡す
-            val dummyRange = functionStmt.range // 適切な範囲を設定する必要がある
+        enterScope(functionStmt.block.range)
+        functionStmt.parameters.forEach { paramToken ->
             currentScope().define(
                 Symbol(
-                    name = paramName,
+                    name = paramToken.literal,
                     kind = SymbolKind.PARAMETER,
-                    range = dummyRange, // TODO: パラメータの正確な範囲を取得する
-                    definitionNode = null // パラメータ自体はASTノードとして存在しないためnull
+                    range = paramToken.range,
+                    scopeRange = functionStmt.block.range,
+                    definitionNode = null
                 )
             )
         }
@@ -125,13 +131,14 @@ class AstVisitor {
     }
 
     private fun visitForStatement(forStmt: AstNode.ForStatement) {
-        enterScope()
+        enterScope(forStmt.block.range)
         currentScope().define(
             Symbol(
                 name = forStmt.loopCounter.literal,
                 kind = SymbolKind.VARIABLE,
                 range = forStmt.loopCounter.range,
-                definitionNode = null // Token.IdentifierはAstNodeではないのでnull
+                scopeRange = forStmt.block.range,
+                definitionNode = forStmt.loopCounter
             )
         )
         visit(forStmt.start)
@@ -175,14 +182,14 @@ class AstVisitor {
     private fun visitSystemLiteral(systemLiteral: AstNode.SystemLiteral) {}
 
     private fun visitFunctionLiteral(functionLiteral: AstNode.FunctionLiteral) {
-        enterScope()
-        functionLiteral.parameters.forEach { paramName ->
-            val dummyRange = functionLiteral.range // 適切���範囲を設定する必要がある
+        enterScope(functionLiteral.body.range)
+        functionLiteral.parameters.forEach { paramToken ->
             currentScope().define(
                 Symbol(
-                    name = paramName,
+                    name = paramToken.literal,
                     kind = SymbolKind.PARAMETER,
-                    range = dummyRange, // TODO: パラメータの正確な範囲を取得する
+                    range = paramToken.range,
+                    scopeRange = functionLiteral.body.range,
                     definitionNode = null
                 )
             )

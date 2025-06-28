@@ -16,7 +16,7 @@ class ReferenceService(
             ?: return emptyList()
 
         // ASTを走査して、同じシンボルの全参照箇所を検索
-        val program = astInfoService.findNodeAtOffset(0) as? AstNode.Program
+        val program = astInfoService.getAst()
             ?: return emptyList()
 
         val references = mutableListOf<Location>()
@@ -52,15 +52,19 @@ class ReferenceService(
                 }
             }
 
+            is AstNode.ExpressionStatement -> {
+                findReferencesInNode(node.expression, targetSymbol, code, uri, references)
+            }
+
             is AstNode.FunctionStatement -> {
-                // 関数名のチェックは文字列なので、範囲を作成して確認
-                if (node.name == targetSymbol.name) {
-                    addReferenceLocation(node, code, uri, references)
+                // 関数名のチェック
+                if (node.name.literal == targetSymbol.name) {
+                    addReferenceLocation(node.name.range, code, uri, references)
                 }
-                // パラメータのチェック（文字列リスト）
+                // パラメータのチェック
                 node.parameters.forEach { param ->
-                    if (param == targetSymbol.name) {
-                        addReferenceLocation(node, code, uri, references) // パラメータの正確な範囲は後で改善
+                    if (param.literal == targetSymbol.name) {
+                        addReferenceLocation(param.range, code, uri, references)
                     }
                 }
                 // 関数本体をチェック
@@ -69,7 +73,7 @@ class ReferenceService(
 
             is AstNode.Identifier -> {
                 if (node.value == targetSymbol.name) {
-                    addReferenceLocation(node, code, uri, references)
+                    addReferenceLocation(node.range, code, uri, references)
                 }
             }
 
@@ -84,13 +88,7 @@ class ReferenceService(
                 findReferencesInNode(node.condition, targetSymbol, code, uri, references)
                 findReferencesInNode(node.consequence, targetSymbol, code, uri, references)
                 node.alternative?.let {
-                    findReferencesInNode(
-                        it,
-                        targetSymbol,
-                        code,
-                        uri,
-                        references
-                    )
+                    findReferencesInNode(it, targetSymbol, code, uri, references)
                 }
             }
 
@@ -100,14 +98,14 @@ class ReferenceService(
             }
 
             is AstNode.ForStatement -> {
+                // ループカウンタのチェック
+                if (node.loopCounter.value == targetSymbol.name) {
+                    addReferenceLocation(node.loopCounter.range, code, uri, references)
+                }
                 findReferencesInNode(node.start, targetSymbol, code, uri, references)
                 findReferencesInNode(node.end, targetSymbol, code, uri, references)
                 findReferencesInNode(node.step, targetSymbol, code, uri, references)
                 findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.ExpressionStatement -> {
-                findReferencesInNode(node.expression, targetSymbol, code, uri, references)
             }
 
             is AstNode.InfixExpression -> {
@@ -125,36 +123,25 @@ class ReferenceService(
             }
 
             is AstNode.ArrayLiteral -> {
-                node.elements.forEach { element ->
-                    findReferencesInNode(element, targetSymbol, code, uri, references)
+                node.elements.forEach {
+                    findReferencesInNode(it, targetSymbol, code, uri, references)
                 }
             }
 
-            // リーフノード - 何もしない
-            is AstNode.IntLiteral,
-            is AstNode.FloatLiteral,
-            is AstNode.StringLiteral,
-            is AstNode.BooleanLiteral -> {
-                // リテラル内に参照は存在しない
-            }
-
-            else -> {
-                // その他のノードタイプを処理
+            // リーフノードは処理済み
+            else -> { /* Do nothing for leaf nodes */
             }
         }
     }
 
     private fun addReferenceLocation(
-        node: AstNode,
+        range: IntRange,
         code: String,
         uri: String,
         references: MutableList<Location>
     ) {
-        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
-            code,
-            node.range.first
-        )
-        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, node.range.last)
+        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(code, range.first)
+        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, range.last)
 
         references.add(
             Location(

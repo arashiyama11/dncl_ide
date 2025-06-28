@@ -70,8 +70,8 @@ class ReferenceServiceTest {
                 戻り値(a + b)
             関数終了
             
-            結果1 ← add(1, 2)
-            結果2 ← add(3, 4)
+            res1 ← add(1, 2)
+            res2 ← add(3, 4)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -123,9 +123,9 @@ class ReferenceServiceTest {
         val (referenceService, _, astInfoService) = createServices()
         val code = """
             関数 calc(num1, num2)を
-                結果 = num1 + num2
+                res = num1 + num2
                 表示(num1)
-                戻り値(結果)
+                戻り値(res)
             と定義する
         """.trimIndent()
 

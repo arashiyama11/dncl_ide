@@ -15,17 +15,22 @@ class DefinitionService(
             ?: return null
 
         // シンボルの定義位置を取得
-        val definitionRange = symbol.range
         val definitionNode = symbol.definitionNode
+
+        val defRange = when (definitionNode) {
+            is AstNode.FunctionStatement -> definitionNode.name.range
+            is AstNode.Identifier -> definitionNode.range
+            else -> symbol.range
+        }
 
         // 定義位置の行と文字位置を計算
         val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
             code,
-            definitionRange.first
+            defRange.first
         )
         val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(
             code,
-            definitionRange.last
+            defRange.last
         )
 
         return Location(
