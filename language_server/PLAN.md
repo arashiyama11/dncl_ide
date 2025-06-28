@@ -17,20 +17,20 @@
 
 - [x] Diagnostics（構文・意味エラー表示）
 - [x] Completion（予約語・関数補完。domain/~~/SuggestionUseCaseを参考に)
-- [x] Hover（関数・キーワードの説明）
+- [ ] Hover（関数・キーワードの説明）- 詳細: `TODO.md`
 
 ### 🟨 フェーズ2: 高度な機能
 
-- [x] Go to Definition
-- [x] Find References
-- [x] Rename Symbol
-- [x] Format
-- [x] Code Actions / Quick Fix
+- [ ] Go to Definition - 詳細: `TODO.md`
+- [ ] Find References - 詳細: `TODO.md`
+- [ ] Rename Symbol - 詳細: `TODO.md`
+- [ ] Format - 詳細: `TODO.md`
+- [ ] Code Actions / Quick Fix - 詳細: `TODO.md`
 
 ### 🟦 フェーズ3: Notebook 対応と拡張
 
 - [x] `.dnclnb` ファイル対応（セル単位のURI仕様）
-- [x] Semantic Tokens（ハイライト高速化）
+- [ ] Semantic Tokens（ハイライト高速化）- 詳細: `TODO.md`
 
 ## ✅ 3. 技術スタックと方針
 

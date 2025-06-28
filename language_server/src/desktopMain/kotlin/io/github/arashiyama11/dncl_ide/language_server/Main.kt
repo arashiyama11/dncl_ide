@@ -10,7 +10,7 @@ import java.io.InputStreamReader
 fun main() = runBlocking {
     logging("Starting DNCL Language Server")
     val json = Json { ignoreUnknownKeys = true }
-    val server = DNCLLanguageServer()
+    val server = DNCLLanguageServer(DocumentManager(), DiagnosticService(), CompletionService(), HoverService(DiagnosticService()), DefinitionService(DiagnosticService()), ReferenceService(DiagnosticService()), RenameService(DiagnosticService()), FormattingService(), CodeActionService(), SemanticTokensService(DiagnosticService()))
 
     // 出力ループを起動
     val outputJob = launchOutputLoop(server)
