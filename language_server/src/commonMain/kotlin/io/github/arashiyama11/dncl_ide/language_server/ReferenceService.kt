@@ -146,17 +146,23 @@ class ReferenceService(
         references: MutableList<Location>
     ) {
         if (node is AstNode.Identifier && node.value == targetSymbol.name) {
-            // スコープを考慮して同じシンボルかどうかチェック
-            val symbolAtPosition = astInfoService.findSymbolAtOffset(node.range.first)
-            if (symbolAtPosition != null && isSameSymbol(symbolAtPosition, targetSymbol)) {
+            // より簡単なスコープチェック：範囲で比較
+            if (isInSameScope(node.range, targetSymbol)) {
                 addReferenceLocation(node.range, code, uri, references)
             }
         }
     }
 
+    private fun isInSameScope(nodeRange: IntRange, targetSymbol: Symbol): Boolean {
+        // シンボルが同じスコープにあるかチェック
+        // 簡単な実装：ターゲットシンボルのスコープ範囲内��ノードがあるかチェック
+        return nodeRange.first >= targetSymbol.scopeRange.first &&
+                nodeRange.last <= targetSymbol.scopeRange.last
+    }
+
     private fun isSameSymbol(range: IntRange, targetSymbol: Symbol): Boolean {
-        // シンボルの範囲が一致するかチェック
-        return range == targetSymbol.range
+        // より厳密でないシンボル比較：名前とスコープ範囲で判定
+        return range == targetSymbol.range || isInSameScope(range, targetSymbol)
     }
 
     private fun isSameSymbol(symbol1: Symbol, symbol2: Symbol): Boolean {

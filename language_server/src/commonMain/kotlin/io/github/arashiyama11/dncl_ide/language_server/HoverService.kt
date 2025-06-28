@@ -29,42 +29,41 @@ class HoverService(
                 } else {
                     // ユーザー定義シンボルのホバー情報
                     val symbol = astInfoService.findSymbolAtOffset(offset)
-                    if (symbol != null) {
-                        when (symbol.kind) {
-                            SymbolKind.VARIABLE -> {
-                                "**変数**: `${symbol.name}`\n\n" +
-                                        "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                        if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
-                            }
+                    when (symbol?.kind) {
+                        SymbolKind.VARIABLE -> {
+                            "**変数**: `${symbol.name}`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
+                        }
 
-                            SymbolKind.FUNCTION -> {
-                                val functionNode =
-                                    symbol.definitionNode as? AstNode.FunctionStatement
-                                val params =
-                                    functionNode?.parameters?.joinToString(", ") { it.literal }
-                                        ?: ""
-                                "**関数**: `${symbol.name}($params)`\n\n" +
-                                        "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                        if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
-                            }
+                        SymbolKind.FUNCTION -> {
+                            val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
+                            val params =
+                                functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
+                            "**関数**: `${symbol.name}($params)`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
+                        }
 
-                            SymbolKind.PARAMETER -> {
-                                "**パラメータ**: `${symbol.name}`\n\n" +
-                                        "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                        "関数のパラメータとして定義されています"
-                            }
+                        SymbolKind.PARAMETER -> {
+                            "**パラメータ**: `${symbol.name}`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    "関数のパラメータとして定義されています"
+                        }
 
-                            SymbolKind.BUILT_IN_FUNCTION -> {
-                                builtInFunctionDescriptions[symbol.name]
-                                    ?: "組み込み関数: ${symbol.name}"
-                            }
+                        SymbolKind.BUILT_IN_FUNCTION -> {
+                            builtInFunctionDescriptions[symbol.name]
+                                ?: "組み込み関数: ${symbol.name}"
+                        }
 
-                            SymbolKind.UNKNOWN -> {
-                                "**不明なシンボル**: `${symbol.name}`"
+                        SymbolKind.UNKNOWN, null -> {
+                            // シンボル解決に失敗した場合も組み込み関数をチェック
+                            if (builtInFunctionDescriptions.containsKey(hoveredToken.literal)) {
+                                builtInFunctionDescriptions[hoveredToken.literal]
+                            } else {
+                                null
                             }
                         }
-                    } else {
-                        null
                     }
                 }
             }

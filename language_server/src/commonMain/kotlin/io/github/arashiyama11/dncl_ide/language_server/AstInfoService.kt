@@ -236,7 +236,7 @@ class AstInfoService {
                     kind = io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.PARAMETER,
                     range = param.range,
                     scopeRange = functionNode.block.range,
-                    definitionNode = null
+                    definitionNode = null // パラメータはTokenなのでAstNodeではない
                 )
             )
         }
