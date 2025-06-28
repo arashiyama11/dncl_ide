@@ -1,4 +1,11 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
+
+import io.github.arashiyama11.dncl_ide.language_server.CodeAction
+import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.TextDocumentEdit
+import io.github.arashiyama11.dncl_ide.language_server.TextEdit
+import io.github.arashiyama11.dncl_ide.language_server.VersionedTextDocumentIdentifier
+import io.github.arashiyama11.dncl_ide.language_server.WorkspaceEdit
 
 class CodeActionService {
     fun getCodeActions(uri: String, diagnostics: List<Diagnostic>): List<CodeAction> {

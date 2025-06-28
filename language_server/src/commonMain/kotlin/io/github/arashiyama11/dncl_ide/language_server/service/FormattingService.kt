@@ -1,4 +1,8 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
+
+import io.github.arashiyama11.dncl_ide.language_server.Position
+import io.github.arashiyama11.dncl_ide.language_server.Range
+import io.github.arashiyama11.dncl_ide.language_server.TextEdit
 
 class FormattingService {
     fun formatDocument(code: String): List<TextEdit> {

@@ -1,7 +1,9 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
+import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
+import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
+import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 

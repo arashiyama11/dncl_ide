@@ -1,6 +1,9 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.language_server.Location
+import io.github.arashiyama11.dncl_ide.language_server.Position
+import io.github.arashiyama11.dncl_ide.language_server.Range
 import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class DefinitionService(

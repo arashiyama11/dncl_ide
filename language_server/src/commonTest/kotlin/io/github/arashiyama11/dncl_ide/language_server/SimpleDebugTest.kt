@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import kotlin.test.Test
 
 class SimpleDebugTest {

@@ -1,10 +1,12 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
+import io.github.arashiyama11.dncl_ide.language_server.Hover
+import io.github.arashiyama11.dncl_ide.language_server.MarkupContent
 
 class HoverService(
     private val astInfoService: AstInfoService

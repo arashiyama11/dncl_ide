@@ -1,6 +1,7 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 
 class CompletionService {
     fun getCompletionItems(code: String, offset: Int): List<CompletionItem> {

@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer

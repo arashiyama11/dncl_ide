@@ -1,5 +1,9 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
+import io.github.arashiyama11.dncl_ide.language_server.TextDocumentEdit
+import io.github.arashiyama11.dncl_ide.language_server.TextEdit
+import io.github.arashiyama11.dncl_ide.language_server.VersionedTextDocumentIdentifier
+import io.github.arashiyama11.dncl_ide.language_server.WorkspaceEdit
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
 class RenameService(

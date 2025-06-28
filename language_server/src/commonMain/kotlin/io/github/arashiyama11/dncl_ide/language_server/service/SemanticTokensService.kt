@@ -1,7 +1,8 @@
-package io.github.arashiyama11.dncl_ide.language_server
+package io.github.arashiyama11.dncl_ide.language_server.service
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
+import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class SemanticTokensService() {
