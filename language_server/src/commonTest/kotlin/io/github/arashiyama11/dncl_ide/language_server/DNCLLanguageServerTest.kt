@@ -350,7 +350,7 @@ class DNCLLanguageServerTest {
                 params = json.encodeToJsonElement(
                     HoverParams(
                         textDocument = TextDocumentIdentifier("file:///b.dncl"),
-                        position = Position(1, 3) // Position at 'x' in "表示 x"
+                        position = Position(1, 5) // Position at 'x' in "表示 x"
                     )
                 )
             )
@@ -367,8 +367,14 @@ class DNCLLanguageServerTest {
             } else {
                 null
             }
-            assertTrue(hover?.contents?.value?.contains("**変数**: `x`") ?: false, "ホバー内容に変数名「x」が含まれるはずです")
-            assertTrue(hover?.contents?.value?.contains("定義位置:") ?: false, "ホバー内容に定義位置が含まれるはずです")
+            assertTrue(
+                hover?.contents?.value?.contains("**変数**: `x`") ?: false,
+                "ホバー内容に変数名「x」が含まれるはずです"
+            )
+            assertTrue(
+                hover?.contents?.value?.contains("定義位置:") ?: false,
+                "ホバー内容に定義位置が含まれるはずです"
+            )
         }
 
 //    @Test
