@@ -30,103 +30,105 @@ class SimpleDebugTest {
         println("=== DEBUG: Simple Variable Test ===")
         println("Code: '$code'")
 
-        astInfoService.parseAndAnalyze(code)
+        val astInfo = astInfoService.parseAndAnalyze(code)
+        println("AstInfo: $astInfo")
 
-        val ast = astInfoService.getAst()
-        println("AST: $ast")
+        if (astInfo != null) {
+            println("AST: ${astInfo.ast}")
+            println("Symbol Table: ${astInfo.symbolTable}")
 
-        val symbolTable = astInfoService.getSymbolTable()
-        println("Symbol Table: $symbolTable")
-
-        if (symbolTable != null) {
-            val allSymbols = symbolTable.allSymbols()
+            val allSymbols = astInfo.symbolTable.allSymbols()
             println("All symbols: $allSymbols")
+
+            allSymbols.forEach { symbol ->
+                println("Symbol: ${symbol.name}, kind: ${symbol.kind}, range: ${symbol.range}")
+            }
         }
 
         val targetOffset = code.indexOf("x")
         println("Target offset: $targetOffset")
 
-        val symbol = astInfoService.findSymbolAtOffset(targetOffset)
-        println("Found symbol: $symbol")
+        if (astInfo != null) {
+            val symbol = astInfoService.findSymbolAtOffset(astInfo, targetOffset)
+            println("Found symbol: $symbol")
+
+            val node = astInfoService.findNodeAtOffset(astInfo, targetOffset)
+            println("Found node: $node")
+        }
     }
 
     @Test
-    fun debug_function_resolution() {
+    fun debug_function_call() {
         val astInfoService = AstInfoService()
         val code = """
-            関数 myFunc(a, b)を:
+            関数 add(a, b)を:
                 戻り値(a + b)
             と定義する
             
-            res = myFunc(1, 2)
+            res = add(1, 2)
         """.trimIndent()
 
-        println("=== DEBUG: Function Resolution ===")
+        println("=== DEBUG: Function Call Test ===")
         println("Code: '$code'")
 
-        astInfoService.parseAndAnalyze(code)
+        val astInfo = astInfoService.parseAndAnalyze(code)
+        println("AstInfo: $astInfo")
 
-        val ast = astInfoService.getAst()
-        println("AST parsed: ${ast != null}")
+        if (astInfo != null) {
+            println("AST: ${astInfo.ast}")
+            println("Symbol Table: ${astInfo.symbolTable}")
 
-        val symbolTable = astInfoService.getSymbolTable()
-        println("Symbol table created: ${symbolTable != null}")
+            val allSymbols = astInfo.symbolTable.allSymbols()
+            println("All symbols: $allSymbols")
 
-        if (symbolTable != null) {
-            val allSymbols = symbolTable.allSymbols()
-            println("All symbols found: ${allSymbols.size}")
             allSymbols.forEach { symbol ->
-                println("  Symbol: ${symbol.name}, kind: ${symbol.kind}, range: ${symbol.range}")
+                println("Symbol: ${symbol.name}, kind: ${symbol.kind}, range: ${symbol.range}")
             }
         }
 
-        val funcCallPosition = code.indexOf("myFunc", code.indexOf("res"))
-        println("Function call position: $funcCallPosition")
-        println("Character at position: '${code[funcCallPosition]}'")
+        val targetOffset = code.indexOf("add", code.indexOf("res"))
+        println("Target offset: $targetOffset")
 
-        val symbol = astInfoService.findSymbolAtOffset(funcCallPosition)
-        println("Found symbol at offset: $symbol")
-
-        val node = astInfoService.findNodeAtOffset(funcCallPosition)
-        println("Found node at offset: $node")
+        if (astInfo != null) {
+            val symbol = astInfoService.findSymbolAtOffset(astInfo, targetOffset)
+            println("Found symbol: $symbol")
+        }
     }
 
     @Test
-    fun debug_exact_failing_test() {
+    fun debug_parameter_reference() {
         val astInfoService = AstInfoService()
         val code = """
-            関数 myFunc(a, b)を:
-                戻り値(a + b)
+            関数 calc(num1, num2)を:
+                res = num1 + num2
+                戻り値(res)
             と定義する
-            
-            res = myFunc(1, 2)
         """.trimIndent()
 
-        println("=== DEBUG: Exact Failing Test Code ===")
+        println("=== DEBUG: Parameter Reference Test ===")
         println("Code: '$code'")
-        println("Code length: ${code.length}")
 
-        astInfoService.parseAndAnalyze(code)
+        val astInfo = astInfoService.parseAndAnalyze(code)
+        println("AstInfo: $astInfo")
 
-        val ast = astInfoService.getAst()
-        println("AST parsed: ${ast != null}")
+        if (astInfo != null) {
+            println("AST: ${astInfo.ast}")
+            println("Symbol Table: ${astInfo.symbolTable}")
 
-        val symbolTable = astInfoService.getSymbolTable()
-        println("Symbol table created: ${symbolTable != null}")
+            val allSymbols = astInfo.symbolTable.allSymbols()
+            println("All symbols: $allSymbols")
 
-        if (symbolTable != null) {
-            val allSymbols = symbolTable.allSymbols()
-            println("All symbols found: ${allSymbols.size}")
             allSymbols.forEach { symbol ->
-                println("  Symbol: ${symbol.name}, kind: ${symbol.kind}, range: ${symbol.range}")
+                println("Symbol: ${symbol.name}, kind: ${symbol.kind}, range: ${symbol.range}")
             }
         }
 
-        val funcCallPosition = code.indexOf("myFunc", code.indexOf("res"))
-        println("Function call position: $funcCallPosition")
-        println("Character at position: '${if (funcCallPosition < code.length) code[funcCallPosition] else "OUT_OF_BOUNDS"}'")
+        val targetOffset = code.indexOf("num1", code.indexOf("res ="))
+        println("Target offset: $targetOffset")
 
-        val symbol = astInfoService.findSymbolAtOffset(funcCallPosition)
-        println("Found symbol at offset: $symbol")
+        if (astInfo != null) {
+            val symbol = astInfoService.findSymbolAtOffset(astInfo, targetOffset)
+            println("Found symbol: $symbol")
+        }
     }
 }

@@ -9,64 +9,53 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.language_server.ast.AstVisitor
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
-class AstInfoService {
-    private var currentAst: AstNode.Program? = null
-    private var currentSymbolTable: SymbolTable? = null
+data class AstInfo(
+    val ast: AstNode.Program,
+    val symbolTable: SymbolTable
+)
 
-    fun parseAndAnalyze(code: String) {
-        try {
+class AstInfoService {
+    fun parseAndAnalyze(code: String): AstInfo? {
+        return try {
             val lexer = Lexer(code)
             val parserResult = Parser(lexer)
             val parser = when (parserResult) {
-                is Either.Left -> {
-                    return
-                }
-
+                is Either.Left -> return null
                 is Either.Right -> parserResult.value
             }
 
             val programResult = parser.parseProgram()
             val program = when (programResult) {
-                is Either.Left -> {
-                    return
-                }
-
+                is Either.Left -> return null
                 is Either.Right -> programResult.value
             }
 
             val visitor = AstVisitor()
             val symbolTable = visitor.visit(program)
 
-            currentAst = program
-            currentSymbolTable = symbolTable
+            AstInfo(program, symbolTable)
         } catch (e: Exception) {
-            // Parsing failed, keep ast and symbolTable as null
+            null
         }
     }
 
-    fun findNodeAtOffset(offset: Int): AstNode? {
-        val ast = currentAst ?: return null
-        return findNodeRecursive(ast, offset)
+    fun findNodeAtOffset(astInfo: AstInfo, offset: Int): AstNode? {
+        return findNodeRecursive(astInfo.ast, offset)
     }
 
-    fun findSymbolAtOffset(offset: Int): Symbol? {
-        val symbolTable = currentSymbolTable ?: return null
-        val ast = currentAst ?: return null
-
+    fun findSymbolAtOffset(astInfo: AstInfo, offset: Int): Symbol? {
         // First, find the node at the offset to understand the context
-        val node = findNodeAtOffset(offset)
-
-        // pure: node found
+        val node = findNodeAtOffset(astInfo, offset)
 
         // If it's an identifier, try to resolve it from the appropriate scope
         if (node is AstNode.Identifier) {
             // Find the appropriate scope for this offset
-            val scopeSymbolTable = findScopeForOffset(ast, offset, symbolTable)
+            val scopeSymbolTable = findScopeForOffset(astInfo.ast, offset, astInfo.symbolTable)
             return scopeSymbolTable.resolve(node.value, offset)
         }
 
         // Also check if we're in a function name or parameter position
-        return findSymbolInAst(ast, offset, symbolTable)
+        return findSymbolInAst(astInfo.ast, offset, astInfo.symbolTable)
     }
 
     private fun findScopeForOffset(
@@ -345,7 +334,7 @@ class AstInfoService {
             return null
         }
 
-        // 複合��ードの場合、子ノードを再帰的に探索
+        // 複合ノードの場合、子ノードを再帰的に探索
         return when (node) {
             is AstNode.Program -> node.statements.firstNotNullOfOrNull {
                 findNodeRecursive(it, offset)
@@ -383,7 +372,10 @@ class AstInfoService {
 
             is AstNode.ForStatement -> {
                 // ループカウンタがオフセットに含まれるかチェック
-                if (offset in node.loopCounter.range) return node.loopCounter
+                if (offset in node.loopCounter.range) return AstNode.Identifier(
+                    node.loopCounter.literal,
+                    node.loopCounter.range
+                )
 
                 findNodeRecursive(node.start, offset)
                     ?: findNodeRecursive(node.end, offset)
@@ -551,8 +543,4 @@ class AstInfoService {
             else -> null
         }
     }
-
-    fun getSymbolTable(): SymbolTable? = currentSymbolTable
-
-    fun getAst(): AstNode.Program? = currentAst
 }

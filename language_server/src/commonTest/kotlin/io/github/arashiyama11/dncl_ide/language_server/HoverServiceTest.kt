@@ -19,16 +19,14 @@ class HoverServiceTest {
 
     @Test
     fun test_hover_on_builtin_function() {
-        // Red: テストが失敗することを確認
-        val (hoverService, _, astInfoService) = createServices()
-        val code = "表示する(\"Hello World\")"
+        val (hoverService, diagnosticService, astInfoService) = createServices()
 
-        astInfoService.parseAndAnalyze(code)
-        val hover = hoverService.getHover(code, 1) // "表示" の位置
+        val code = "表示する(x)"
+        val hover = hoverService.getHover(code, 1) // 「表示」の位置
 
         assertNotNull(hover)
+        assertNotNull(hover.contents)
         assertEquals("markdown", hover.contents.kind)
-        // builtInFunctionDescriptionsに「表示」の説明があることを期待
     }
 
     @Test
@@ -40,13 +38,12 @@ class HoverServiceTest {
             表示する(x)
         """.trimIndent()
 
-        astInfoService.parseAndAnalyze(code)
         val hover =
             hoverService.getHover(code, code.indexOf("x)", code.indexOf("表示する"))) // 2行目のxの位置
 
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
-        // ��数xの情報が含まれることを期待
+        // 変数xの情報が含まれることを期待
     }
 
     @Test
@@ -61,7 +58,6 @@ class HoverServiceTest {
             res = myFunc(1, 2)
         """.trimIndent()
 
-        astInfoService.parseAndAnalyze(code)
         val hover = hoverService.getHover(
             code,
             code.indexOf("myFunc", code.indexOf("res"))
@@ -78,7 +74,6 @@ class HoverServiceTest {
         val (hoverService, _, astInfoService) = createServices()
         val code = "表示(\"Hello World\")"
 
-        astInfoService.parseAndAnalyze(code)
         val hover = hoverService.getHover(code, code.length - 1) // 文字列の最後の空白部分
 
         assertNull(hover)
@@ -94,7 +89,6 @@ class HoverServiceTest {
             と定義する
         """.trimIndent()
 
-        astInfoService.parseAndAnalyze(code)
         val hover =
             hoverService.getHover(code, code.indexOf("param1", code.indexOf("表示"))) // 関数内のparam1
 

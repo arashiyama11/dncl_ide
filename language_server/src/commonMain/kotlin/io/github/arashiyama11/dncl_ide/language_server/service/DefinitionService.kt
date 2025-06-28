@@ -4,17 +4,16 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.Location
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.Range
-import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class DefinitionService(
     private val astInfoService: AstInfoService
 ) {
     fun getDefinitionLocation(uri: String, code: String, offset: Int): Location? {
-        // AST is parsed
-        astInfoService.parseAndAnalyze(code)
+        // Parse and analyze the code
+        val astInfo = astInfoService.parseAndAnalyze(code) ?: return null
 
         // カーソル位置のシンボルを取得
-        val symbol = astInfoService.findSymbolAtOffset(offset)
+        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
             ?: return null
 
         // シンボルの定義位置を取得
@@ -27,21 +26,11 @@ class DefinitionService(
             else -> symbol.range
         }
 
-        // 定義位置の行と文字位置を計算
-        val (startLine, startChar) = calculateLineAndCharacter(
-            code,
-            defRange.first
-        )
-        val (endLine, endChar) = calculateLineAndCharacter(
-            code,
-            defRange.last + 1  // Make end position exclusive
-        )
-
         return Location(
             uri = uri,
             range = Range(
-                start = Position(startLine, startChar),
-                end = Position(endLine, endChar)
+                start = Position(line = 0, character = defRange.first),
+                end = Position(line = 0, character = defRange.last + 1)
             )
         )
     }

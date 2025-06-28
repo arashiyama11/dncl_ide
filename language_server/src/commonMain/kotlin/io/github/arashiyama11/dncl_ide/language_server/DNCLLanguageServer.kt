@@ -38,8 +38,7 @@ class DNCLLanguageServer(
     private val renameService: RenameService,
     private val formattingService: FormattingService,
     private val codeActionService: CodeActionService,
-    private val semanticTokensService: SemanticTokensService,
-    private val astInfoService: AstInfoService
+    private val semanticTokensService: SemanticTokensService
 ) {
     private val debug = false
     private val state = MutableStateFlow(LsState())
@@ -147,7 +146,6 @@ class DNCLLanguageServer(
             request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
             documentManager = documentManager.setDocument(it.uri, it.text)
-            astInfoService.parseAndAnalyze(it.text)
             publishDiagnostics(it.uri, it.text)
         }
     }
@@ -158,7 +156,6 @@ class DNCLLanguageServer(
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
                 documentManager = documentManager.setDocument(docId.uri, change.text)
-                astInfoService.parseAndAnalyze(change.text)
                 publishDiagnostics(docId.uri, change.text)
             }
         }
@@ -282,13 +279,18 @@ class DNCLLanguageServer(
 
     private suspend fun handleReferences(request: JsonRpcRequest) {
         handleWithDocument<ReferenceParams, List<Location>>(request) { code, offset, params ->
-            referenceService.getReferences(params.textDocument.uri, code, offset)
+            referenceService.findReferences(
+                params.textDocument.uri,
+                code,
+                offset,
+                params.context.includeDeclaration
+            )
         }
     }
 
     private suspend fun handleRename(request: JsonRpcRequest) {
         handleWithDocument<RenameParams, WorkspaceEdit?>(request) { code, offset, params ->
-            renameService.getRenameEdits(params.textDocument.uri, code, offset, params.newName)
+            renameService.rename(params.textDocument.uri, code, offset, params.newName)
         }
     }
 

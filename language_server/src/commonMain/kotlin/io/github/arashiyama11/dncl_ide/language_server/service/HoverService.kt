@@ -13,7 +13,7 @@ class HoverService(
 ) {
     fun getHover(code: String, offset: Int): Hover? {
         // First parse and analyze the code
-        astInfoService.parseAndAnalyze(code)
+        val astInfo = astInfoService.parseAndAnalyze(code) ?: return null
 
         val lexer = Lexer(code)
         val tokens = lexer.toList().mapNotNull { it.getOrNull() }
@@ -24,8 +24,7 @@ class HoverService(
 
         val hoverContent: String? = when (hoveredToken) {
             is Token.Japanese, is Token.Identifier -> {
-
-                val symbol = astInfoService.findSymbolAtOffset(offset)
+                val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
                 when (symbol?.kind) {
                     SymbolKind.VARIABLE -> {
                         "**変数**: `${symbol.name}`\n\n" +
@@ -49,42 +48,58 @@ class HoverService(
                     }
 
                     SymbolKind.BUILT_IN_FUNCTION -> {
-                        val builtInFunction =
-                            AllBuiltInFunction.values().find { it.identifier == symbol.name }
+                        val builtInFunction = AllBuiltInFunction.from(symbol.name)
                         if (builtInFunction != null) {
-                            """**組み込み関数**: `${builtInFunction.identifier}`
-
-この関数はDNCLの組み込み関数です。"""
+                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n" +
+                                    "この関数はDNCLの組み込み関数です。"
                         } else {
-                            null
+                            "**組み込み関数**: `${symbol.name}`"
                         }
                     }
 
                     SymbolKind.UNKNOWN, null -> {
-                        // シンボル解決に失敗した場合も組み込み関数をチェック
-                        val builtInFunction = AllBuiltInFunction.values()
-                            .find { it.identifier == hoveredToken.literal }
+                        // シンボルが見つからない場合は組み込み関数かどうかチェック
+                        val tokenText = hoveredToken.literal
+                        val builtInFunction = AllBuiltInFunction.from(tokenText)
                         if (builtInFunction != null) {
-                            """**組み込み関数**: `${builtInFunction.identifier}`
-
-この関数はDNCLの組み込み関数です。"""
-                        } else {
-                            null
-                        }
+                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n" +
+                                    "この関数はDNCLの組み込み関数です。"
+                        } else null
                     }
                 }
+            }
+
+            is Token.Int -> {
+                "**整数リテラル**: `${hoveredToken.literal}`\n\n" +
+                        "値: ${hoveredToken.literal}"
+            }
+
+            is Token.Float -> {
+                "**浮動小数点リテラル**: `${hoveredToken.literal}`\n\n" +
+                        "値: ${hoveredToken.literal}"
+            }
+
+            is Token.String -> {
+                "**文字列リテラル**: `${hoveredToken.literal}`\n\n" +
+                        "値: ${hoveredToken.literal}"
+            }
+
+            is Token.Boolean -> {
+                "**ブール値リテラル**: `${hoveredToken.literal}`\n\n" +
+                        "値: ${hoveredToken.value}"
             }
 
             else -> null
         }
 
-        return if (hoverContent != null) {
+        return hoverContent?.let { content ->
             Hover(
                 contents = MarkupContent(
                     kind = "markdown",
-                    value = hoverContent
-                )
+                    value = content
+                ),
+                range = null
             )
-        } else null
+        }
     }
 }
