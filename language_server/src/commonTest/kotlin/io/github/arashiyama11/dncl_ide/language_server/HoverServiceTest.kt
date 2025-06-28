@@ -43,15 +43,15 @@ class HoverServiceTest {
 
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
-        // 変数xの情報が含まれることを期待
+        // ��数xの情報が含まれることを期待
     }
 
     @Test
     fun test_hover_on_function_definition() {
-        // Red: 関数定��に対するホバー情報をテスト
+        // Red: 関数定義に対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
-            関数 myFunc(a, b)を:
+            関数 myFunc(a, b) を:
                 戻り値(a + b)
             と定義する
             
@@ -86,7 +86,7 @@ class HoverServiceTest {
         // Red: 関数パラメータに対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
-            関数 myFunc(param1, param2)を:
+            関数 myFunc(param1, param2) を:
                 表示する(param1)
             と定義する
         """.trimIndent()

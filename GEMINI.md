@@ -58,7 +58,7 @@ This project follows the principles of **Clean Architecture**:
 
 ## 5. Common Gradle Tasks (Desktop)
 
-> Always add `--console=plain` to keep logs clean and avoid daemon issues.
+> Always add `--console=plain --stacktrace` to keep logs clean.
 
 ### Compilation
 

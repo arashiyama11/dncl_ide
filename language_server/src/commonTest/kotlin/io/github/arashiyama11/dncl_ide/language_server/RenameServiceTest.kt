@@ -10,7 +10,7 @@ class RenameServiceTest {
     private fun createServices(): Triple<RenameService, DiagnosticService, AstInfoService> {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val renameService = RenameService(diagnosticService, astInfoService)
+        val renameService = RenameService(diagnosticService)
         return Triple(renameService, diagnosticService, astInfoService)
     }
 
@@ -154,7 +154,7 @@ class RenameServiceTest {
         val workspaceEdit =
             renameService.getRenameEdits("test://file.dncl", code, invalidPosition, "newName")
 
-        assertNull(workspaceEdit, "文字列リテラル内ではリネームできないはずです")
+        assertNull(workspaceEdit, "文字列リテラル内ではリ���ームできないはずです")
     }
 
     @Test

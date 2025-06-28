@@ -1,0 +1,41 @@
+package io.github.arashiyama11.dncl_ide.language_server
+
+import kotlin.test.Test
+
+class DebugHoverTest {
+
+    @Test
+    fun debug_hover_function() {
+        val diagnosticService = DiagnosticService()
+        val astInfoService = AstInfoService()
+        val hoverService = HoverService(diagnosticService, astInfoService)
+
+        val code = """
+            関数 myFunc(a, b) を:
+                戻り値(a + b)
+            と定義する
+            
+            結果 = myFunc(1, 2)
+        """.trimIndent()
+
+        println("Code to parse:")
+        println(code)
+        println("Code length: ${code.length}")
+
+        astInfoService.parseAndAnalyze(code)
+
+        val targetIndex = code.indexOf("myFunc", code.indexOf("結果"))
+        println("Target index: $targetIndex")
+        println("Character at target: '${code[targetIndex]}'")
+
+        val hover = hoverService.getHover(code, targetIndex)
+        println("Hover result: $hover")
+
+        if (hover != null) {
+            println("Hover contents kind: ${hover.contents.kind}")
+            println("Hover contents value: ${hover.contents.value}")
+        } else {
+            println("Hover is null")
+        }
+    }
+}

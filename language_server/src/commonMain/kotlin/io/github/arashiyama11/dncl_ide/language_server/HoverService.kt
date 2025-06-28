@@ -50,15 +50,14 @@ class HoverService(
 
                         SymbolKind.BUILT_IN_FUNCTION -> {
                             builtInFunctionDescriptions[symbol.name]
-                                ?: "**組み込み関数**: `${symbol.name}`"
+                                ?: "組み込み関数: ${symbol.name}"
                         }
 
-                        SymbolKind.UNKNOWN -> null
+                        SymbolKind.UNKNOWN -> {
+                            "**不明なシンボル**: `${symbol.name}`"
+                        }
                     }
-                } else {
-                    // シンボルが見つからない場合、組み込み関数かチェック
-                    builtInFunctionDescriptions[hoveredToken.literal]
-                }
+                } else null
             }
 
             else -> null
@@ -66,21 +65,11 @@ class HoverService(
 
         return if (hoverContent != null) {
             Hover(
-                contents = MarkupContent(kind = "markdown", value = hoverContent),
-                range = hoveredToken?.let { token ->
-                    val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
-                        code,
-                        token.range.first
-                    )
-                    val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(
-                        code,
-                        token.range.last
-                    )
-                    Range(Position(startLine, startChar), Position(endLine, endChar))
-                }
+                contents = MarkupContent(
+                    kind = "markdown",
+                    value = hoverContent
+                )
             )
-        } else {
-            null
-        }
+        } else null
     }
 }

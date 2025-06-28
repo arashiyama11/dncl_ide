@@ -3,12 +3,11 @@ package io.github.arashiyama11.dncl_ide.language_server
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 
 class RenameService(
-    private val diagnosticService: DiagnosticService,
-    private val astInfoService: AstInfoService,
-    private val referenceService: ReferenceService
+    private val diagnosticService: DiagnosticService
 ) {
     fun getRenameEdits(uri: String, code: String, offset: Int, newName: String): WorkspaceEdit? {
         // ASTを解析
+        val astInfoService = AstInfoService()
         astInfoService.parseAndAnalyze(code)
 
         // カーソル位置のシンボルを取得
@@ -20,7 +19,8 @@ class RenameService(
             return null
         }
 
-        // Find References機能を使用して、すべての参照箇所を取得
+        // ReferenceServiceを作成してすべての参照箇所を取得
+        val referenceService = ReferenceService(diagnosticService, astInfoService)
         val references = referenceService.getReferences(uri, code, offset)
 
         if (references.isEmpty()) {

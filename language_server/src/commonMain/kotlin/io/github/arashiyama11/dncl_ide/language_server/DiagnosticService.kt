@@ -15,12 +15,14 @@ class DiagnosticService {
                 diagnostics.add(parserResult.value.toDiagnostic(text))
                 return diagnostics
             }
+
             is Either.Right -> parserResult.value
         }
 
         when (val programResult = parser.parseProgram()) {
             is Either.Left -> diagnostics.add(programResult.value.toDiagnostic(text))
-            is Either.Right -> { /* Success, no diagnostics from parser */ }
+            is Either.Right -> { /* Success, no diagnostics from parser */
+            }
         }
         return diagnostics
     }
@@ -52,8 +54,9 @@ class DiagnosticService {
                 character = offset - currentOffset
                 break
             }
-            currentOffset += s.length + 1
+            currentOffset += s.length + 1 // +1 for newline
         }
+
         return Pair(line, character)
     }
 }

@@ -19,7 +19,7 @@ class SymbolTableBuilder {
     }
 
     private fun exitScope() {
-        // TODO: 親スコープに戻る仕組み��実装する必要がある
+        // TODO: 親スコープに戻る仕組み����実装する必要がある
         // 現在の実装では簡略化
     }
 
@@ -60,12 +60,11 @@ class SymbolTableBuilder {
 
             is AstNode.ForStatement -> {
                 enterScope()
-                currentScope().define(
+                currentScope.define(
                     Symbol(
                         name = statement.loopCounter.literal,
                         kind = SymbolKind.VARIABLE,
-                        range = statement.loopCounter.range,
-                        definitionNode = null // Token.IdentifierはAstNodeではないのでnull
+                        range = statement.loopCounter.range
                     )
                 )
                 visitExpression(statement.start)
@@ -93,14 +92,11 @@ class SymbolTableBuilder {
                 )
                 enterScope()
                 statement.parameters.forEach { param ->
-                    // パラメータもシンボルとして定義
-                    // TODO: パラメータのrangeを正確に取得する方法を検討
                     currentScope.define(
                         Symbol(
                             name = param,
                             kind = SymbolKind.PARAMETER,
-                            range = IntRange.EMPTY,
-                            definitionNode = null
+                            range = statement.range // パラメータの正確なrangeは後で改善
                         )
                     )
                 }
@@ -136,13 +132,11 @@ class SymbolTableBuilder {
             is AstNode.FunctionLiteral -> {
                 enterScope()
                 expression.parameters.forEach { param ->
-                    // TODO: パラメータのrangeを正確に取得する方法を検討
                     currentScope.define(
                         Symbol(
                             name = param,
                             kind = SymbolKind.PARAMETER,
-                            range = IntRange.EMPTY,
-                            definitionNode = null
+                            range = expression.range // パラメータの正確なrangeは後で改善
                         )
                     )
                 }
@@ -151,7 +145,7 @@ class SymbolTableBuilder {
             }
 
             is AstNode.Identifier, is AstNode.IntLiteral, is AstNode.FloatLiteral, is AstNode.StringLiteral, is AstNode.BooleanLiteral, is AstNode.SystemLiteral, is AstNode.WhileExpression -> {
-                // これらのノードは子ノードを持たないか、シンボル定義��関わらない
+                // これらのノードは子ノードを持たないか、シンボル定義に関わらない
             }
         }
     }

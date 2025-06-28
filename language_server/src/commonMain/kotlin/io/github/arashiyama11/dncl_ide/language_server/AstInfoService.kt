@@ -44,34 +44,29 @@ class AstInfoService {
         // 複合ノードの場合、子ノードを再帰的に探索
         return when (node) {
             is AstNode.Program -> node.statements.firstNotNullOfOrNull {
-                findNodeRecursive(
-                    it,
-                    offset
-                )
+                findNodeRecursive(it, offset)
             } ?: node
-
-            is AstNode.BlockStatement -> node.statements.firstNotNullOfOrNull {
-                findNodeRecursive(
-                    it,
-                    offset
-                )
-            } ?: node
-
-            is AstNode.ExpressionStatement -> findNodeRecursive(node.expression, offset) ?: node
-            is AstNode.AssignStatement -> {
-                node.assignments.firstNotNullOfOrNull { (assignable, expression) ->
-                    findNodeRecursive(assignable, offset) ?: findNodeRecursive(expression, offset)
-                } ?: node
-            }
 
             is AstNode.FunctionStatement -> {
-                findNodeRecursive(node.block, offset) ?: node
+                // 関数名、パラメータ、本体をチェック
+                node.parameters.firstNotNullOfOrNull { param ->
+                    // パラメータは文字列なので、rangeは関数全体を使用
+                    null
+                }
+                    ?: findNodeRecursive(node.block, offset)
+                    ?: node
             }
 
             is AstNode.IfStatement -> {
                 findNodeRecursive(node.condition, offset)
                     ?: findNodeRecursive(node.consequence, offset)
                     ?: node.alternative?.let { findNodeRecursive(it, offset) }
+                    ?: node
+            }
+
+            is AstNode.WhileStatement -> {
+                findNodeRecursive(node.condition, offset)
+                    ?: findNodeRecursive(node.block, offset)
                     ?: node
             }
 
@@ -83,9 +78,29 @@ class AstInfoService {
                     ?: node
             }
 
-            is AstNode.WhileStatement -> {
-                findNodeRecursive(node.condition, offset) ?: findNodeRecursive(node.block, offset)
-                ?: node
+            is AstNode.AssignStatement -> {
+                node.assignments.firstNotNullOfOrNull { (assignable, expression) ->
+                    findNodeRecursive(assignable, offset)
+                        ?: findNodeRecursive(expression, offset)
+                } ?: node
+            }
+
+            is AstNode.ExpressionStatement -> {
+                findNodeRecursive(node.expression, offset) ?: node
+            }
+
+            is AstNode.BlockStatement -> {
+                node.statements.firstNotNullOfOrNull { findNodeRecursive(it, offset) } ?: node
+            }
+
+            is AstNode.InfixExpression -> {
+                findNodeRecursive(node.left, offset)
+                    ?: findNodeRecursive(node.right, offset)
+                    ?: node
+            }
+
+            is AstNode.PrefixExpression -> {
+                findNodeRecursive(node.right, offset) ?: node
             }
 
             is AstNode.CallExpression -> {
@@ -94,39 +109,24 @@ class AstInfoService {
                     ?: node
             }
 
-            is AstNode.InfixExpression -> {
-                findNodeRecursive(node.left, offset) ?: findNodeRecursive(node.right, offset)
-                ?: node
-            }
-
-            is AstNode.PrefixExpression -> {
-                findNodeRecursive(node.right, offset) ?: node
-            }
-
             is AstNode.IndexExpression -> {
-                findNodeRecursive(node.left, offset) ?: findNodeRecursive(node.right, offset)
-                ?: node
+                findNodeRecursive(node.left, offset)
+                    ?: findNodeRecursive(node.right, offset)
+                    ?: node
             }
 
             is AstNode.ArrayLiteral -> {
                 node.elements.firstNotNullOfOrNull { findNodeRecursive(it, offset) } ?: node
             }
 
-            is AstNode.FunctionLiteral -> {
-                findNodeRecursive(node.body, offset) ?: node
-            }
-
-            is AstNode.WhileExpression -> {
-                findNodeRecursive(node.condition, offset) ?: findNodeRecursive(node.block, offset)
-                ?: node
-            }
             // リーフノード
             is AstNode.Identifier,
-            is AstNode.BooleanLiteral,
-            is AstNode.FloatLiteral,
             is AstNode.IntLiteral,
+            is AstNode.FloatLiteral,
             is AstNode.StringLiteral,
-            is AstNode.SystemLiteral -> node
+            is AstNode.BooleanLiteral -> node
+
+            else -> node
         }
     }
 }

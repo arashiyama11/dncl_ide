@@ -35,25 +35,13 @@ class ReferenceService(
         when (node) {
             is AstNode.Program -> {
                 node.statements.forEach {
-                    findReferencesInNode(
-                        it,
-                        targetSymbol,
-                        code,
-                        uri,
-                        references
-                    )
+                    findReferencesInNode(it, targetSymbol, code, uri, references)
                 }
             }
 
             is AstNode.BlockStatement -> {
                 node.statements.forEach {
-                    findReferencesInNode(
-                        it,
-                        targetSymbol,
-                        code,
-                        uri,
-                        references
-                    )
+                    findReferencesInNode(it, targetSymbol, code, uri, references)
                 }
             }
 
@@ -65,31 +53,30 @@ class ReferenceService(
             }
 
             is AstNode.FunctionStatement -> {
-                // 関数名の参照をチェック
-                if (targetSymbol.name == node.name && targetSymbol.kind == io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.FUNCTION) {
-                    addReference(node.range, code, uri, references)
+                // 関数名のチェックは文字列なので、範囲を作成して確認
+                if (node.name == targetSymbol.name) {
+                    addReferenceLocation(node, code, uri, references)
                 }
+                // パラメータのチェック（文字列リスト）
+                node.parameters.forEach { param ->
+                    if (param == targetSymbol.name) {
+                        addReferenceLocation(node, code, uri, references) // パラメータの正確な範囲は後で改善
+                    }
+                }
+                // 関数本体をチェック
                 findReferencesInNode(node.block, targetSymbol, code, uri, references)
             }
 
             is AstNode.Identifier -> {
-                // 識別子の参照をチェ��ク
-                val symbolAtNode = astInfoService.findSymbolAtOffset(node.range.first)
-                if (symbolAtNode != null && isSameSymbol(symbolAtNode, targetSymbol)) {
-                    addReference(node.range, code, uri, references)
+                if (node.value == targetSymbol.name) {
+                    addReferenceLocation(node, code, uri, references)
                 }
             }
 
             is AstNode.CallExpression -> {
                 findReferencesInNode(node.function, targetSymbol, code, uri, references)
-                node.arguments.forEach {
-                    findReferencesInNode(
-                        it,
-                        targetSymbol,
-                        code,
-                        uri,
-                        references
-                    )
+                node.arguments.forEach { arg ->
+                    findReferencesInNode(arg, targetSymbol, code, uri, references)
                 }
             }
 
@@ -107,15 +94,15 @@ class ReferenceService(
                 }
             }
 
+            is AstNode.WhileStatement -> {
+                findReferencesInNode(node.condition, targetSymbol, code, uri, references)
+                findReferencesInNode(node.block, targetSymbol, code, uri, references)
+            }
+
             is AstNode.ForStatement -> {
                 findReferencesInNode(node.start, targetSymbol, code, uri, references)
                 findReferencesInNode(node.end, targetSymbol, code, uri, references)
                 findReferencesInNode(node.step, targetSymbol, code, uri, references)
-                findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.WhileStatement -> {
-                findReferencesInNode(node.condition, targetSymbol, code, uri, references)
                 findReferencesInNode(node.block, targetSymbol, code, uri, references)
             }
 
@@ -138,47 +125,36 @@ class ReferenceService(
             }
 
             is AstNode.ArrayLiteral -> {
-                node.elements.forEach {
-                    findReferencesInNode(
-                        it,
-                        targetSymbol,
-                        code,
-                        uri,
-                        references
-                    )
+                node.elements.forEach { element ->
+                    findReferencesInNode(element, targetSymbol, code, uri, references)
                 }
             }
 
-            is AstNode.FunctionLiteral -> {
-                findReferencesInNode(node.body, targetSymbol, code, uri, references)
+            // リーフノード - 何もしない
+            is AstNode.IntLiteral,
+            is AstNode.FloatLiteral,
+            is AstNode.StringLiteral,
+            is AstNode.BooleanLiteral -> {
+                // リテラル内に参照は存在しない
             }
 
-            is AstNode.WhileExpression -> {
-                findReferencesInNode(node.condition, targetSymbol, code, uri, references)
-                findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
-            // リーフノードは処理不要
-            else -> { /* リーフノード */
+            else -> {
+                // その他のノードタイプを処理
             }
         }
     }
 
-    private fun isSameSymbol(symbol1: Symbol, symbol2: Symbol): Boolean {
-        // 同じシンボルかどうかを判定
-        // 名前、種類、定義範囲で比較
-        return symbol1.name == symbol2.name &&
-                symbol1.kind == symbol2.kind &&
-                symbol1.range == symbol2.range
-    }
-
-    private fun addReference(
-        range: IntRange,
+    private fun addReferenceLocation(
+        node: AstNode,
         code: String,
         uri: String,
         references: MutableList<Location>
     ) {
-        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(code, range.first)
-        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, range.last)
+        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
+            code,
+            node.range.first
+        )
+        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, node.range.last)
 
         references.add(
             Location(

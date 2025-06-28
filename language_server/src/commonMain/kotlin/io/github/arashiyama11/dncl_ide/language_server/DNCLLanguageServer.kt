@@ -171,11 +171,17 @@ class DNCLLanguageServer(
         )
     }
 
-    
-
     private suspend fun sendResponse(id: Long?, result: JsonElement?) {
         val response = JsonRpcResponse(id = id, result = result)
         outputChannel.send(json.encodeToString(response))
+    }
+
+    private suspend fun sendErrorResponse(id: Long?, code: Int, message: String) {
+        val errorResponse = JsonRpcErrorResponse(
+            id = id,
+            error = JsonRpcError(code = code, message = message)
+        )
+        outputChannel.send(json.encodeToString(errorResponse))
     }
 
     private suspend inline fun <reified T> sendNotification(method: String, params: T) {
@@ -188,7 +194,8 @@ class DNCLLanguageServer(
         val params = request.params?.let { json.decodeFromJsonElement<CompletionParams>(it) }
         params?.let {
             val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset = documentManager.calculateOffset(code, it.position.line, it.position.character)
+            val offset =
+                documentManager.calculateOffset(code, it.position.line, it.position.character)
             val completionItems = completionService.getCompletionItems(code, offset)
             sendResponse(
                 request.id,
@@ -200,13 +207,12 @@ class DNCLLanguageServer(
         }
     }
 
-    
-
     private suspend fun handleHover(request: JsonRpcRequest) {
         val params = request.params?.let { json.decodeFromJsonElement<HoverParams>(it) }
         params?.let {
             val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset = documentManager.calculateOffset(code, it.position.line, it.position.character)
+            val offset =
+                documentManager.calculateOffset(code, it.position.line, it.position.character)
 
             val hover = hoverService.getHover(code, offset)
             if (hover != null) {
@@ -221,9 +227,11 @@ class DNCLLanguageServer(
         val params = request.params?.let { json.decodeFromJsonElement<DefinitionParams>(it) }
         params?.let {
             val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset = documentManager.calculateOffset(code, it.position.line, it.position.character)
+            val offset =
+                documentManager.calculateOffset(code, it.position.line, it.position.character)
 
-            val definitionLocation = definitionService.getDefinitionLocation(it.textDocument.uri, code, offset)
+            val definitionLocation =
+                definitionService.getDefinitionLocation(it.textDocument.uri, code, offset)
             sendResponse(
                 request.id,
                 definitionLocation?.let { json.encodeToJsonElement(Location.serializer(), it) })
@@ -234,7 +242,8 @@ class DNCLLanguageServer(
         val params = request.params?.let { json.decodeFromJsonElement<ReferenceParams>(it) }
         params?.let {
             val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset = documentManager.calculateOffset(code, it.position.line, it.position.character)
+            val offset =
+                documentManager.calculateOffset(code, it.position.line, it.position.character)
 
             val references = referenceService.getReferences(it.textDocument.uri, code, offset)
             sendResponse(
@@ -248,10 +257,12 @@ class DNCLLanguageServer(
         val params = request.params?.let { json.decodeFromJsonElement<RenameParams>(it) }
         params?.let {
             val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val offset = documentManager.calculateOffset(code, it.position.line, it.position.character)
+            val offset =
+                documentManager.calculateOffset(code, it.position.line, it.position.character)
             val newName = it.newName
 
-            val workspaceEdit = renameService.getRenameEdits(it.textDocument.uri, code, offset, newName)
+            val workspaceEdit =
+                renameService.getRenameEdits(it.textDocument.uri, code, offset, newName)
             if (workspaceEdit != null) {
                 sendResponse(
                     request.id,
@@ -279,7 +290,8 @@ class DNCLLanguageServer(
     private suspend fun handleCodeAction(request: JsonRpcRequest) {
         val params = request.params?.let { json.decodeFromJsonElement<CodeActionParams>(it) }
         params?.let {
-            val codeActions = codeActionService.getCodeActions(it.textDocument.uri, it.context.diagnostics)
+            val codeActions =
+                codeActionService.getCodeActions(it.textDocument.uri, it.context.diagnostics)
             sendResponse(
                 request.id,
                 json.encodeToJsonElement(ListSerializer(CodeAction.serializer()), codeActions)
@@ -298,16 +310,4 @@ class DNCLLanguageServer(
             )
         }
     }
-
-    
-
-    
-
-    private suspend fun sendErrorResponse(id: Long?, code: Int, message: String) {
-        println("[Info] Sending error response: code=$code, message=$message")
-        val error = JsonRpcError(code = code, message = message)
-        val response = JsonRpcErrorResponse(id = id, error = error)
-        outputChannel.send(json.encodeToString(response))
-    }
 }
-

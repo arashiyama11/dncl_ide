@@ -157,39 +157,40 @@ data class Position(
 )
 
 @Serializable
-data class CompletionParams(
-    val textDocument: TextDocumentIdentifier,
-    val position: Position
+data class TextDocumentIdentifier(
+    @SerialName("uri") val uri: String
 )
 
 @Serializable
-data class TextDocumentIdentifier(
-    val uri: String
+data class CompletionParams(
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("position") val position: Position
 )
 
 @Serializable
 data class CompletionList(
-    val isIncomplete: Boolean,
-    val items: List<CompletionItem>
+    @SerialName("isIncomplete") val isIncomplete: Boolean,
+    @SerialName("items") val items: List<CompletionItem>
 )
 
 @Serializable
 data class CompletionItem(
-    val label: String,
-    val kind: Int? = null, // e.g., 14 for Function
-    val detail: String? = null
+    @SerialName("label") val label: String,
+    @SerialName("kind") val kind: Int? = null,
+    @SerialName("detail") val detail: String? = null,
+    @SerialName("documentation") val documentation: String? = null
 )
 
 @Serializable
 data class CodeActionParams(
-    val textDocument: TextDocumentIdentifier,
-    val range: Range,
-    val context: CodeActionContext
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("range") val range: Range,
+    @SerialName("context") val context: CodeActionContext
 )
 
 @Serializable
 data class CodeActionContext(
-    val diagnostics: List<Diagnostic>
+    @SerialName("diagnostics") val diagnostics: List<Diagnostic>
 )
 
 @Serializable
@@ -197,9 +198,7 @@ data class CodeAction(
     @SerialName("title") val title: String,
     @SerialName("kind") val kind: String? = null,
     @SerialName("diagnostics") val diagnostics: List<Diagnostic>? = null,
-    @SerialName("isPreferred") val isPreferred: Boolean? = null,
-    @SerialName("edit") val edit: WorkspaceEdit? = null,
-    @SerialName("command") val command: Command? = null
+    @SerialName("edit") val edit: WorkspaceEdit? = null
 )
 
 @Serializable
@@ -211,33 +210,33 @@ data class Command(
 
 @Serializable
 data class DocumentFormattingParams(
-    val textDocument: TextDocumentIdentifier,
-    val options: FormattingOptions
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("options") val options: FormattingOptions
 )
 
 @Serializable
 data class FormattingOptions(
-    val tabSize: Int,
-    val insertSpaces: Boolean
+    @SerialName("tabSize") val tabSize: Int,
+    @SerialName("insertSpaces") val insertSpaces: Boolean
 )
 
 @Serializable
 data class RenameParams(
-    val textDocument: TextDocumentIdentifier,
-    val position: Position,
-    val newName: String
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("position") val position: Position,
+    @SerialName("newName") val newName: String
 )
 
 @Serializable
 data class WorkspaceEdit(
-    val changes: Map<String, List<TextEdit>>? = null,
-    val documentChanges: List<TextDocumentEdit>? = null
+    @SerialName("changes") val changes: Map<String, List<TextEdit>>? = null,
+    @SerialName("documentChanges") val documentChanges: List<TextDocumentEdit>? = null
 )
 
 @Serializable
 data class TextDocumentEdit(
-    val textDocument: VersionedTextDocumentIdentifier,
-    val edits: List<TextEdit>
+    @SerialName("textDocument") val textDocument: VersionedTextDocumentIdentifier,
+    @SerialName("edits") val edits: List<TextEdit>
 )
 
 @Serializable
@@ -248,56 +247,68 @@ data class TextEdit(
 
 @Serializable
 data class ReferenceParams(
-    val textDocument: TextDocumentIdentifier,
-    val position: Position,
-    val context: ReferenceContext
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("position") val position: Position,
+    @SerialName("context") val context: ReferenceContext
 )
 
 @Serializable
 data class ReferenceContext(
-    val includeDeclaration: Boolean
+    @SerialName("includeDeclaration") val includeDeclaration: Boolean
 )
 
 @Serializable
 data class DefinitionParams(
-    val textDocument: TextDocumentIdentifier,
-    val position: Position
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("position") val position: Position
 )
 
 @Serializable
 data class Location(
-    val uri: String,
-    val range: Range
+    @SerialName("uri") val uri: String,
+    @SerialName("range") val range: Range
 )
 
 @Serializable
 data class HoverParams(
-    val textDocument: TextDocumentIdentifier,
-    val position: Position
+    @SerialName("textDocument") val textDocument: TextDocumentIdentifier,
+    @SerialName("position") val position: Position
 )
 
 @Serializable
 data class Hover(
-    val contents: MarkupContent,
-    val range: Range? = null
+    @SerialName("contents") val contents: MarkupContent,
+    @SerialName("range") val range: Range? = null
 )
 
 @Serializable
 data class MarkupContent(
-    val kind: String, // "plaintext" or "markdown"
-    val value: String
+    @SerialName("kind") val kind: String, // "plaintext" or "markdown"
+    @SerialName("value") val value: String
 )
 
-data class NotebookCellUri(
-    val notebookUri: String,
-    val cellId: String
-) {
-    companion object {
-        fun parse(uri: String): NotebookCellUri? {
-            if (!uri.startsWith("dnclnb://")) return null
-            val parts = uri.substringAfter("dnclnb://").split("#cell=")
-            if (parts.size != 2) return null
-            return NotebookCellUri(notebookUri = "dnclnb://" + parts[0], cellId = parts[1])
+// NotebookCellUri utility class
+object NotebookCellUri {
+    fun parse(uri: String): NotebookCellUriParts? {
+        // Simple implementation for notebook cell URI parsing
+        // Expected format: vscode-notebook-cell:/path/to/notebook.ipynb#cell-id
+        if (!uri.startsWith("vscode-notebook-cell:")) {
+            return null
         }
+
+        val parts = uri.split("#")
+        if (parts.size != 2) {
+            return null
+        }
+
+        val notebookUri = parts[0]
+        val cellId = parts[1]
+
+        return NotebookCellUriParts(notebookUri, cellId)
     }
 }
+
+data class NotebookCellUriParts(
+    val notebookUri: String,
+    val cellId: String
+)
