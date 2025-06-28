@@ -10,7 +10,7 @@ class RenameServiceTest {
     private fun createServices(): Triple<RenameService, DiagnosticService, AstInfoService> {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val renameService = RenameService(diagnosticService)
+        val renameService = RenameService(diagnosticService, astInfoService)
         return Triple(renameService, diagnosticService, astInfoService)
     }
 

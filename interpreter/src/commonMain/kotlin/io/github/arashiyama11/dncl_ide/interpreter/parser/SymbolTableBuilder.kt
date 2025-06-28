@@ -102,14 +102,15 @@ class SymbolTableBuilder {
                         definitionNode = statement
                     )
                 )
-                enterScope(statement.block.range)
+                enterScope(statement.range)
                 statement.parameters.forEach { param ->
+                    println("defining parameter: ${param.literal} at ${statement.range}")
                     currentScope().define(
                         Symbol(
                             name = param.literal,
                             kind = SymbolKind.PARAMETER,
                             range = param.range, // パラメータの正確なrangeは後で改善
-                            scopeRange = statement.block.range
+                            scopeRange = statement.range
                         )
                     )
                 }
@@ -143,14 +144,15 @@ class SymbolTableBuilder {
 
             is AstNode.ArrayLiteral -> expression.elements.forEach { visitExpression(it) }
             is AstNode.FunctionLiteral -> {
-                enterScope(expression.body.range)
+                enterScope(expression.range)
                 expression.parameters.forEach { param ->
+                    println("defining parameter: ${param.literal} at ${expression.range}")
                     currentScope().define(
                         Symbol(
                             name = param.literal,
                             kind = SymbolKind.PARAMETER,
                             range = param.range, // パラメータの正確なrangeは後で改善
-                            scopeRange = expression.body.range
+                            scopeRange = expression.range
                         )
                     )
                 }

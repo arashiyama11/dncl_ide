@@ -85,13 +85,13 @@ class HoverServiceIntegrationTest {
         astInfoService.parseAndAnalyze(code)
 
         // 表示関数の位置でホバーテスト
-        val displayPosition = code.indexOf("表示する")
+        val displayPosition = code.indexOf("表示する") + 1
         val hover = hoverService.getHover(code, displayPosition)
 
         assertNotNull(hover, "組み込み関数「表示する」のホバー情報が取得できるはずです")
         assertTrue(
-            hover.contents.value.contains("表示する"),
-            "ホバー内容に「表示する」という文字が含まれるはずです"
+            hover.contents.value.contains("この関数はDNCLの組み込み関数です。"),
+            "ホバー内容に組み込み関数の説明が含まれるはずです"
         )
     }
 }

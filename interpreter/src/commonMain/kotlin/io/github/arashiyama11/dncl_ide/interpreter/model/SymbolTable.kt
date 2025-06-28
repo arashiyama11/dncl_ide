@@ -23,6 +23,7 @@ class SymbolTable(val outer: SymbolTable? = null) {
     private val store: MutableMap<String, Symbol> = mutableMapOf()
 
     fun define(symbol: Symbol) {
+        println("defied symbol: $symbol")
         store[symbol.name] = symbol
     }
 

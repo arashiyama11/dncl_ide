@@ -55,10 +55,22 @@ class AstInfoService {
         // First, find the node at the offset to understand the context
         val node = findNodeAtOffset(offset)
 
+        println("node: $node")
+
         // If it's an identifier, try to resolve it from the appropriate scope
         if (node is AstNode.Identifier) {
             // Find the appropriate scope for this offset
             val scopeSymbolTable = findScopeForOffset(ast, offset, symbolTable)
+            println(scopeSymbolTable.allSymbols().map { it.name })
+            println(
+                "Resolving identifier: ${node.value} in scope: ${
+                    scopeSymbolTable.resolve(
+                        node.value,
+                        offset
+                    )
+                }"
+            )
+            println(scopeSymbolTable.allSymbols().firstOrNull() { it.name == "num1" })
             return scopeSymbolTable.resolve(node.value, offset)
         }
 
@@ -85,7 +97,7 @@ class AstInfoService {
 
             is AstNode.FunctionStatement -> {
                 // If we're inside the function body, return the function's scope
-                if (offset in node.block.range) {
+                if (offset in node.range) {
                     // Create function scope with parameters and local variables
                     return createFunctionScope(node, globalScope)
                 }
@@ -235,14 +247,14 @@ class AstInfoService {
                     name = param.literal,
                     kind = io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.PARAMETER,
                     range = param.range,
-                    scopeRange = functionNode.block.range,
+                    scopeRange = functionNode.range,
                     definitionNode = null // パラメータはTokenなのでAstNodeではない
                 )
             )
         }
 
         // Add local variables defined within the function
-        collectLocalVariables(functionNode.block, childScope, functionNode.block.range)
+        collectLocalVariables(functionNode.block, childScope, functionNode.range)
 
         return childScope
     }

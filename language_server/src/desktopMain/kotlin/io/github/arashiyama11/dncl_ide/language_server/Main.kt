@@ -18,7 +18,7 @@ fun main() = runBlocking {
         HoverService(DiagnosticService(), astInfoService),
         DefinitionService(DiagnosticService(), astInfoService),
         ReferenceService(DiagnosticService(), astInfoService),
-        RenameService(DiagnosticService()),
+        RenameService(DiagnosticService(), astInfoService),
         FormattingService(),
         CodeActionService(),
         SemanticTokensService(DiagnosticService()),

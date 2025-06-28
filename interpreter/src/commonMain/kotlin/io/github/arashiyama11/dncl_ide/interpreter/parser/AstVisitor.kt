@@ -98,14 +98,15 @@ class AstVisitor {
                 definitionNode = functionStmt
             )
         )
-        enterScope(functionStmt.block.range)
+        enterScope(functionStmt.range)
         functionStmt.parameters.forEach { paramToken ->
+            println("define parameter: ${paramToken.literal} at ${functionStmt.range}")
             currentScope().define(
                 Symbol(
                     name = paramToken.literal,
                     kind = SymbolKind.PARAMETER,
                     range = paramToken.range,
-                    scopeRange = functionStmt.block.range,
+                    scopeRange = functionStmt.range,
                     definitionNode = null
                 )
             )
@@ -182,14 +183,14 @@ class AstVisitor {
     private fun visitSystemLiteral(systemLiteral: AstNode.SystemLiteral) {}
 
     private fun visitFunctionLiteral(functionLiteral: AstNode.FunctionLiteral) {
-        enterScope(functionLiteral.body.range)
+        enterScope(functionLiteral.range)
         functionLiteral.parameters.forEach { paramToken ->
             currentScope().define(
                 Symbol(
                     name = paramToken.literal,
                     kind = SymbolKind.PARAMETER,
                     range = paramToken.range,
-                    scopeRange = functionLiteral.body.range,
+                    scopeRange = functionLiteral.range,
                     definitionNode = null
                 )
             )

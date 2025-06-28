@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
+import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 
 class ReferenceService(
     private val diagnosticService: DiagnosticService,
@@ -10,166 +11,136 @@ class ReferenceService(
     fun getReferences(uri: String, code: String, offset: Int): List<Location> {
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
+        println("offset: $offset")
 
         // カーソル位置のシンボルを取得（スコープ認識版を使用）
         val targetSymbol = astInfoService.findSymbolAtOffset(offset)
             ?: return emptyList()
 
+        println("targetSymbol: $targetSymbol")
+
         // ASTを走査して、同じシンボルの全参照箇所を検索
         val program = astInfoService.getAst()
             ?: return emptyList()
 
+
         val references = mutableListOf<Location>()
-        findReferencesInNode(program, targetSymbol, code, uri, references)
 
-        return references
-    }
+        // 定義箇所を追加
+        addReferenceLocation(targetSymbol.range, code, uri, references)
 
-    private fun findReferencesInNode(
-        node: AstNode,
-        targetSymbol: Symbol,
-        code: String,
-        uri: String,
-        references: MutableList<Location>
-    ) {
-        when (node) {
-            is AstNode.Program -> {
-                node.statements.forEach {
-                    findReferencesInNode(it, targetSymbol, code, uri, references)
-                }
-            }
-
-            is AstNode.BlockStatement -> {
-                node.statements.forEach {
-                    findReferencesInNode(it, targetSymbol, code, uri, references)
-                }
-            }
-
-            is AstNode.AssignStatement -> {
-                node.assignments.forEach { (assignable, expression) ->
-                    checkNodeForReference(assignable, targetSymbol, code, uri, references)
-                    findReferencesInNode(expression, targetSymbol, code, uri, references)
-                }
-            }
-
-            is AstNode.ExpressionStatement -> {
-                findReferencesInNode(node.expression, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.FunctionStatement -> {
-                // 関数名のチェック
-                if (node.name.literal == targetSymbol.name &&
-                    isSameSymbol(node.name.range, targetSymbol)
-                ) {
-                    addReferenceLocation(node.name.range, code, uri, references)
-                }
-                // パラメータのチェック
-                node.parameters.forEach { param ->
-                    if (param.literal == targetSymbol.name &&
-                        isSameSymbol(param.range, targetSymbol)
-                    ) {
-                        addReferenceLocation(param.range, code, uri, references)
+        // ASTを走査して参照箇所を収集
+        fun collectReferences(node: AstNode) {
+            when (node) {
+                is AstNode.Program -> node.statements.forEach { collectReferences(it) }
+                is AstNode.BlockStatement -> node.statements.forEach { collectReferences(it) }
+                is AstNode.AssignStatement -> {
+                    node.assignments.forEach { (assignable, expression) ->
+                        if (assignable is AstNode.Identifier) {
+                            val resolvedSymbol =
+                                astInfoService.findSymbolAtOffset(assignable.range.first)
+                            if (resolvedSymbol != null && isSameSymbol(
+                                    resolvedSymbol,
+                                    targetSymbol
+                                )
+                            ) {
+                                addReferenceLocation(assignable.range, code, uri, references)
+                            }
+                        }
+                        collectReferences(expression)
                     }
                 }
-                // 関数本体をチェック
-                findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
 
-            is AstNode.Identifier -> {
-                checkNodeForReference(node, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.CallExpression -> {
-                findReferencesInNode(node.function, targetSymbol, code, uri, references)
-                node.arguments.forEach { arg ->
-                    findReferencesInNode(arg, targetSymbol, code, uri, references)
+                is AstNode.ExpressionStatement -> collectReferences(node.expression)
+                is AstNode.FunctionStatement -> {
+                    val resolvedSymbol = astInfoService.findSymbolAtOffset(node.name.range.first)
+                    if (resolvedSymbol != null && isSameSymbol(resolvedSymbol, targetSymbol)) {
+                        addReferenceLocation(node.name.range, code, uri, references)
+                    }
+                    node.parameters.forEach { param ->
+                        val paramResolvedSymbol =
+                            astInfoService.findSymbolAtOffset(param.range.first)
+                        if (paramResolvedSymbol != null && isSameSymbol(
+                                paramResolvedSymbol,
+                                targetSymbol
+                            )
+                        ) {
+                            addReferenceLocation(param.range, code, uri, references)
+                        }
+                    }
+                    collectReferences(node.block)
                 }
-            }
 
-            is AstNode.IfStatement -> {
-                findReferencesInNode(node.condition, targetSymbol, code, uri, references)
-                findReferencesInNode(node.consequence, targetSymbol, code, uri, references)
-                node.alternative?.let {
-                    findReferencesInNode(it, targetSymbol, code, uri, references)
+                is AstNode.Identifier -> {
+                    val resolvedSymbol = astInfoService.findSymbolAtOffset(node.range.first)
+                    if (resolvedSymbol != null && isSameSymbol(resolvedSymbol, targetSymbol)) {
+                        addReferenceLocation(node.range, code, uri, references)
+                    }
                 }
-            }
 
-            is AstNode.WhileStatement -> {
-                findReferencesInNode(node.condition, targetSymbol, code, uri, references)
-                findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.ForStatement -> {
-                // ループカウンタのチェック
-                if (node.loopCounter.value == targetSymbol.name &&
-                    isSameSymbol(node.loopCounter.range, targetSymbol)
-                ) {
-                    addReferenceLocation(node.loopCounter.range, code, uri, references)
+                is AstNode.CallExpression -> {
+                    val resolvedSymbol =
+                        astInfoService.findSymbolAtOffset(node.function.range.first)
+                    if (resolvedSymbol != null && isSameSymbol(resolvedSymbol, targetSymbol)) {
+                        addReferenceLocation(node.function.range, code, uri, references)
+                    }
+                    collectReferences(node.function)
+                    node.arguments.forEach { collectReferences(it) }
                 }
-                findReferencesInNode(node.start, targetSymbol, code, uri, references)
-                findReferencesInNode(node.end, targetSymbol, code, uri, references)
-                findReferencesInNode(node.step, targetSymbol, code, uri, references)
-                findReferencesInNode(node.block, targetSymbol, code, uri, references)
-            }
 
-            is AstNode.InfixExpression -> {
-                findReferencesInNode(node.left, targetSymbol, code, uri, references)
-                findReferencesInNode(node.right, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.PrefixExpression -> {
-                findReferencesInNode(node.right, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.IndexExpression -> {
-                findReferencesInNode(node.left, targetSymbol, code, uri, references)
-                findReferencesInNode(node.right, targetSymbol, code, uri, references)
-            }
-
-            is AstNode.ArrayLiteral -> {
-                node.elements.forEach {
-                    findReferencesInNode(it, targetSymbol, code, uri, references)
+                is AstNode.IfStatement -> {
+                    collectReferences(node.condition)
+                    collectReferences(node.consequence)
+                    node.alternative?.let { collectReferences(it) }
                 }
-            }
 
-            // リーフノードは処理済み
-            else -> { /* Do nothing for leaf nodes */
+                is AstNode.WhileStatement -> {
+                    collectReferences(node.condition)
+                    collectReferences(node.block)
+                }
+
+                is AstNode.ForStatement -> {
+                    val resolvedSymbol =
+                        astInfoService.findSymbolAtOffset(node.loopCounter.range.first)
+                    if (resolvedSymbol != null && isSameSymbol(resolvedSymbol, targetSymbol)) {
+                        addReferenceLocation(node.loopCounter.range, code, uri, references)
+                    }
+                    collectReferences(node.start)
+                    collectReferences(node.end)
+                    collectReferences(node.step)
+                    collectReferences(node.block)
+                }
+
+                is AstNode.InfixExpression -> {
+                    collectReferences(node.left)
+                    collectReferences(node.right)
+                }
+
+                is AstNode.PrefixExpression -> collectReferences(node.right)
+                is AstNode.IndexExpression -> {
+                    collectReferences(node.left)
+                    collectReferences(node.right)
+                }
+
+                is AstNode.ArrayLiteral -> node.elements.forEach { collectReferences(it) }
+                is AstNode.IntLiteral, is AstNode.FloatLiteral, is AstNode.StringLiteral, is AstNode.BooleanLiteral, is AstNode.SystemLiteral, is AstNode.FunctionLiteral, is AstNode.WhileExpression -> {
+                    // リーフノードまたは処理不要なノード
+                }
             }
         }
-    }
 
-    private fun checkNodeForReference(
-        node: AstNode,
-        targetSymbol: Symbol,
-        code: String,
-        uri: String,
-        references: MutableList<Location>
-    ) {
-        if (node is AstNode.Identifier && node.value == targetSymbol.name) {
-            // より簡単なスコープチェック：範囲で比較
-            if (isInSameScope(node.range, targetSymbol)) {
-                addReferenceLocation(node.range, code, uri, references)
-            }
-        }
-    }
+        collectReferences(program)
 
-    private fun isInSameScope(nodeRange: IntRange, targetSymbol: Symbol): Boolean {
-        // シンボルが同じスコープにあるかチェック
-        // 簡単な実装：ターゲットシンボルのスコープ範囲内��ノードがあるかチェック
-        return nodeRange.first >= targetSymbol.scopeRange.first &&
-                nodeRange.last <= targetSymbol.scopeRange.last
-    }
-
-    private fun isSameSymbol(range: IntRange, targetSymbol: Symbol): Boolean {
-        // より厳密でないシンボル比較：名前とスコープ範囲で判定
-        return range == targetSymbol.range || isInSameScope(range, targetSymbol)
+        // 重複を削除し、ソート
+        return references.distinctBy { it.range.start.line to it.range.start.character }
+            .sortedWith(compareBy({ it.range.start.line }, { it.range.start.character }))
     }
 
     private fun isSameSymbol(symbol1: Symbol, symbol2: Symbol): Boolean {
-        // シンボルが同じかどうかをチェック（名前、種類、範囲で判定）
+        // シンボルが同じかどうかを厳密にチェック（名前、種類、定義範囲、スコープ範囲で判定）
         return symbol1.name == symbol2.name &&
                 symbol1.kind == symbol2.kind &&
-                symbol1.range == symbol2.range
+                symbol1.scopeRange == symbol2.scopeRange
     }
 
     private fun addReferenceLocation(

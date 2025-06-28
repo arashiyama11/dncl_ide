@@ -21,50 +21,60 @@ class HoverService(
             offset in token.range
         }
 
-        val hoverContent = when (hoveredToken) {
+        println("Hovered token: $hoveredToken at offset $offset")
+        val hoverContent: String? = when (hoveredToken) {
             is Token.Japanese, is Token.Identifier -> {
-                // まず組み込み関数をチェック
-                if (builtInFunctionDescriptions.containsKey(hoveredToken.literal)) {
-                    builtInFunctionDescriptions[hoveredToken.literal]
-                } else {
-                    // ユーザー定義シンボルのホバー情報
-                    val symbol = astInfoService.findSymbolAtOffset(offset)
-                    when (symbol?.kind) {
-                        SymbolKind.VARIABLE -> {
-                            "**変数**: `${symbol.name}`\n\n" +
-                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                    if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
-                        }
 
-                        SymbolKind.FUNCTION -> {
-                            val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
-                            val params =
-                                functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
-                            "**関数**: `${symbol.name}($params)`\n\n" +
-                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                    if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
-                        }
+                val symbol = astInfoService.findSymbolAtOffset(offset)
+                println("Found symbol: $symbol")
+                when (symbol?.kind) {
+                    SymbolKind.VARIABLE -> {
+                        "**変数**: `${symbol.name}`\n\n" +
+                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
+                    }
 
-                        SymbolKind.PARAMETER -> {
-                            "**パラメータ**: `${symbol.name}`\n\n" +
-                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                    "関数のパラメータとして定義されています"
-                        }
+                    SymbolKind.FUNCTION -> {
+                        val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
+                        val params =
+                            functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
+                        "**関数**: `${symbol.name}($params)`\n\n" +
+                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
+                    }
 
-                        SymbolKind.BUILT_IN_FUNCTION -> {
-                            builtInFunctionDescriptions[symbol.name]
-                                ?: "組み込み関数: ${symbol.name}"
-                        }
+                    SymbolKind.PARAMETER -> {
+                        "**パラメータ**: `${symbol.name}`\n\n" +
+                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                "関数のパラメータとして定義されています"
+                    }
 
-                        SymbolKind.UNKNOWN, null -> {
-                            // シンボル解決に失敗した場合も組み込み関数をチェック
-                            if (builtInFunctionDescriptions.containsKey(hoveredToken.literal)) {
-                                builtInFunctionDescriptions[hoveredToken.literal]
-                            } else {
-                                null
-                            }
+                    SymbolKind.BUILT_IN_FUNCTION -> {
+                        val builtInFunction =
+                            AllBuiltInFunction.values().find { it.identifier == symbol.name }
+                        if (builtInFunction != null) {
+                            """**組み込み関数**: `${builtInFunction.identifier}`
+
+この関数はDNCLの組み込み関数です。"""
+                        } else {
+                            null
                         }
                     }
+
+                    SymbolKind.UNKNOWN, null -> {
+                        // シンボル解決に失敗した場合も組み込み関数をチェック
+                        val builtInFunction = AllBuiltInFunction.values()
+                            .find { it.identifier == hoveredToken.literal }
+                        if (builtInFunction != null) {
+                            """**組み込み関数**: `${builtInFunction.identifier}`
+
+この関数はDNCLの組み込み関数です。"""
+                        } else {
+                            null
+                        }
+                    }
+
+                    else -> null
                 }
             }
 

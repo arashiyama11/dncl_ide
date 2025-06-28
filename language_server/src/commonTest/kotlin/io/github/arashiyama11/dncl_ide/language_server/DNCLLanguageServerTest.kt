@@ -24,7 +24,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),
@@ -74,7 +74,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),
@@ -136,7 +136,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),
@@ -205,7 +205,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),
@@ -262,7 +262,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),
@@ -321,7 +321,7 @@ class DNCLLanguageServerTest {
                 HoverService(DiagnosticService(), astInfoService),
                 DefinitionService(DiagnosticService(), astInfoService),
                 ReferenceService(DiagnosticService(), astInfoService),
-                RenameService(DiagnosticService()),
+                RenameService(DiagnosticService(), astInfoService),
                 FormattingService(),
                 CodeActionService(),
                 SemanticTokensService(DiagnosticService()),
@@ -367,7 +367,8 @@ class DNCLLanguageServerTest {
             } else {
                 null
             }
-            assertEquals("**表示する**: 画面に値を出力する", hover?.contents?.value)
+            assertTrue(hover?.contents?.value?.contains("**変数**: `x`") ?: false, "ホバー内容に変数名「x」が含まれるはずです")
+            assertTrue(hover?.contents?.value?.contains("定義位置:") ?: false, "ホバー内容に定義位置が含まれるはずです")
         }
 
 //    @Test
@@ -427,7 +428,7 @@ class DNCLLanguageServerTest {
                 HoverService(DiagnosticService(), astInfoService),
                 DefinitionService(DiagnosticService(), astInfoService),
                 ReferenceService(DiagnosticService(), astInfoService),
-                RenameService(DiagnosticService()),
+                RenameService(DiagnosticService(), astInfoService),
                 FormattingService(),
                 CodeActionService(),
                 SemanticTokensService(DiagnosticService()),
@@ -494,7 +495,7 @@ class DNCLLanguageServerTest {
             HoverService(DiagnosticService(), astInfoService),
             DefinitionService(DiagnosticService(), astInfoService),
             ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService()),
+            RenameService(DiagnosticService(), astInfoService),
             FormattingService(),
             CodeActionService(),
             SemanticTokensService(DiagnosticService()),

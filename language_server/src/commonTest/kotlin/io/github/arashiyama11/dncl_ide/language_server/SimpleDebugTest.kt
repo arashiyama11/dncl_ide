@@ -1,8 +1,25 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
+import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlin.test.Test
 
 class SimpleDebugTest {
+
+    @Test
+    fun test() {
+        val astInfoService = AstInfoService()
+        val code = """
+            関数 myFunc(a, b)を:
+                戻り値(a + b)
+            と定義する
+            
+            res = myFunc(1, 2)
+        """.trimIndent()
+
+        val program = Parser(Lexer(code)).getOrNull()!!.parseProgram().getOrNull()!!
+        println(program.statements[0].range)
+    }
 
     @Test
     fun debug_simple_variable() {
