@@ -1,9 +1,23 @@
 package io.github.arashiyama11.dncl_ide.language_server.ast
 
+import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 
 class AstVisitor {
-    private val globalSymbolTable = SymbolTable()
+    private val globalSymbolTable = SymbolTable().apply {
+        // グローバルスコープに組み込み関数を定義
+        AllBuiltInFunction.allIdentifiers().forEach {
+            define(
+                Symbol(
+                    name = it,
+                    kind = SymbolKind.BUILT_IN_FUNCTION,
+                    range = IntRange(0, 0), // 組み込み関数は範囲を持たない
+                    scopeRange = IntRange(0, Int.MAX_VALUE),
+                    definitionNode = null
+                )
+            )
+        }
+    }
     private val scopes: MutableList<Pair<SymbolTable, IntRange>> = mutableListOf()
 
     init {

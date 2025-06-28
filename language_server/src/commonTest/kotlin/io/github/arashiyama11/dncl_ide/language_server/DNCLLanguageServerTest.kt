@@ -36,7 +36,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         val initializeRequest = JsonRpcRequest(
             id = 1,
@@ -85,7 +85,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
@@ -146,7 +146,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         // First, open the document with an error
         val didOpenNotification = JsonRpcRequest(
@@ -214,7 +214,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
@@ -270,7 +270,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
@@ -328,7 +328,7 @@ class DNCLLanguageServerTest {
                 RenameService(astInfoService),
                 FormattingService(),
                 CodeActionService(),
-                SemanticTokensService()
+                SemanticTokensService(astInfoService)
             )
             // First, open the document
             val didOpenNotification = JsonRpcRequest(
@@ -440,7 +440,7 @@ class DNCLLanguageServerTest {
                 RenameService(astInfoService),
                 FormattingService(),
                 CodeActionService(),
-                SemanticTokensService()
+                SemanticTokensService(astInfoService)
             )
             // First, open the document
             val didOpenNotification = JsonRpcRequest(
@@ -506,7 +506,7 @@ class DNCLLanguageServerTest {
             RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService()
+            SemanticTokensService(astInfoService)
         )
         // First, open the document with a definition and its usage
         val didOpenNotification = JsonRpcRequest(

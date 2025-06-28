@@ -127,7 +127,29 @@ class DNCLLanguageServer(
                 resolveProvider = false,
                 triggerCharacters = listOf(":", "=", "(", "[", " ")
             ),
-            hoverProvider = true
+            hoverProvider = true,
+            definitionProvider = true,
+            referencesProvider = true,
+            renameProvider = true,
+            documentFormattingProvider = true,
+            codeActionProvider = true,
+            semanticTokensProvider = SemanticTokensOptions(
+                legend = SemanticTokensLegend(
+                    tokenTypes = listOf(
+                        "keyword",
+                        "variable",
+                        "function",
+                        "number",
+                        "string",
+                        "comment",
+                        "operator",
+                        "parameter"
+                    ),
+                    tokenModifiers = listOf("definition", "readonly")
+                ),
+                full = true,
+                range = false
+            )
         )
         val result = InitializeResult(capabilities)
         sendResponse(request.id, json.encodeToJsonElement(InitializeResult.serializer(), result))
@@ -190,7 +212,7 @@ class DNCLLanguageServer(
         outputChannel.send(json.encodeToString(notification))
     }
 
-    // 共通処理のヘルパ関数を追加
+    // 共���処理のヘルパ関数を追加
     private suspend inline fun <reified T, R> handleWithDocument(
         request: JsonRpcRequest,
         crossinline handler: (code: String, offset: Int, params: T) -> R?

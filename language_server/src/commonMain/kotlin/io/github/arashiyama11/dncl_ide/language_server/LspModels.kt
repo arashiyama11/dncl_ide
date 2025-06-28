@@ -84,6 +84,11 @@ data class ServerCapabilities(
     val textDocumentSync: Int? = null, // 1 for Full, 2 for Incremental
     val completionProvider: CompletionOptions? = null,
     val hoverProvider: Boolean? = null,
+    val definitionProvider: Boolean? = null,
+    val referencesProvider: Boolean? = null,
+    val renameProvider: Boolean? = null,
+    val documentFormattingProvider: Boolean? = null,
+    val codeActionProvider: Boolean? = null,
     val semanticTokensProvider: SemanticTokensOptions? = null
 )
 
