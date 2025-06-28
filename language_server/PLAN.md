@@ -32,10 +32,6 @@
 - [x] `.dnclnb` ファイル対応（セル単位のURI仕様）
 - [x] Semantic Tokens（ハイライト高速化）
 
-### 🟪 フェーズ4: Server実装
-
-- [x] Ktor などを用いた HTTP/WebSocket サーバー機能追加
-
 ## ✅ 3. 技術スタックと方針
 
 - [ ] Kotlin Multiplatform (android, iOS, desktop)

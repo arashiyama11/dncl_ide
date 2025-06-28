@@ -11,6 +11,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.internal.throwMissingFieldException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -23,14 +25,17 @@ internal data class LsState(
     val capabilities: ClientCapabilities? = null
 )
 
+
 class DNCLLanguageServer {
+    private val debug = false
     private val state = MutableStateFlow(LsState())
 
     private val json = Json {
-        prettyPrint = true
+        prettyPrint = debug
         isLenient = false
         ignoreUnknownKeys = true // ignoreUnknownKeysをtrueに戻す
         encodeDefaults = true
+        explicitNulls = false
     }
     private val outputChannel = Channel<String>(1024)
     val output: ReceiveChannel<String> = outputChannel
@@ -55,6 +60,7 @@ class DNCLLanguageServer {
                 else -> sendErrorResponse(jsonRpcRequest.id, -32601, "Method not found")
             }
         } catch (e: Exception) {
+            if (debug) throw e
             outputChannel.send(
                 json.encodeToString(
                     JsonRpcErrorResponse(
@@ -75,6 +81,7 @@ class DNCLLanguageServer {
             handleMessage(jsonRpcRequest)
         } catch (e: Exception) {
             // Handle parsing errors or other exceptions
+            if (debug) throw e
             outputChannel.send(
                 json.encodeToString(
                     JsonRpcErrorResponse(
@@ -221,7 +228,7 @@ class DNCLLanguageServer {
         outputChannel.send(json.encodeToString(response))
     }
 
-    private suspend fun sendNotification(method: String, params: Any?) {
+    private suspend inline fun <reified T> sendNotification(method: String, params: T) {
         val notification =
             JsonRpcRequest(method = method, params = params?.let { json.encodeToJsonElement(it) })
         outputChannel.send(json.encodeToString(notification))

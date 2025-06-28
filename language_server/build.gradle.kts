@@ -102,4 +102,5 @@ val runJsonRpcServer by tasks.registering(JavaExec::class) {
     mainClass.set("io.github.arashiyama11.dncl_ide.language_server.MainKt")
     standardInput = System.`in`
     standardOutput = System.out
+    args = project.properties["args"]?.toString()?.split(" ") ?: emptyList()
 }
