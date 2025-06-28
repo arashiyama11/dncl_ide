@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.interpreter.parser
+package io.github.arashiyama11.dncl_ide.language_server.ast
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol

@@ -10,7 +10,7 @@ class HoverServiceTest {
     private fun createServices(): Triple<HoverService, DiagnosticService, AstInfoService> {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val hoverService = HoverService(diagnosticService, astInfoService)
+        val hoverService = HoverService(astInfoService)
         return Triple(hoverService, diagnosticService, astInfoService)
     }
 

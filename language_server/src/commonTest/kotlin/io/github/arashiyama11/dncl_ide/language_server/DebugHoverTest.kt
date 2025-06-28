@@ -8,7 +8,7 @@ class DebugHoverTest {
     fun debug_hover_function() {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val hoverService = HoverService(diagnosticService, astInfoService)
+        val hoverService = HoverService(astInfoService)
 
         val code = """
             関数 myFunc(a, b) を:

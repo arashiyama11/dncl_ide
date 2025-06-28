@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.interpreter.parser
+package io.github.arashiyama11.dncl_ide.language_server.ast
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 
@@ -38,10 +38,12 @@ class Formatter {
                     }
                 }
             }
+
             is AstNode.ExpressionStatement -> {
                 appendIndent()
                 visitExpression(statement.expression)
             }
+
             is AstNode.IfStatement -> {
                 appendIndent()
                 builder.append("もし ")
@@ -58,10 +60,16 @@ class Formatter {
                     currentIndent -= indentSize
                 }
             }
+
             is AstNode.ForStatement -> {
                 appendIndent()
                 builder.append("繰り返し ")
-                visitIdentifier(AstNode.Identifier(statement.loopCounter.literal, statement.loopCounter.range))
+                visitIdentifier(
+                    AstNode.Identifier(
+                        statement.loopCounter.literal,
+                        statement.loopCounter.range
+                    )
+                )
                 builder.append(" を ")
                 visitExpression(statement.start)
                 builder.append(" から ")
@@ -73,6 +81,7 @@ class Formatter {
                 visitBlockStatement(statement.block)
                 currentIndent -= indentSize
             }
+
             is AstNode.WhileStatement -> {
                 appendIndent()
                 builder.append("間 ")
@@ -82,6 +91,7 @@ class Formatter {
                 visitBlockStatement(statement.block)
                 currentIndent -= indentSize
             }
+
             is AstNode.FunctionStatement -> {
                 appendIndent()
                 builder.append("関数 ")
@@ -100,6 +110,7 @@ class Formatter {
                 appendIndent()
                 builder.append("定義終わり\n")
             }
+
             is AstNode.BlockStatement -> {
                 visitBlockStatement(statement)
             }
@@ -125,17 +136,20 @@ class Formatter {
                 builder.append(expression.operator.literal)
                 visitExpression(expression.right)
             }
+
             is AstNode.InfixExpression -> {
                 visitExpression(expression.left)
                 builder.append(" ${expression.operator.literal} ")
                 visitExpression(expression.right)
             }
+
             is AstNode.IndexExpression -> {
                 visitExpression(expression.left)
                 builder.append("[")
                 visitExpression(expression.right)
                 builder.append("]")
             }
+
             is AstNode.CallExpression -> {
                 visitExpression(expression.function)
                 builder.append("(")
@@ -147,6 +161,7 @@ class Formatter {
                 }
                 builder.append(")")
             }
+
             is AstNode.ArrayLiteral -> {
                 builder.append("[")
                 expression.elements.forEachIndexed { index, element ->
@@ -157,6 +172,7 @@ class Formatter {
                 }
                 builder.append("]")
             }
+
             is AstNode.FunctionLiteral -> {
                 builder.append("関数(")
                 expression.parameters.forEachIndexed { index, param ->
@@ -172,6 +188,7 @@ class Formatter {
                 appendIndent()
                 builder.append("定義終わり")
             }
+
             is AstNode.WhileExpression -> {
                 builder.append("間 ")
                 visitExpression(expression.condition)

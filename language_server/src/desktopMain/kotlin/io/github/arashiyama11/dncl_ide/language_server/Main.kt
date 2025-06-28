@@ -15,7 +15,7 @@ fun main() = runBlocking {
         DocumentManager(),
         DiagnosticService(),
         CompletionService(),
-        HoverService(DiagnosticService(), astInfoService),
+        HoverService(astInfoService),
         DefinitionService(DiagnosticService(), astInfoService),
         ReferenceService(DiagnosticService(), astInfoService),
         RenameService(DiagnosticService(), astInfoService),

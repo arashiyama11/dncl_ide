@@ -7,7 +7,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 
 class HoverService(
-    private val diagnosticService: DiagnosticService,
     private val astInfoService: AstInfoService
 ) {
     fun getHover(code: String, offset: Int): Hover? {

@@ -6,7 +6,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolTable
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.parser.AstVisitor
+import io.github.arashiyama11.dncl_ide.language_server.ast.AstVisitor
 
 class AstInfoService {
     private var currentAst: AstNode.Program? = null

@@ -12,7 +12,7 @@ class HoverServiceIntegrationTest {
         // 統合テスト: ユーザー定義変数のホバー情報
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val hoverService = HoverService(diagnosticService, astInfoService)
+        val hoverService = HoverService(astInfoService)
 
         val code = """
             x = 10
@@ -39,7 +39,7 @@ class HoverServiceIntegrationTest {
         // 統合テスト: ユーザー定義関数のホバー情報
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val hoverService = HoverService(diagnosticService, astInfoService)
+        val hoverService = HoverService(astInfoService)
 
         val code = """
             関数 add(a, b) を:
@@ -77,7 +77,7 @@ class HoverServiceIntegrationTest {
         // 統合テスト: 組み込み関数のホバー情報（既存機能の確認）
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val hoverService = HoverService(diagnosticService, astInfoService)
+        val hoverService = HoverService(astInfoService)
 
         val code = "表示する(\"Hello World\")"
 
