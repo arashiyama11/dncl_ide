@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
-import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
+import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
 class RenameService(
     private val diagnosticService: DiagnosticService,
@@ -20,7 +20,8 @@ class RenameService(
         }
 
         // ReferenceServiceを作成してすべての参照箇所を取得
-        val referenceService = ReferenceService(diagnosticService, astInfoService) // astInfoServiceを渡す
+        val referenceService =
+            ReferenceService(diagnosticService, astInfoService) // astInfoServiceを渡す
         val references = referenceService.getReferences(uri, code, offset)
 
         if (references.isEmpty()) {

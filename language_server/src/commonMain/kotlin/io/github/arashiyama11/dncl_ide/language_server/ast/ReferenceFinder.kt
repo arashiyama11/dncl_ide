@@ -1,9 +1,6 @@
 package io.github.arashiyama11.dncl_ide.language_server.ast
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolTable
-import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
-import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 
 class ReferenceFinder(private val targetSymbol: Symbol) {
     private val references = mutableListOf<IntRange>()

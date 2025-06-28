@@ -3,10 +3,11 @@ package io.github.arashiyama11.dncl_ide.language_server
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
-import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolTable
+import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
+import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolTable
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.language_server.ast.AstVisitor
+import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
 class AstInfoService {
     private var currentAst: AstNode.Program? = null
@@ -235,7 +236,7 @@ class AstInfoService {
             childScope.define(
                 Symbol(
                     name = param.literal,
-                    kind = io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.PARAMETER,
+                    kind = SymbolKind.PARAMETER,
                     range = param.range,
                     scopeRange = functionNode.range,
                     definitionNode = null // パラメータはTokenなのでAstNodeではない
@@ -263,7 +264,7 @@ class AstInfoService {
                         scope.define(
                             Symbol(
                                 name = assignable.value,
-                                kind = io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.VARIABLE,
+                                kind = SymbolKind.VARIABLE,
                                 range = assignable.range,
                                 scopeRange = scopeRange,
                                 definitionNode = assignable
@@ -285,7 +286,7 @@ class AstInfoService {
                 scope.define(
                     Symbol(
                         name = node.loopCounter.literal,
-                        kind = io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind.VARIABLE,
+                        kind = SymbolKind.VARIABLE,
                         range = node.loopCounter.range,
                         scopeRange = scopeRange,
                         definitionNode = node.loopCounter
