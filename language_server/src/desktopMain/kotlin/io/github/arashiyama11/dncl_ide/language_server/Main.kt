@@ -16,12 +16,12 @@ fun main() = runBlocking {
         DiagnosticService(),
         CompletionService(),
         HoverService(astInfoService),
-        DefinitionService(DiagnosticService(), astInfoService),
-        ReferenceService(DiagnosticService(), astInfoService),
-        RenameService(DiagnosticService(), astInfoService),
+        DefinitionService(astInfoService),
+        ReferenceService(astInfoService),
+        RenameService(astInfoService),
         FormattingService(),
         CodeActionService(),
-        SemanticTokensService(DiagnosticService()),
+        SemanticTokensService(),
         astInfoService
     )
 

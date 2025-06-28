@@ -10,7 +10,7 @@ class DefinitionServiceTest {
     private fun createServices(): Triple<DefinitionService, DiagnosticService, AstInfoService> {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val definitionService = DefinitionService(diagnosticService, astInfoService)
+        val definitionService = DefinitionService(astInfoService)
         return Triple(definitionService, diagnosticService, astInfoService)
     }
 

@@ -9,7 +9,7 @@ class ReferenceServiceTest {
     private fun createServices(): Triple<ReferenceService, DiagnosticService, AstInfoService> {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
-        val referenceService = ReferenceService(diagnosticService, astInfoService)
+        val referenceService = ReferenceService(astInfoService)
         return Triple(referenceService, diagnosticService, astInfoService)
     }
 

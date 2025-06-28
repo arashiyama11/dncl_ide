@@ -3,7 +3,6 @@ package io.github.arashiyama11.dncl_ide.language_server
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
 class RenameService(
-    private val diagnosticService: DiagnosticService,
     private val astInfoService: AstInfoService // AstInfoServiceを追加
 ) {
     fun getRenameEdits(uri: String, code: String, offset: Int, newName: String): WorkspaceEdit? {
@@ -21,7 +20,7 @@ class RenameService(
 
         // ReferenceServiceを作成してすべての参照箇所を取得
         val referenceService =
-            ReferenceService(diagnosticService, astInfoService) // astInfoServiceを渡す
+            ReferenceService(astInfoService) // astInfoServiceを渡す
         val references = referenceService.getReferences(uri, code, offset)
 
         if (references.isEmpty()) {

@@ -3,7 +3,6 @@ package io.github.arashiyama11.dncl_ide.language_server
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,12 +21,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         val initializeRequest = JsonRpcRequest(
@@ -72,12 +71,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         // First, open the document
@@ -134,12 +133,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         // First, open the document with an error
@@ -203,12 +202,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         // First, open the document
@@ -260,12 +259,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         // First, open the document
@@ -319,12 +318,12 @@ class DNCLLanguageServerTest {
                 DiagnosticService(),
                 CompletionService(),
                 HoverService(astInfoService),
-                DefinitionService(DiagnosticService(), astInfoService),
-                ReferenceService(DiagnosticService(), astInfoService),
-                RenameService(DiagnosticService(), astInfoService),
+                DefinitionService(astInfoService),
+                ReferenceService(astInfoService),
+                RenameService(astInfoService),
                 FormattingService(),
                 CodeActionService(),
-                SemanticTokensService(DiagnosticService()),
+                SemanticTokensService(),
                 astInfoService
             )
             // First, open the document
@@ -432,12 +431,12 @@ class DNCLLanguageServerTest {
                 DiagnosticService(),
                 CompletionService(),
                 HoverService(astInfoService),
-                DefinitionService(DiagnosticService(), astInfoService),
-                ReferenceService(DiagnosticService(), astInfoService),
-                RenameService(DiagnosticService(), astInfoService),
+                DefinitionService(astInfoService),
+                ReferenceService(astInfoService),
+                RenameService(astInfoService),
                 FormattingService(),
                 CodeActionService(),
-                SemanticTokensService(DiagnosticService()),
+                SemanticTokensService(),
                 astInfoService
             )
             // First, open the document
@@ -499,12 +498,12 @@ class DNCLLanguageServerTest {
             DiagnosticService(),
             CompletionService(),
             HoverService(astInfoService),
-            DefinitionService(DiagnosticService(), astInfoService),
-            ReferenceService(DiagnosticService(), astInfoService),
-            RenameService(DiagnosticService(), astInfoService),
+            DefinitionService(astInfoService),
+            ReferenceService(astInfoService),
+            RenameService(astInfoService),
             FormattingService(),
             CodeActionService(),
-            SemanticTokensService(DiagnosticService()),
+            SemanticTokensService(),
             astInfoService
         )
         // First, open the document with a definition and its usage

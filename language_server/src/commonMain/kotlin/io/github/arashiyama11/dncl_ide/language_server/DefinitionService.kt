@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class DefinitionService(
-    private val diagnosticService: DiagnosticService,
     private val astInfoService: AstInfoService
 ) {
     fun getDefinitionLocation(uri: String, code: String, offset: Int): Location? {

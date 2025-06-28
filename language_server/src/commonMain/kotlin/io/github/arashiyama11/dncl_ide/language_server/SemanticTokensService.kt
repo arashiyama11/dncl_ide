@@ -4,7 +4,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
-class SemanticTokensService(private val diagnosticService: DiagnosticService) {
+class SemanticTokensService() {
     fun getSemanticTokens(code: String): SemanticTokens {
         val lexer = Lexer(code)
         val tokens = lexer.toList().mapNotNull { it.getOrNull() }

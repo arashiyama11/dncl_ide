@@ -5,7 +5,6 @@ import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class ReferenceService(
-    private val diagnosticService: DiagnosticService,
     private val astInfoService: AstInfoService
 ) {
     fun getReferences(uri: String, code: String, offset: Int): List<Location> {
