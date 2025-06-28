@@ -101,7 +101,6 @@ class SymbolTableBuilder {
                 )
                 enterScope(statement.range)
                 statement.parameters.forEach { param ->
-                    println("defining parameter: ${param.literal} at ${statement.range}")
                     currentScope().define(
                         Symbol(
                             name = param.literal,
@@ -143,7 +142,6 @@ class SymbolTableBuilder {
             is AstNode.FunctionLiteral -> {
                 enterScope(expression.range)
                 expression.parameters.forEach { param ->
-                    println("defining parameter: ${param.literal} at ${expression.range}")
                     currentScope().define(
                         Symbol(
                             name = param.literal,

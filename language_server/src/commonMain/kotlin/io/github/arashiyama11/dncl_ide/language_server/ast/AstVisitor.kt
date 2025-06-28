@@ -97,7 +97,6 @@ class AstVisitor {
         )
         enterScope(functionStmt.range)
         functionStmt.parameters.forEach { paramToken ->
-            println("define parameter: ${paramToken.literal} at ${functionStmt.range}")
             currentScope().define(
                 Symbol(
                     name = paramToken.literal,

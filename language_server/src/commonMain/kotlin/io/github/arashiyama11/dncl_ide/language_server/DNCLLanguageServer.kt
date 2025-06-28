@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
@@ -170,7 +172,7 @@ class DNCLLanguageServer(
     }
 
     private suspend fun sendResponse(id: Long?, result: JsonElement?) {
-        val response = JsonRpcResponse(id = id, result = result)
+        val response = JsonRpcResponse(id = id, result = result ?: JsonObject(emptyMap()))
         outputChannel.send(json.encodeToString(response))
     }
 

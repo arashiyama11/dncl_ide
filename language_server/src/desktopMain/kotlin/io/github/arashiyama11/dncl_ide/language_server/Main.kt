@@ -14,8 +14,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.serialization.json.Json
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
+import java.io.EOFException
 import java.io.File
-import java.io.InputStreamReader
 
 fun main() = runBlocking {
     logging("Starting DNCL Language Server")
@@ -47,8 +48,9 @@ fun main() = runBlocking {
 fun CoroutineScope.launchOutputLoop(server: DNCLLanguageServer) = launch(Dispatchers.IO) {
     server.output.consumeEach { it ->
         val bytes = it.encodeToByteArray()
-        // フレーミング
-        System.out.write("Content-Length: ${bytes.size}\r\n\r\n".toByteArray())
+        val length = "Content-Length: ${bytes.size}\r\n\r\n"
+        logging("output: $length${String(bytes, Charsets.UTF_8)}")
+        System.out.write(length.toByteArray())
         System.out.write(bytes)
         System.out.flush()
     }
@@ -61,41 +63,63 @@ fun logging(message: String) {
 
 fun CoroutineScope.launchInputLoop(
     server: DNCLLanguageServer,
-    json: Json
+    json: Json,
+    timeoutMillis: Long = 3_000L
 ) = launch(Dispatchers.IO) {
-    val inStream = BufferedInputStream(System.`in`)
-    val reader = InputStreamReader(inStream, Charsets.UTF_8).buffered()
+    val rawIn = BufferedInputStream(System.`in`)
 
     while (isActive) {
-        // ヘッダー読み取り
-        val headers = mutableMapOf<String, String>()
-        var line: String = reader.readLine() ?: break
-        if (line.isBlank()) continue
-        while (line.isNotBlank()) {
-            val (key, value) = line.split(":", limit = 2)
-            headers[key.trim()] = value.trim()
-            line = reader.readLine() ?: break
-        }
-
-        // Content-Length を取得
-        val length = headers["Content-Length"]?.toIntOrNull() ?: continue
-
-        // 本文読み取り（バイト数指定）
-        val buf = CharArray(length)
-        var read = 0
-        while (read < length) {
-            val r = reader.read(buf, read, length - read)
-            if (r < 0) break
-            read += r
-        }
-        val message = String(buf, 0, read)
-
-        // JSON-RPC リクエストとして処理
-        runCatching { json.decodeFromString<JsonRpcRequest>(message) }
-            .onSuccess {
-                withContext(Dispatchers.Default) {
-                    server.handleMessage(it)
+        // タイムアウト付きでヘッダー＋本文をまとめて読み込む
+        val message: String? = withTimeoutOrNull(timeoutMillis) {
+            // ── ヘッダー取得 ────────────────────────────────────────────
+            val headerBytes = ByteArrayOutputStream()
+            var prevState = 0
+            while (prevState < 4) {
+                val b = rawIn.read().takeIf { it >= 0 } ?: throw EOFException()
+                headerBytes.write(b)
+                prevState = when (prevState) {
+                    0 -> if (b == '\r'.code) 1 else 0
+                    1 -> if (b == '\n'.code) 2 else if (b == '\r'.code) 1 else 0
+                    2 -> if (b == '\r'.code) 3 else 0
+                    3 -> if (b == '\n'.code) 4 else 0
+                    else -> prevState
                 }
             }
+            val headers = headerBytes.toString("UTF-8")
+            val length = headers
+                .lineSequence()
+                .mapNotNull {
+                    it.split(":", limit = 2)
+                        .takeIf { it[0].equals("Content-Length", true) }
+                        ?.getOrNull(1)
+                        ?.trim()
+                        ?.toIntOrNull()
+                }
+                .firstOrNull()
+                ?: return@withTimeoutOrNull null
+
+            logging("Received headers, Content-Length=$length")
+
+            // ── 本文取得 ───────────────────────────────────────────────
+            val body = ByteArray(length)
+            var read = 0
+            while (read < length) {
+                val n = rawIn.read(body, read, length - read)
+                if (n < 0) throw EOFException("Unexpected EOF")
+                read += n
+            }
+            body.toString(Charsets.UTF_8)
+        }
+
+        if (message == null) {
+            // タイムアウト or Content-Length が取れなかった
+            logging("No input within ${timeoutMillis}ms, retrying…")
+            continue
+        }
+
+        logging("Received message: $message")
+        runCatching { json.decodeFromString<JsonRpcRequest>(message) }
+            .onSuccess { launch { server.handleMessage(it) } }
+            .onFailure { logging("Error processing message: ${it.message}") }
     }
 }
