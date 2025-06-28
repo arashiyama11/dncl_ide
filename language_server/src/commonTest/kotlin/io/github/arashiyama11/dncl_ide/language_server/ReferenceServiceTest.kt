@@ -15,7 +15,7 @@ class ReferenceServiceTest {
 
     @Test
     fun test_find_variable_references() {
-        // Red: 変数の全参照箇所を検索するテスト
+        // Red: 変数���全参照箇所を検索するテスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
             x = 10
@@ -68,10 +68,10 @@ class ReferenceServiceTest {
         val code = """
             関数 add(a, b)を:
                 戻り値(a + b)
-            関数終了
+            と定義する
             
-            res1 ← add(1, 2)
-            res2 ← add(3, 4)
+            res1 = add(1, 2)
+            res2 = add(3, 4)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -106,7 +106,7 @@ class ReferenceServiceTest {
             referenceService.getReferences("test://file.dncl", code, globalXPosition)
 
         // グローバルのxは2箇所（定義1回 + 最後の表示での使用1回）
-        assertEquals(2, globalReferences.size, "グローバル変数xの参照は2箇所あるはずです")
+        assertEquals(2, globalReferences.size, "グローバル変数xの参照���2箇所あるはずです")
 
         // 関数内のxの参照を検索
         val localXPosition = code.indexOf("x = 20")
@@ -119,12 +119,12 @@ class ReferenceServiceTest {
 
     @Test
     fun test_parameter_references() {
-        // Red: 関数パラメータの参照検索テスト
+        // Red: 関数パラメ��タの参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
-            関数 calc(num1, num2)を
+            関数 calc(num1, num2)を:
                 res = num1 + num2
-                表示(num1)
+                表示する(num1)
                 戻り値(res)
             と定義する
         """.trimIndent()
@@ -135,13 +135,13 @@ class ReferenceServiceTest {
         val param1Position = code.indexOf("num1")
         val references = referenceService.getReferences("test://file.dncl", code, param1Position)
 
-        // num1は3箇所で使用されてい���（パラメータ定義1回 + 使用2回）
+        // num1は3箇所で使用されている（パラメータ定義1回 + 使用2回）
         assertEquals(3, references.size, "パラメータnum1の参照は3箇所あるはずです")
     }
 
     @Test
     fun test_no_references_for_undefined_symbol() {
-        // Green: 未定義シンボルに対する参照検索テスト
+        // Green: 未��義シンボルに対する参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
             表示する("hello")

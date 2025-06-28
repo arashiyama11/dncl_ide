@@ -11,7 +11,7 @@ class ReferenceService(
         // ASTを解析
         astInfoService.parseAndAnalyze(code)
 
-        // カーソル位置のシンボルを取得
+        // カーソル位置のシンボルを取得（スコープ認識版を使用）
         val targetSymbol = astInfoService.findSymbolAtOffset(offset)
             ?: return emptyList()
 
@@ -47,7 +47,7 @@ class ReferenceService(
 
             is AstNode.AssignStatement -> {
                 node.assignments.forEach { (assignable, expression) ->
-                    findReferencesInNode(assignable, targetSymbol, code, uri, references)
+                    checkNodeForReference(assignable, targetSymbol, code, uri, references)
                     findReferencesInNode(expression, targetSymbol, code, uri, references)
                 }
             }
@@ -58,12 +58,16 @@ class ReferenceService(
 
             is AstNode.FunctionStatement -> {
                 // 関数名のチェック
-                if (node.name.literal == targetSymbol.name) {
+                if (node.name.literal == targetSymbol.name &&
+                    isSameSymbol(node.name.range, targetSymbol)
+                ) {
                     addReferenceLocation(node.name.range, code, uri, references)
                 }
                 // パラメータのチェック
                 node.parameters.forEach { param ->
-                    if (param.literal == targetSymbol.name) {
+                    if (param.literal == targetSymbol.name &&
+                        isSameSymbol(param.range, targetSymbol)
+                    ) {
                         addReferenceLocation(param.range, code, uri, references)
                     }
                 }
@@ -72,9 +76,7 @@ class ReferenceService(
             }
 
             is AstNode.Identifier -> {
-                if (node.value == targetSymbol.name) {
-                    addReferenceLocation(node.range, code, uri, references)
-                }
+                checkNodeForReference(node, targetSymbol, code, uri, references)
             }
 
             is AstNode.CallExpression -> {
@@ -99,7 +101,9 @@ class ReferenceService(
 
             is AstNode.ForStatement -> {
                 // ループカウンタのチェック
-                if (node.loopCounter.value == targetSymbol.name) {
+                if (node.loopCounter.value == targetSymbol.name &&
+                    isSameSymbol(node.loopCounter.range, targetSymbol)
+                ) {
                     addReferenceLocation(node.loopCounter.range, code, uri, references)
                 }
                 findReferencesInNode(node.start, targetSymbol, code, uri, references)
@@ -132,6 +136,34 @@ class ReferenceService(
             else -> { /* Do nothing for leaf nodes */
             }
         }
+    }
+
+    private fun checkNodeForReference(
+        node: AstNode,
+        targetSymbol: Symbol,
+        code: String,
+        uri: String,
+        references: MutableList<Location>
+    ) {
+        if (node is AstNode.Identifier && node.value == targetSymbol.name) {
+            // スコープを考慮して同じシンボルかどうかチェック
+            val symbolAtPosition = astInfoService.findSymbolAtOffset(node.range.first)
+            if (symbolAtPosition != null && isSameSymbol(symbolAtPosition, targetSymbol)) {
+                addReferenceLocation(node.range, code, uri, references)
+            }
+        }
+    }
+
+    private fun isSameSymbol(range: IntRange, targetSymbol: Symbol): Boolean {
+        // シンボルの範囲が一致するかチェック
+        return range == targetSymbol.range
+    }
+
+    private fun isSameSymbol(symbol1: Symbol, symbol2: Symbol): Boolean {
+        // シンボルが同じかどうかをチェック（名前、種類、範囲で判定）
+        return symbol1.name == symbol2.name &&
+                symbol1.kind == symbol2.kind &&
+                symbol1.range == symbol2.range
     }
 
     private fun addReferenceLocation(

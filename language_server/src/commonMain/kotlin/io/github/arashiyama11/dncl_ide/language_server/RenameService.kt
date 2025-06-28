@@ -10,7 +10,7 @@ class RenameService(
         val astInfoService = AstInfoService()
         astInfoService.parseAndAnalyze(code)
 
-        // カーソル位置のシンボルを取得
+        // カーソル位置のシンボルを取得（スコープ認識版を使用）
         val targetSymbol = astInfoService.findSymbolAtOffset(offset)
             ?: return null
 

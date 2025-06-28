@@ -18,7 +18,6 @@ class AstInfoService {
             val parserResult = Parser(lexer)
             val parser = when (parserResult) {
                 is Either.Left -> {
-                    println("Parser creation failed: ${parserResult.value}")
                     return
                 }
 
@@ -28,7 +27,6 @@ class AstInfoService {
             val programResult = parser.parseProgram()
             val program = when (programResult) {
                 is Either.Left -> {
-                    println("Program parsing failed: ${programResult.value}")
                     return
                 }
 
@@ -40,13 +38,8 @@ class AstInfoService {
 
             currentAst = program
             currentSymbolTable = symbolTable
-
-            println("Successfully parsed AST with ${program.statements.size} statements")
-            println("Symbol table created with ${symbolTable.allSymbols().map { it.name }} symbols")
-            println("outer: ${symbolTable.outer?.allSymbols()?.map { it.name }}")
         } catch (e: Exception) {
-            println("Exception during parsing: ${e.message}")
-            e.printStackTrace()
+            // Parsing failed, keep ast and symbolTable as null
         }
     }
 

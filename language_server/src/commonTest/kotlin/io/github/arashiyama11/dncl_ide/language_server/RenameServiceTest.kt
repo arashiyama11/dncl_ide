@@ -21,7 +21,7 @@ class RenameServiceTest {
         val code = """
             x = 10
             y = x + 5
-            表示(x)
+            表示する(x)
         """.trimIndent()
 
         astInfoService.parseAndAnalyze(code)
@@ -50,7 +50,7 @@ class RenameServiceTest {
         // Red: 関数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
-            関数 add(a, b):
+            関数 add(a, b)を:
                 戻り値(a + b)
             と定義する
             
@@ -100,13 +100,13 @@ class RenameServiceTest {
         )
 
         // 関数内のxをlocalVarにリネーム
-        val localXPosition = code.indexOf("x ← 20")
+        val localXPosition = code.indexOf("x = 20")
         val localEdit =
             renameService.getRenameEdits("test://file.dncl", code, localXPosition, "localVar")
 
         assertNotNull(localEdit)
         val localTextEdit = localEdit.documentChanges!![0]
-        // ローカルのxは2箇所のみ（グローバルのxは対象外）
+        // ローカルのxは2箇所のみ（グローバルのxは対象外���
         assertEquals(2, localTextEdit.edits.size, "ローカル変数xは2箇所のみリネームされるはずです")
     }
 
@@ -154,7 +154,7 @@ class RenameServiceTest {
         val workspaceEdit =
             renameService.getRenameEdits("test://file.dncl", code, invalidPosition, "newName")
 
-        assertNull(workspaceEdit, "文字列リテラル内ではリ���ームできないはずです")
+        assertNull(workspaceEdit, "文字列リテラル内��はリネームできないはずです")
     }
 
     @Test
