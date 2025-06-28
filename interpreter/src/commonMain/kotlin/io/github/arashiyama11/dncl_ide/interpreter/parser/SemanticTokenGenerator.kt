@@ -44,7 +44,7 @@ class SemanticTokenGenerator(
         lastChar = tokenChar
     }
 
-    private fun calculateLineAndCharacter(program: String, offset: Int): Pair<Int, Int> {
+    fun calculateLineAndCharacter(program: String, offset: Int): Pair<Int, Int> {
         var line = 0
         var character = 0
         var currentOffset = 0

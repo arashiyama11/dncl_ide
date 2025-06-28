@@ -55,22 +55,12 @@ class AstInfoService {
         // First, find the node at the offset to understand the context
         val node = findNodeAtOffset(offset)
 
-        println("node: $node")
+        // pure: node found
 
         // If it's an identifier, try to resolve it from the appropriate scope
         if (node is AstNode.Identifier) {
             // Find the appropriate scope for this offset
             val scopeSymbolTable = findScopeForOffset(ast, offset, symbolTable)
-            println(scopeSymbolTable.allSymbols().map { it.name })
-            println(
-                "Resolving identifier: ${node.value} in scope: ${
-                    scopeSymbolTable.resolve(
-                        node.value,
-                        offset
-                    )
-                }"
-            )
-            println(scopeSymbolTable.allSymbols().firstOrNull() { it.name == "num1" })
             return scopeSymbolTable.resolve(node.value, offset)
         }
 

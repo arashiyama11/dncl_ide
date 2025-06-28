@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
+import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class SemanticTokensService(private val diagnosticService: DiagnosticService) {
     fun getSemanticTokens(code: String): SemanticTokens {
@@ -13,7 +14,7 @@ class SemanticTokensService(private val diagnosticService: DiagnosticService) {
         var lastChar = 0
 
         tokens.forEach { token ->
-            val (tokenLine, tokenChar) = diagnosticService.calculateLineAndCharacter(code, token.range.first)
+            val (tokenLine, tokenChar) = calculateLineAndCharacter(code, token.range.first)
             val tokenLength = token.literal.length
             val tokenType = getTokenType(token)
             val tokenModifiers = 0 // No modifiers for now

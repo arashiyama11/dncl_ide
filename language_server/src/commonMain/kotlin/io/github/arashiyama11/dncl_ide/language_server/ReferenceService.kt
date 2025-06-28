@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.language_server
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.Symbol
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
+import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class ReferenceService(
     private val diagnosticService: DiagnosticService,
@@ -149,8 +150,8 @@ class ReferenceService(
         uri: String,
         references: MutableList<Location>
     ) {
-        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(code, range.first)
-        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, range.last)
+        val (startLine, startChar) = calculateLineAndCharacter(code, range.first)
+        val (endLine, endChar) = calculateLineAndCharacter(code, range.last)
 
         references.add(
             Location(

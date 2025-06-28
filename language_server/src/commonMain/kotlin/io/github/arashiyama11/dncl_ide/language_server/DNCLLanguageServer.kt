@@ -6,6 +6,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.language_server.util.calculateOffset
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -27,7 +28,7 @@ internal data class LsState(
 
 
 class DNCLLanguageServer(
-    private val documentManager: DocumentManager,
+    private var documentManager: DocumentManager,
     private val diagnosticService: DiagnosticService,
     private val completionService: CompletionService,
     private val hoverService: HoverService,
@@ -144,7 +145,7 @@ class DNCLLanguageServer(
         val params =
             request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
-            documentManager.updateState(it.uri, it.text)
+            documentManager = documentManager.setDocument(it.uri, it.text)
             astInfoService.parseAndAnalyze(it.text)
             publishDiagnostics(it.uri, it.text)
         }
@@ -155,7 +156,7 @@ class DNCLLanguageServer(
             request.params?.let { json.decodeFromJsonElement<DidChangeTextDocumentParams>(it) }
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
-                documentManager.updateState(docId.uri, change.text)
+                documentManager = documentManager.setDocument(docId.uri, change.text)
                 astInfoService.parseAndAnalyze(change.text)
                 publishDiagnostics(docId.uri, change.text)
             }
@@ -189,7 +190,7 @@ class DNCLLanguageServer(
         outputChannel.send(json.encodeToString(notification))
     }
 
-    // 共通処理のヘルパー関数を追加
+    // 共通処理のヘルパ関数を追加
     private suspend inline fun <reified T, R> handleWithDocument(
         request: JsonRpcRequest,
         crossinline handler: (code: String, offset: Int, params: T) -> R?
@@ -215,7 +216,7 @@ class DNCLLanguageServer(
             } ?: return
 
             val code = documentManager.getDocument(textDocument.uri) ?: return
-            val offset = DocumentManager.calculateOffset(code, position.line, position.character)
+            val offset = calculateOffset(code, position.line, position.character)
             val result = handler(code, offset, it)
 
             when (result) {

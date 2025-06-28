@@ -4,6 +4,7 @@ import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
 
 class DiagnosticService {
 
@@ -36,23 +37,5 @@ class DiagnosticService {
             message = this.explain(program),
             source = "dncl-ls"
         )
-    }
-
-    fun calculateLineAndCharacter(program: String, offset: Int): Pair<Int, Int> {
-        var line = 0
-        var character = 0
-        var currentOffset = 0
-
-        val lines = program.lines()
-        for ((idx, s) in lines.withIndex()) {
-            if (currentOffset + s.length + 1 > offset) { // +1 for newline character
-                line = idx
-                character = offset - currentOffset
-                break
-            }
-            currentOffset += s.length + 1 // +1 for newline
-        }
-
-        return Pair(line, character)
     }
 }

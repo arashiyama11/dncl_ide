@@ -21,12 +21,10 @@ class HoverService(
             offset in token.range
         }
 
-        println("Hovered token: $hoveredToken at offset $offset")
         val hoverContent: String? = when (hoveredToken) {
             is Token.Japanese, is Token.Identifier -> {
 
                 val symbol = astInfoService.findSymbolAtOffset(offset)
-                println("Found symbol: $symbol")
                 when (symbol?.kind) {
                     SymbolKind.VARIABLE -> {
                         "**変数**: `${symbol.name}`\n\n" +
@@ -73,8 +71,6 @@ class HoverService(
                             null
                         }
                     }
-
-                    else -> null
                 }
             }
 
