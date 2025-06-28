@@ -1,47 +1,48 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
-import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.model.Token
+import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
 
-class RenameService(private val diagnosticService: DiagnosticService) {
+class RenameService(
+    private val diagnosticService: DiagnosticService,
+    private val astInfoService: AstInfoService,
+    private val referenceService: ReferenceService
+) {
     fun getRenameEdits(uri: String, code: String, offset: Int, newName: String): WorkspaceEdit? {
-        val lexer = Lexer(code)
-        val tokens = lexer.toList().mapNotNull { it.getOrNull() }
+        // ASTを解析
+        astInfoService.parseAndAnalyze(code)
 
-        val targetToken = tokens.firstOrNull { token ->
-            token.range.contains(offset) && (token is Token.Identifier || token is Token.Japanese)
-        }
+        // カーソル位置のシンボルを取得
+        val targetSymbol = astInfoService.findSymbolAtOffset(offset)
+            ?: return null
 
-        if (targetToken != null) {
-            val targetLiteral = targetToken.literal
-            val edits = mutableListOf<TextEdit>()
-            tokens.filter { it.literal == targetLiteral && (it is Token.Identifier || it is Token.Japanese) }
-                .forEach { token ->
-                    val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
-                        code,
-                        token.range.first
-                    )
-                    val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, token.range.last)
-                    edits.add(
-                        TextEdit(
-                            range = Range(
-                                Position(startLine, startChar),
-                                Position(endLine, endChar)
-                            ),
-                            newText = newName
-                        )
-                    )
-                }
-            val textDocumentEdit = TextDocumentEdit(
-                textDocument = VersionedTextDocumentIdentifier(
-                    uri = uri,
-                    version = -1
-                ), // -1 for unknown version
-                edits = edits
-            )
-            return WorkspaceEdit(documentChanges = listOf(textDocumentEdit))
-        } else {
+        // 組み込み関数はリネーム不可
+        if (targetSymbol.kind == SymbolKind.BUILT_IN_FUNCTION) {
             return null
         }
+
+        // Find References機能を使用して、すべての参照箇所を取得
+        val references = referenceService.getReferences(uri, code, offset)
+
+        if (references.isEmpty()) {
+            return null
+        }
+
+        // 各参照箇所をリネーム用の編集に変換
+        val edits = references.map { location ->
+            TextEdit(
+                range = location.range,
+                newText = newName
+            )
+        }
+
+        val textDocumentEdit = TextDocumentEdit(
+            textDocument = VersionedTextDocumentIdentifier(
+                uri = uri,
+                version = -1 // -1 for unknown version
+            ),
+            edits = edits
+        )
+
+        return WorkspaceEdit(documentChanges = listOf(textDocumentEdit))
     }
 }

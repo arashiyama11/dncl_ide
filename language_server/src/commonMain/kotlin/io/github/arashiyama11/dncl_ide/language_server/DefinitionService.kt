@@ -1,42 +1,39 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
-import arrow.core.Either
-import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
-import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 
-class DefinitionService(private val diagnosticService: DiagnosticService) {
+class DefinitionService(
+    private val diagnosticService: DiagnosticService,
+    private val astInfoService: AstInfoService
+) {
     fun getDefinitionLocation(uri: String, code: String, offset: Int): Location? {
-        val lexer = Lexer(code)
-        val parser: Parser = when (val parserResult = Parser(lexer)) {
-            is Either.Left -> {
-                return null
-            }
-            is Either.Right -> parserResult.value
-        }
+        // ASTを解析
+        astInfoService.parseAndAnalyze(code)
 
-        val program = when (val programResult = parser.parseProgram()) {
-            is Either.Left -> {
-                return null
-            }
-            is Either.Right -> programResult.value
-        }
+        // カーソル位置のシンボルを取得
+        val symbol = astInfoService.findSymbolAtOffset(offset)
+            ?: return null
 
-        val suggestionUseCase = SuggestionUseCase()
-        val definitions =
-            suggestionUseCase.suggestWithParsedData(code, offset, lexer.toList(), program)
+        // シンボルの定義位置を取得
+        val definitionRange = symbol.range
+        val definitionNode = symbol.definitionNode
 
-        return definitions.firstOrNull { def ->
-            def.position?.let { pos -> pos <= offset && (pos + def.literal.length) >= offset } == true
-        }?.let { def ->
-            val pos =
-                def.position!! // Now this is safe because the filter ensures it's not null
-            val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(code, pos)
-            val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(code, pos + def.literal.length)
-            Location(
-                uri = uri,
-                range = Range(Position(startLine, startChar), Position(endLine, endChar))
+        // 定義位置の行と文字位置を計算
+        val (startLine, startChar) = diagnosticService.calculateLineAndCharacter(
+            code,
+            definitionRange.first
+        )
+        val (endLine, endChar) = diagnosticService.calculateLineAndCharacter(
+            code,
+            definitionRange.last
+        )
+
+        return Location(
+            uri = uri,
+            range = Range(
+                start = Position(startLine, startChar),
+                end = Position(endLine, endChar)
             )
-        }
+        )
     }
 }

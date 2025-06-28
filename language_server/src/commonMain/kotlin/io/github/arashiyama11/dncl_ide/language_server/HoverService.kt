@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.SymbolKind
-import io.github.arashiyama11.dncl_ide.language_server.builtInFunctionDescriptions
 
 class HoverService(
     private val diagnosticService: DiagnosticService,
@@ -19,19 +18,46 @@ class HoverService(
         }
 
         val hoverContent = when (hoveredToken) {
-            is Token.Japanese -> builtInFunctionDescriptions[hoveredToken.literal]
+            is Token.Japanese -> {
+                // 組み込み関数のホバー情報
+                builtInFunctionDescriptions[hoveredToken.literal]
+            }
+
             is Token.Identifier -> {
+                // ユーザー定義シンボルのホバー情報
                 val symbol = astInfoService.findSymbolAtOffset(offset)
                 if (symbol != null) {
                     when (symbol.kind) {
-                        SymbolKind.VARIABLE -> "変数: ${symbol.name}"
-                        SymbolKind.FUNCTION -> "関数: ${symbol.name}(${symbol.definitionNode?.let { (it as? AstNode.FunctionStatement)?.parameters?.joinToString() } ?: ""})"
-                        SymbolKind.PARAMETER -> "パラメータ: ${symbol.name}"
-                        SymbolKind.BUILT_IN_FUNCTION -> builtInFunctionDescriptions[symbol.name]
+                        SymbolKind.VARIABLE -> {
+                            "**変数**: `${symbol.name}`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
+                        }
+
+                        SymbolKind.FUNCTION -> {
+                            val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
+                            val params = functionNode?.parameters?.joinToString(", ") ?: ""
+                            "**関数**: `${symbol.name}($params)`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
+                        }
+
+                        SymbolKind.PARAMETER -> {
+                            "**パラメータ**: `${symbol.name}`\n\n" +
+                                    "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
+                                    "関数のパラメータとして定義されています"
+                        }
+
+                        SymbolKind.BUILT_IN_FUNCTION -> {
+                            builtInFunctionDescriptions[symbol.name]
+                                ?: "**組み込み関数**: `${symbol.name}`"
+                        }
+
                         SymbolKind.UNKNOWN -> null
                     }
                 } else {
-                    null
+                    // シンボルが見つからない場合、組み込み関数かチェック
+                    builtInFunctionDescriptions[hoveredToken.literal]
                 }
             }
 
