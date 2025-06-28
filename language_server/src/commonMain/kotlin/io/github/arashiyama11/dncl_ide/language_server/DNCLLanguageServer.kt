@@ -36,7 +36,8 @@ class DNCLLanguageServer(
     private val renameService: RenameService,
     private val formattingService: FormattingService,
     private val codeActionService: CodeActionService,
-    private val semanticTokensService: SemanticTokensService
+    private val semanticTokensService: SemanticTokensService,
+    private val astInfoService: AstInfoService
 ) {
     private val debug = false
     private val state = MutableStateFlow(LsState())
@@ -145,6 +146,7 @@ class DNCLLanguageServer(
             request.params?.let { json.decodeFromJsonElement<DidOpenTextDocumentParams>(it) }
         params?.textDocument?.let {
             documentManager.setDocument(it.uri, it.text)
+            astInfoService.parseAndAnalyze(it.text)
             publishDiagnostics(it.uri, it.text)
         }
     }
@@ -155,6 +157,7 @@ class DNCLLanguageServer(
         params?.textDocument?.let { docId ->
             params.contentChanges.firstOrNull()?.let { change ->
                 documentManager.setDocument(docId.uri, change.text)
+                astInfoService.parseAndAnalyze(change.text)
                 publishDiagnostics(docId.uri, change.text)
             }
         }
