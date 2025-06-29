@@ -225,7 +225,7 @@ class DNCLLanguageServerTest {
                         uri = "file:///a.dncl",
                         languageId = "dncl",
                         version = 1,
-                        text = "表示 x\n計算 y"
+                        text = "表示(x)\n計算(y)"
                     )
                 )
             )

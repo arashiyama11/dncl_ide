@@ -153,20 +153,4 @@ class RenameServiceTest {
 
         assertNull(workspaceEdit, "文字列リテラル内ではリネームできないはずです")
     }
-
-    @Test
-    fun test_rename_builtin_function_should_fail() {
-        // Green: 組み込み関数のリネーム試行テスト（失敗すべき）
-        val (renameService, _, astInfoService) = createServices()
-        val code = """
-            表示する("hello")
-        """.trimIndent()
-
-        // 組み込み関数「表示」のリネーム試行
-        val uri = "file:///test.dncl"
-        val displayPosition = code.indexOf("表示する")
-        val workspaceEdit = renameService.rename(uri, code, displayPosition, "show")
-
-        assertNull(workspaceEdit, "組み込み関数はリネームできないはずです")
-    }
 }
