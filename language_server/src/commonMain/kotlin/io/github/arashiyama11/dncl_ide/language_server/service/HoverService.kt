@@ -7,6 +7,7 @@ import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.MarkupContent
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
 class HoverService(
     private val astInfoService: AstInfoService
@@ -27,31 +28,38 @@ class HoverService(
                 val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
                 when (symbol?.kind) {
                     SymbolKind.VARIABLE -> {
-                        "**変数**: `${symbol.name}`\n\n" +
-                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                if (symbol.type != null) "型: ${symbol.type}" else "型: 不明"
+                        val start = calculatePosition(code, symbol.range.first)
+                        """**変数**: `${symbol.name}`  
+                           定義位置: ${start.line + 1}行${start.character}文字目  
+                           ${if (symbol.type != null) "型: ${symbol.type}" else ""}""".trimIndent()
                     }
 
                     SymbolKind.FUNCTION -> {
                         val functionNode = symbol.definitionNode as? AstNode.FunctionStatement
                         val params =
                             functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
-                        "**関数**: `${symbol.name}($params)`\n\n" +
-                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"
+                        val start = calculatePosition(code, symbol.range.first)
+                        """**関数**: `${symbol.name}($params)`  
+                           定義位置: ${start.line + 1}行${start.character + 1}文字目  
+                           ${if (params.isNotEmpty()) "パラメータ: $params" else "パラメータなし"}
+                        """.trimIndent()
                     }
 
                     SymbolKind.PARAMETER -> {
-                        "**パラメータ**: `${symbol.name}`\n\n" +
-                                "定義位置: ${symbol.range.first}-${symbol.range.last}\n" +
-                                "関数のパラメータとして定義されています"
+                        val start = calculatePosition(code, symbol.range.first)
+                        """**パラメータ**: `${symbol.name}`
+                           定義位置: ${start.line + 1}行${start.character + 1}文字目
+                           関数のパラメータとして定義されています""".trimIndent()
                     }
 
                     SymbolKind.BUILT_IN_FUNCTION -> {
                         val builtInFunction = AllBuiltInFunction.from(symbol.name)
                         if (builtInFunction != null) {
-                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n" +
-                                    "この関数はDNCLの組み込み関数です。"
+                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n${
+                                descriptionOfBuiltInFunction(
+                                    builtInFunction
+                                )
+                            }"
                         } else {
                             "**組み込み関数**: `${symbol.name}`"
                         }
@@ -62,16 +70,18 @@ class HoverService(
                         val tokenText = hoveredToken.literal
                         val builtInFunction = AllBuiltInFunction.from(tokenText)
                         if (builtInFunction != null) {
-                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n" +
-                                    "この関数はDNCLの組み込み関数です。"
+                            "**組み込み関数**: `${builtInFunction.identifier}`\n\n ${
+                                descriptionOfBuiltInFunction(
+                                    builtInFunction
+                                )
+                            }"
                         } else null
                     }
                 }
             }
 
             is Token.Int -> {
-                "**整数リテラル**: `${hoveredToken.literal}`\n\n" +
-                        "値: ${hoveredToken.literal}"
+                "**整数リテラル**: `${hoveredToken.literal}`\n\n" + "値: ${hoveredToken.literal}"
             }
 
             is Token.Float -> {
@@ -100,6 +110,57 @@ class HoverService(
                 ),
                 range = null
             )
+        }
+    }
+
+    private fun descriptionOfBuiltInFunction(fn: AllBuiltInFunction): String {
+        return when (fn) {
+            AllBuiltInFunction.PRINT -> """
+                与えられた引数を画面に表示する関数です。どの型の引数も受け付けます。  
+                複数与えられた場合は、スペースで区切って表示されます。
+                使用例
+                ```
+                表示する("こんにちは")
+                表示する("さようなら", 1+2, 3.14)
+                ```
+            """.trimIndent()
+
+            AllBuiltInFunction.LENGTH -> TODO()
+            AllBuiltInFunction.DIFF -> TODO()
+            AllBuiltInFunction.RETURN -> TODO()
+            AllBuiltInFunction.CONCAT -> TODO()
+            AllBuiltInFunction.PUSH -> TODO()
+            AllBuiltInFunction.SHIFT -> TODO()
+            AllBuiltInFunction.UNSHIFT -> TODO()
+            AllBuiltInFunction.POP -> TODO()
+            AllBuiltInFunction.INT -> TODO()
+            AllBuiltInFunction.FLOAT -> TODO()
+            AllBuiltInFunction.STRING -> TODO()
+            AllBuiltInFunction.IMPORT -> TODO()
+            AllBuiltInFunction.CHAR_CODE -> TODO()
+            AllBuiltInFunction.FROM_CHAR_CODE -> TODO()
+            AllBuiltInFunction.SLICE -> TODO()
+            AllBuiltInFunction.JOIN -> TODO()
+            AllBuiltInFunction.SORT -> TODO()
+            AllBuiltInFunction.REVERSE -> TODO()
+            AllBuiltInFunction.FIND -> TODO()
+            AllBuiltInFunction.SUBSTRING -> TODO()
+            AllBuiltInFunction.SPLIT -> TODO()
+            AllBuiltInFunction.TRIM -> TODO()
+            AllBuiltInFunction.REPLACE -> TODO()
+            AllBuiltInFunction.ROUND -> TODO()
+            AllBuiltInFunction.FLOOR -> TODO()
+            AllBuiltInFunction.CEIL -> TODO()
+            AllBuiltInFunction.RANDOM -> TODO()
+            AllBuiltInFunction.MAX -> TODO()
+            AllBuiltInFunction.MIN -> TODO()
+            AllBuiltInFunction.IS_INT -> TODO()
+            AllBuiltInFunction.IS_FLOAT -> TODO()
+            AllBuiltInFunction.IS_STRING -> TODO()
+            AllBuiltInFunction.IS_ARRAY -> TODO()
+            AllBuiltInFunction.IS_BOOLEAN -> TODO()
+            AllBuiltInFunction.CLEAR -> TODO()
+            AllBuiltInFunction.SLEEP -> TODO()
         }
     }
 }
