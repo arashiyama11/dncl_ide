@@ -7,7 +7,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.Range
-import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
 class DiagnosticService {
 
@@ -28,13 +28,13 @@ class DiagnosticService {
     }
 
     private fun DnclError.toDiagnostic(program: String): Diagnostic {
-        val (line, character) = calculateLineAndCharacter(program, this.errorRange?.first ?: 0)
-        val (endLine, endCharacter) = calculateLineAndCharacter(program, this.errorRange?.last ?: 0)
+        val start = calculatePosition(program, this.errorRange?.first ?: 0)
+        val end = calculatePosition(program, this.errorRange?.last ?: 0)
 
         return Diagnostic(
             range = Range(
-                start = Position(line, character),
-                end = Position(endLine, endCharacter)
+                start = start,
+                end = end
             ),
             severity = 1, // Error
             message = this.explain(program),

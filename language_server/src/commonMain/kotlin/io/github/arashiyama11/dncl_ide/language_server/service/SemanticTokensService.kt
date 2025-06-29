@@ -4,7 +4,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
-import io.github.arashiyama11.dncl_ide.language_server.util.calculateLineAndCharacter
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 
@@ -26,7 +26,7 @@ class SemanticTokensService(
             if (token is Token.Indent || token is Token.NewLine) {
                 return@forEach
             }
-            val (tokenLine, tokenChar) = calculateLineAndCharacter(code, token.range.first)
+            val (tokenLine, tokenChar) = calculatePosition(code, token.range.first)
             val tokenLength = token.literal.length + if (token is Token.String) 2 else 0
             val tokenType = getEnhancedTokenType(token, astInfo, token.range.first)
             val tokenModifiers = getTokenModifiers(token, astInfo, token.range.first)

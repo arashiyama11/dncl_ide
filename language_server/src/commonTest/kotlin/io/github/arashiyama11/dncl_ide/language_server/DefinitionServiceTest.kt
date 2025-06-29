@@ -43,6 +43,8 @@ class DefinitionServiceTest {
         // Red: 関数定義へのジャンプをテスト
         val (definitionService, _, astInfoService) = createServices()
         val code = """
+            hoge=1
+            # comment
             関数 myFunc(a, b)を:
                 戻り値(a + b)
             と定義する
@@ -57,10 +59,8 @@ class DefinitionServiceTest {
 
         assertNotNull(location)
         // 1行目の関数定義位置を期待
-        assertEquals(0, location.range.start.line)
-        // 関数名の開始位置を期待
-        val expectedChar = code.indexOf("myFunc")
-        assertEquals(expectedChar, location.range.start.character)
+        assertEquals(2, location.range.start.line)
+        assertEquals(3, location.range.start.character)
     }
 
     @Test

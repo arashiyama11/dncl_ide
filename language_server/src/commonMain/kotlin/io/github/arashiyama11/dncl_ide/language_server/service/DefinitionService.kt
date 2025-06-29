@@ -2,8 +2,8 @@ package io.github.arashiyama11.dncl_ide.language_server.service
 
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.Location
-import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.Range
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
 class DefinitionService(
     private val astInfoService: AstInfoService
@@ -29,8 +29,8 @@ class DefinitionService(
         return Location(
             uri = uri,
             range = Range(
-                start = Position(line = 0, character = defRange.first),
-                end = Position(line = 0, character = defRange.last + 1)
+                start = calculatePosition(code, defRange.first),
+                end = calculatePosition(code, defRange.last)
             )
         )
     }
