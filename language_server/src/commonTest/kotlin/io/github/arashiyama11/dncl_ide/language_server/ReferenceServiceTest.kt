@@ -123,4 +123,18 @@ class ReferenceServiceTest {
 
         assertTrue(references.isEmpty(), "無効な位置では参照が見つからないはずです")
     }
+
+    @Test
+    fun test_complex_code_structure() {
+        // Red: 複雑なコード構造に対する参照検索テスト
+        val (referenceService, _, astInfoService) = createServices()
+        val code = TestCase.lifeGame
+
+        // outerFuncのxの参照を検索
+        val uri = "file:///test.dncl"
+        val position = code.indexOf("board", code.indexOf("進化(board)を"))
+        val references = referenceService.findReferences(uri, code, position, true)
+        //関数 進化内のboardの参照の数は定義を含めて4つ
+        assertEquals(references.size, 4)
+    }
 }
