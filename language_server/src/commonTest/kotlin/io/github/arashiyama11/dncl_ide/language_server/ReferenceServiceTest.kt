@@ -135,6 +135,6 @@ class ReferenceServiceTest {
         val position = code.indexOf("board", code.indexOf("進化(board)を"))
         val references = referenceService.findReferences(uri, code, position, true)
         //関数 進化内のboardの参照の数は定義を含めて4つ
-        assertEquals(references.size, 4)
+        assertEquals(4, references.size)
     }
 }
