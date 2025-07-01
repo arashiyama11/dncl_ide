@@ -11,83 +11,13 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 
 @OptIn(DelicateCoroutinesApi::class)
 fun main(args: Array<String>): Unit = runBlocking {
     if (args.isEmpty()) {
-        println("DNCL REPL (終了するには 'exit' または 'quit' と入力してください)")
-        val scanner = Scanner(System.`in`)
-        val inputChannel = Channel<String>()
-
-        val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
-            onStdout = { output ->
-                println(output)
-            },
-            onImport = { path ->
-                System.err.println("REPLモードではimportはサポートされていません: $path")
-                DnclObject.Null(astNode)
-            }
-        )
-
-        // SystemCommand.Inputが呼ばれたときに標準入力から読み取るためのコルーチンを起動
-        launch {
-            val inputScanner = Scanner(System.`in`)
-            while (true) {
-                if (inputChannel.isClosedForSend) break
-                val line = inputScanner.nextLine()
-                inputChannel.send(line)
-            }
-        }
-
-        while (true) {
-            print(">>> ")
-            val line = scanner.nextLine()
-            if (line.lowercase() == "exit" || line.lowercase() == "quit") {
-                break
-            }
-
-            val lexer = Lexer(line)
-            val parser = Parser(lexer).fold(
-                { error ->
-                    System.err.println("構文解析エラー: ${error.explain(line)}")
-                    null
-                },
-                { it }
-            )
-
-            if (parser == null) continue
-
-            val program = parser.parseProgram().fold(
-                { error ->
-                    System.err.println("構文解析エラー: ${error.explain(line)}")
-                    null
-                },
-                { it }
-            )
-
-            if (program == null) continue
-
-            val evaluator = EvaluatorFactory.create(
-                inputChannel = inputChannel,
-                arrayOrigin = 0,
-                onEval = null
-            )
-
-            val result = evaluator.eval(program, env)
-
-            result.fold(
-                { error ->
-                    System.err.println("実行時エラー: ${error.explain(line)}")
-                },
-                { dnclObject ->
-                    if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
-                        println(dnclObject)
-                    }
-                }
-            )
-        }
-        inputChannel.close()
-        exitProcess(0)
+        runRepl()
     } else {
         val filePath = args[0]
         val file = File(filePath)
@@ -120,8 +50,8 @@ fun main(args: Array<String>): Unit = runBlocking {
 
         val evaluator = EvaluatorFactory.create(
             inputChannel = inputChannel,
-            arrayOrigin = 0, // 必要に応じて変更
-            onEval = null // CLIでは不要
+            arrayOrigin = 0,
+            onEval = null
         )
 
         val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
@@ -129,12 +59,11 @@ fun main(args: Array<String>): Unit = runBlocking {
                 println(output)
             },
             onImport = { path ->
-                // TODO: import機能の実装
-                DnclObject.Nothing(program) // InternalErrorの代わりにDnclObject.Nothingを返す
+                System.err.println("REPLモードではimportはサポートされていません: $path")
+                DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
             }
         )
 
-        // SystemCommand.Inputが呼ばれたときに標準入力から読み取るためのコルーチンを起動
         launch {
             val scanner = Scanner(System.`in`)
             while (true) {
@@ -158,4 +87,86 @@ fun main(args: Array<String>): Unit = runBlocking {
         )
         inputChannel.close()
     }
+}
+
+@OptIn(DelicateCoroutinesApi::class)
+suspend fun CoroutineScope.runRepl() {
+    println("DNCL REPL (終了するには 'exit' または 'quit' と入力してください)")
+    val scanner = Scanner(System.`in`)
+    val inputChannel = Channel<String>()
+
+    val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
+        onStdout = { output ->
+            println(output)
+        },
+        onImport = { path ->
+            System.err.println("REPLモードではimportはサポートされていません: $path")
+            DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
+        }
+    )
+
+    this.launch {
+        val inputScanner = Scanner(System.`in`)
+        while (true) {
+            if (inputChannel.isClosedForSend) break
+            val line = inputScanner.nextLine()
+            inputChannel.send(line)
+        }
+    }
+
+    var currentInput = ""
+    var prompt = ">>> "
+
+    while (true) {
+        print(prompt)
+        val line = scanner.nextLine()
+
+        if (line.lowercase() == "exit" || line.lowercase() == "quit") {
+            break
+        }
+
+        currentInput += line + "\n"
+
+        // 行がコロンで終わる場合、複数行入力の可能性があるため、入力を継続
+        // ただし、空行の場合は継続しない
+        if (line.trimEnd().endsWith(":") && line.trim().isNotEmpty()) {
+            prompt = "... "
+            continue
+        }
+
+        val lexer = Lexer(currentInput)
+        val parserResult = Parser(lexer)
+
+        val parser = parserResult.fold(
+            { error ->
+                System.err.println("構文解析エラー: ${error.explain(currentInput)}")
+                currentInput = ""
+                prompt = ">>> "
+                null
+            },
+            { it }
+        )
+
+        if (parser == null) {
+            continue
+        }
+
+        val programResult = parser.parseProgram()
+
+        val program = programResult.fold(
+            { error ->
+                System.err.println("構文解析エラー: ${error.explain(currentInput)}")
+                currentInput = ""
+                prompt = ">>> "
+                null
+            },
+            { it }
+        )
+
+        if (program == null) {
+            continue
+        }
+    }
+    inputChannel.close()
+    exitProcess(0)
 }
