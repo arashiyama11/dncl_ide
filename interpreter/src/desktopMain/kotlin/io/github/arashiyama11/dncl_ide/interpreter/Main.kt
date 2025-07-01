@@ -125,47 +125,70 @@ suspend fun CoroutineScope.runRepl() {
             break
         }
 
-        currentInput += line + "\n"
+        val isBlankLine = line.trim().isEmpty()
 
-        // 行がコロンで終わる場合、複数行入力の可能性があるため、入力を継続
-        // ただし、空行の場合は継続しない
-        if (line.trimEnd().endsWith(":") && line.trim().isNotEmpty()) {
-            prompt = "... "
+        // 空行が入力された場合、現在の入力を評価しようとする
+        // ただし、currentInputが既に空の場合は何もしない
+        if (!isBlankLine) {
+            currentInput += line + "\n"
+        } else if (currentInput.trim().isEmpty()) {
             continue
         }
+        // 空行が入力された場合、currentInputはそのまま保持し、次のパース試行で処理される
 
         val lexer = Lexer(currentInput)
         val parserResult = Parser(lexer)
 
-        val parser = parserResult.fold(
+        parserResult.fold(
             { error ->
+                // LexerまたはParserの初期化エラー（致命的なエラー）
                 System.err.println("構文解析エラー: ${error.explain(currentInput)}")
-                currentInput = ""
+                currentInput = "" // 致命的なエラーなのでリセット
                 prompt = ">>> "
-                null
             },
-            { it }
+            { parser ->
+                // Parserのインスタンスが正常に作成された場合
+                val programResult = parser.parseProgram()
+
+                programResult.fold(
+                    { error ->
+                        // parseProgram()が失敗した場合
+                        if (isBlankLine) {
+                            // 空行で確定された場合、エラーを出力してリセット
+                            System.err.println("構文解析エラー: ${error.explain(currentInput)}")
+                            currentInput = ""
+                            prompt = ">>> "
+                        } else {
+                            // 不完全な入力とみなし、入力を継続
+                            prompt = "... "
+                        }
+                    },
+                    { program ->
+                        // パース成功
+                        val evaluator = EvaluatorFactory.create(
+                            inputChannel = inputChannel,
+                            arrayOrigin = 0,
+                            onEval = null
+                        )
+
+                        val result = evaluator.eval(program, env)
+
+                        result.fold(
+                            { error ->
+                                System.err.println("実行時エラー: ${error.explain(currentInput)}")
+                            },
+                            { dnclObject ->
+                                if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
+                                    println(dnclObject)
+                                }
+                            }
+                        )
+                        currentInput = ""
+                        prompt = ">>> "
+                    }
+                )
+            }
         )
-
-        if (parser == null) {
-            continue
-        }
-
-        val programResult = parser.parseProgram()
-
-        val program = programResult.fold(
-            { error ->
-                System.err.println("構文解析エラー: ${error.explain(currentInput)}")
-                currentInput = ""
-                prompt = ">>> "
-                null
-            },
-            { it }
-        )
-
-        if (program == null) {
-            continue
-        }
     }
     inputChannel.close()
     exitProcess(0)
