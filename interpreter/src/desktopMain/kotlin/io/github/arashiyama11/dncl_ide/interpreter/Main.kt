@@ -17,7 +17,14 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 @OptIn(DelicateCoroutinesApi::class)
 fun main(args: Array<String>): Unit = runBlocking {
     if (args.isEmpty()) {
-        runRepl()
+        // 標準入力にデータがあるかチェック
+        val scanner = Scanner(System.`in`)
+        if (scanner.hasNextLine()) {
+            val sourceCode = scanner.useDelimiter("\\A").next()
+            this.executeSourceCode(sourceCode)
+        } else {
+            runRepl()
+        }
     } else {
         val filePath = args[0]
         val file = File(filePath)
@@ -28,65 +35,69 @@ fun main(args: Array<String>): Unit = runBlocking {
         }
 
         val sourceCode = file.readText()
+        this.executeSourceCode(sourceCode)
+    }
+}
 
-        val lexer = Lexer(sourceCode)
-        val parser = Parser(lexer).fold(
-            { error ->
-                System.err.println("構文解析エラー: ${error.explain(sourceCode)}")
-                exitProcess(1)
-            },
-            { it }
-        )
+@OptIn(DelicateCoroutinesApi::class)
+suspend fun CoroutineScope.executeSourceCode(sourceCode: String) {
+    val lexer = Lexer(sourceCode)
+    val parser = Parser(lexer).fold(
+        { error ->
+            System.err.println("構文解析エラー: ${error.explain(sourceCode)}")
+            exitProcess(1)
+        },
+        { it }
+    )
 
-        val program = parser.parseProgram().fold(
-            { error ->
-                System.err.println("構文解析エラー: ${error.explain(sourceCode)}")
-                exitProcess(1)
-            },
-            { it }
-        )
+    val program = parser.parseProgram().fold(
+        { error ->
+            System.err.println("構文解析エラー: ${error.explain(sourceCode)}")
+            exitProcess(1)
+        },
+        { it }
+    )
 
-        val inputChannel = Channel<String>()
+    val inputChannel = Channel<String>()
 
-        val evaluator = EvaluatorFactory.create(
-            inputChannel = inputChannel,
-            arrayOrigin = 0,
-            onEval = null
-        )
+    val evaluator = EvaluatorFactory.create(
+        inputChannel = inputChannel,
+        arrayOrigin = 0,
+        onEval = null
+    )
 
-        val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
-            onStdout = { output ->
-                println(output)
-            },
-            onImport = { path ->
-                System.err.println("REPLモードではimportはサポートされていません: $path")
-                DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
-            }
-        )
+    val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
+        onStdout = { output ->
+            println(output)
+        },
+        onImport = { path ->
+            System.err.println("REPLモードではimportはサポートされていません: $path")
+            DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
+        }
+    )
 
-        launch {
-            val scanner = Scanner(System.`in`)
-            while (true) {
-                if (inputChannel.isClosedForSend) break
-                val line = scanner.nextLine()
-                inputChannel.send(line)
+    this.launch {
+        val scanner = Scanner(System.`in`)
+        while (true) {
+            if (inputChannel.isClosedForSend) break
+            val line = scanner.nextLine()
+            inputChannel.send(line)
+        }
+    }
+
+    val result = evaluator.eval(program, env)
+
+    result.fold(
+        { error ->
+            System.err.println("実行時エラー: ${error.explain(sourceCode)}")
+        },
+        { dnclObject ->
+            if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
+                println(dnclObject)
             }
         }
-
-        val result = evaluator.eval(program, env)
-
-        result.fold(
-            { error ->
-                System.err.println("実行時エラー: ${error.explain(sourceCode)}")
-            },
-            { dnclObject ->
-                if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
-                    println(dnclObject)
-                }
-            }
-        )
-        inputChannel.close()
-    }
+    )
+    inputChannel.close()
 }
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -169,24 +180,21 @@ suspend fun CoroutineScope.runRepl() {
                             val secondLastNonEmptyLine = if (lines.size >= 2) lines[lines.size - 2] else null
 
                             if (lastNonEmptyLine != null) {
-                                val endsWithColon = lastNonEmptyLine.trimEnd().endsWith(":")
                                 val blockKeywords = listOf("もし", "関数", "繰り返し") // DNCLのキーワードに合わせて調整
 
-                                val isBlockStartingKeyword = blockKeywords.any { keyword ->
-                                    lastNonEmptyLine.trimStart().startsWith(keyword) && endsWithColon
-                                }
-
                                 // Case 1: The current line is a block-starting keyword ending with a colon
-                                if (isBlockStartingKeyword) {
+                                val isCurrentLineBlockStart = blockKeywords.any { keyword ->
+                                    lastNonEmptyLine.trimStart().startsWith(keyword) && lastNonEmptyLine.trimEnd().endsWith(":")
+                                }
+                                if (isCurrentLineBlockStart) {
                                     shouldContinue = true
                                 } else if (secondLastNonEmptyLine != null) {
                                     // Case 2: The current line is indented and the previous line was a block-starting keyword ending with a colon
-                                    val isLastLineIndented = lastNonEmptyLine.startsWith(" ") || lastNonEmptyLine.startsWith("	")
-                                    val prevEndsWithColon = secondLastNonEmptyLine.trimEnd().endsWith(":")
-                                    val isPrevBlockStartingKeyword = blockKeywords.any { keyword ->
-                                        secondLastNonEmptyLine.trimStart().startsWith(keyword) && prevEndsWithColon
+                                    val isLastLineIndented = lastNonEmptyLine.startsWith(" ") || lastNonEmptyLine.startsWith("\t")
+                                    val isPrevLineBlockStart = blockKeywords.any { keyword ->
+                                        secondLastNonEmptyLine.trimStart().startsWith(keyword) && secondLastNonEmptyLine.trimEnd().endsWith(":")
                                     }
-                                    shouldContinue = isLastLineIndented && isPrevBlockStartingKeyword
+                                    shouldContinue = isLastLineIndented && isPrevLineBlockStart
                                 }
                             }
                         }
