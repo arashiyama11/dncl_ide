@@ -127,14 +127,9 @@ suspend fun CoroutineScope.runRepl() {
 
         val isBlankLine = line.trim().isEmpty()
 
-        // 空行が入力された場合、現在の入力を評価しようとする
-        // ただし、currentInputが既に空の場合は何もしない
         if (!isBlankLine) {
             currentInput += line + "\n"
-        } else if (currentInput.trim().isEmpty()) {
-            continue
         }
-        // 空行が入力された場合、currentInputはそのまま保持し、次のパース試行で処理される
 
         val lexer = Lexer(currentInput)
         val parserResult = Parser(lexer)
@@ -153,9 +148,10 @@ suspend fun CoroutineScope.runRepl() {
                 programResult.fold(
                     { error ->
                         // parseProgram()が失敗した場合
-                        if (isBlankLine) {
-                            // 空行で確定された場合、エラーを出力してリセット
-                            System.err.println("構文解析エラー: ${error.explain(currentInput)}")
+                        val errorMessage = error.explain(currentInput)
+                        if (isBlankLine || !(errorMessage.contains("EOF") || errorMessage.contains("expected") || errorMessage.contains("unclosed"))) {
+                            // 空行で確定された場合、または復元不可能なエラーの場合、エラーを出力してリセット
+                            System.err.println("構文解析エラー: $errorMessage")
                             currentInput = ""
                             prompt = ">>> "
                         } else {
@@ -165,30 +161,68 @@ suspend fun CoroutineScope.runRepl() {
                     },
                     { program ->
                         // パース成功
-                        val evaluator = EvaluatorFactory.create(
-                            inputChannel = inputChannel,
-                            arrayOrigin = 0,
-                            onEval = null
-                        )
+                        // ここで、ユーザーがまだ入力を続けたいかどうかを判断する
+                        var shouldContinue = false
+                        if (!isBlankLine) { // 空行でない場合にのみ継続の可能性をチェック
+                            val lines = currentInput.lines().filter { it.trim().isNotEmpty() }
+                            val lastNonEmptyLine = lines.lastOrNull()
+                            val secondLastNonEmptyLine = if (lines.size >= 2) lines[lines.size - 2] else null
 
-                        val result = evaluator.eval(program, env)
+                            if (lastNonEmptyLine != null) {
+                                val endsWithColon = lastNonEmptyLine.trimEnd().endsWith(":")
+                                val blockKeywords = listOf("もし", "関数", "繰り返し") // DNCLのキーワードに合わせて調整
 
-                        result.fold(
-                            { error ->
-                                System.err.println("実行時エラー: ${error.explain(currentInput)}")
-                            },
-                            { dnclObject ->
-                                if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
-                                    println(dnclObject)
+                                val isBlockStartingKeyword = blockKeywords.any { keyword ->
+                                    lastNonEmptyLine.trimStart().startsWith(keyword) && endsWithColon
+                                }
+
+                                // Case 1: The current line is a block-starting keyword ending with a colon
+                                if (isBlockStartingKeyword) {
+                                    shouldContinue = true
+                                } else if (secondLastNonEmptyLine != null) {
+                                    // Case 2: The current line is indented and the previous line was a block-starting keyword ending with a colon
+                                    val isLastLineIndented = lastNonEmptyLine.startsWith(" ") || lastNonEmptyLine.startsWith("	")
+                                    val prevEndsWithColon = secondLastNonEmptyLine.trimEnd().endsWith(":")
+                                    val isPrevBlockStartingKeyword = blockKeywords.any { keyword ->
+                                        secondLastNonEmptyLine.trimStart().startsWith(keyword) && prevEndsWithColon
+                                    }
+                                    shouldContinue = isLastLineIndented && isPrevBlockStartingKeyword
                                 }
                             }
-                        )
-                        currentInput = ""
-                        prompt = ">>> "
+                        }
+
+                        if (shouldContinue) {
+                            prompt = "... "
+                        } else {
+                            // 実行ロジック
+                            val evaluator = EvaluatorFactory.create(
+                                inputChannel = inputChannel,
+                                arrayOrigin = 0,
+                                onEval = null
+                            )
+
+                            val result = evaluator.eval(program, env)
+
+                            result.fold(
+                                { error ->
+                                    System.err.println("実行時エラー: ${error.explain(currentInput)}")
+                                },
+                                { dnclObject ->
+                                    if (dnclObject !is DnclObject.Nothing && dnclObject !is DnclObject.Null) {
+                                        println(dnclObject)
+                                    }
+                                }
+                            )
+                            currentInput = ""
+                            prompt = ">>> "
+                        }
                     }
                 )
             }
         )
+        if (isBlankLine && currentInput.trim().isEmpty()) {
+            continue
+        }
     }
     inputChannel.close()
     exitProcess(0)
