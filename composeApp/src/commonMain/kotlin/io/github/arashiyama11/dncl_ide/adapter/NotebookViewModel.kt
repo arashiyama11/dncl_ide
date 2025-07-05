@@ -631,7 +631,6 @@ class NotebookViewModel(
                     nb,
                     cellId,
                 ) { oldCell ->
-                    println("update sorce: $newText")
                     oldCell.copy(source = newText.split("\n"))
                 }
             }
