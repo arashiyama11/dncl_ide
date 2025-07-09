@@ -89,7 +89,7 @@ sealed interface AstNode {
 
 
     data class ForStatement(
-        val loopCounter: Token.Identifier,
+        val loopCounter: Identifier,
         val start: Expression,
         val end: Expression,
         val step: Expression,

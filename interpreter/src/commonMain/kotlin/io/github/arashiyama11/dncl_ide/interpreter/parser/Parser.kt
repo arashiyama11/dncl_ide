@@ -59,7 +59,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.If -> parseIfStatement()
             is Token.Function -> parseFunctionStatement()
 
-            is Token.Identifier -> when (nextToken) {
+            is Token.Identifier, is Token.Japanese -> when (nextToken) {
                 is Token.Assign, is Token.BracketOpen -> parseAssignStatement()
                 is Token.Wo -> parseForStatement()
                 else -> parseExpressionStatement()
@@ -252,8 +252,11 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
     @EnsuredEndOfLine
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
-        val counter = (currentToken as? Token.Identifier)
-            ?: return ParserError.UnExpectedToken(currentToken).left()
+        val counter = when (val token = currentToken) {
+            is Token.Identifier -> AstNode.Identifier(token.literal, token.range)
+            is Token.Japanese -> AstNode.Identifier(token.literal, token.range)
+            else -> return ParserError.UnExpectedToken(currentToken).left()
+        }
         expectNextToken<Token.Wo>().bind()
         nextToken().bind()
         val start = parseExpression(Precedence.LOWEST).bind()
@@ -312,23 +315,23 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseAssignStatement(): Either<DnclError, AstNode.AssignStatement> = either {
         val assignments: MutableList<Pair<AstNode.Assignable, AstNode.Expression>> = mutableListOf()
         while (currentToken !is Token.NewLine && currentToken !is Token.EOF) {
-            if (currentToken !is Token.Identifier) raise(
+            val identifierToken = currentToken
+            if (identifierToken !is Token.Identifier && identifierToken !is Token.Japanese) raise(
                 ParserError.UnExpectedToken(
                     currentToken,
                     expectedToken = "識別子"
                 )
             )
-            val identifier = (currentToken as Token.Identifier)
             val left = if (nextToken is Token.BracketOpen) {
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
-                    AstNode.Identifier(identifier.literal, identifier.range),
+                    AstNode.Identifier(identifierToken.literal, identifierToken.range),
                     parseExpressionList<Token.BracketClose>().bind()
                         .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
                 )
             } else {
-                AstNode.Identifier(identifier.literal, identifier.range)
+                AstNode.Identifier(identifierToken.literal, identifierToken.range)
             }
 
             expectNextToken<Token.Assign>().bind()
