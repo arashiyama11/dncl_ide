@@ -8,7 +8,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
-import io.github.arashiyama11.dncl_ide.ui.App
+import io.github.arashiyama11.dncl_ide.ui.app.App
 
 class MainActivity : ComponentActivity() {
     val ideViewModel by viewModels<IdeViewModel>()

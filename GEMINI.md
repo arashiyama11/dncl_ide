@@ -4,11 +4,11 @@
 
 You are a **coding assistant**.  
 Internally, you should **think in English and output in Japanese**.  
-Before responding to any prompt, **evaluate the user's intent comprehension level**. If the
-understanding level is below **0.8**, you **must ask clarifying questions until it exceeds 0.8**
+Before responding to any prompt, **evaluate the user's intent comprehension level**. If the  
+understanding level is below **0.8**, you **must ask clarifying questions until it exceeds 0.8**  
 before proceeding.
 
-This document provides guidance for effective and consistent development within the DNCL IDE
+This document provides guidance for effective and consistent development within the DNCL IDE  
 project.
 
 ## 2. Project Overview
@@ -19,7 +19,7 @@ project.
 | **Platforms**    | Android, iOS, **Desktop** (primary)                                                                                                                            |
 | **Core Modules** | - `composeApp` (UI; Desktop entry: `io.github.arashiyama11.dncl_ide.MainKt`) <br> - `domain` (business logic) <br> - `interpreter` (DNCL language interpreter) |
 
-The DNCL IDE provides a runtime environment for the DNCL programming language, commonly used in
+The DNCL IDE provides a runtime environment for the DNCL programming language, commonly used in  
 standardized testing, on Android and iOS platforms.
 
 ## 3. Architecture
@@ -40,14 +40,14 @@ This project follows the principles of **Clean Architecture**:
 ## 4. Development Workflow and Conventions
 
 1. **Focus on the `desktop` target**:  
-   Although this project supports multiple platforms, development should focus on **Desktop** for
+   Although this project supports multiple platforms, development should focus on **Desktop** for  
    simplicity and faster feedback.
 
 2. **Never assume — ask if unclear**:  
    If a requirement is ambiguous, confirm with the user rather than guessing.
 
 3. **Plan before coding**:  
-   For complex tasks, gather relevant information, plan an approach, and get user confirmation
+   For complex tasks, gather relevant information, plan an approach, and get user confirmation  
    before implementation.
 
 4. **Compile frequently**:  
@@ -55,6 +55,15 @@ This project follows the principles of **Clean Architecture**:
 
 5. **Follow existing code style**:  
    Unless instructed otherwise, maintain consistency with the current codebase.
+
+6. **Do not perform any Git operations**:  
+   No repository manipulations, commits, pushes, or other Git commands are to be executed.
+
+7. **Strictly adhere to twada’s TDD process**:
+    - Write tests first
+    - Implement the minimal code necessary to make tests pass
+    - Refactor continually  
+      Maintain this Red-Green-Refactor cycle without exception.
 
 ## 5. Common Gradle Tasks (Desktop)
 

@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -110,12 +110,13 @@ fun NotebookContent(
         )
 
         // Cells
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            items(uiState.notebook!!.cells) { cell ->
+            (uiState.notebook!!.cells).forEach { cell ->
                 CellComponent(
                     cell = cell,
                     isSelected = cell.id == uiState.selectedCellId,
@@ -127,10 +128,8 @@ fun NotebookContent(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            item {
-                with(LocalDensity.current) {
-                    Spacer(Modifier.height(LocalWindowInfo.current.containerSize.height.toDp() / 3))
-                }
+            with(LocalDensity.current) {
+                Spacer(Modifier.height(LocalWindowInfo.current.containerSize.height.toDp() / 3))
             }
         }
     }
