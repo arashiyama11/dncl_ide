@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
@@ -169,6 +170,18 @@ fun SettingsScreen(
                     .padding(top = 16.dp)
             ) {
                 Text("ライセンス表示")
+            }
+
+            val uriHandler = LocalUriHandler.current
+            TextButton(
+                onClick = {
+                    uriHandler.openUri("https://github.com/arashiyama11/DNCL-IDE/issues/new/choose")
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+            ) {
+                Text("改善報告・バグ報告")
             }
         }
     }
