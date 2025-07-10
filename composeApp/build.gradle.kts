@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.navigation.compose)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.kotlinx.collections.immutable)
 
             implementation(libs.arrow.core)
             implementation(libs.arrow.fx.coroutines)
