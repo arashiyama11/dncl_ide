@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -34,13 +35,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -51,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
+import com.mikepenz.markdown.compose.Markdown
+import com.mikepenz.markdown.model.MarkdownColors
+import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
@@ -59,12 +67,10 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
-import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.model.MarkdownColors
-import com.mikepenz.markdown.model.MarkdownTypography
-import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
+import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -95,10 +101,11 @@ fun NotebookScreen(
 @Composable
 fun NotebookContent(
     notebookViewModel: NotebookViewModel = koinViewModel(),
+    modifier: Modifier = Modifier
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize()) {
         // Notebook toolbar with cancel capability
         NotebookToolbar(
             selectedEntryPath = uiState.selectedEntryPath,
@@ -110,26 +117,25 @@ fun NotebookContent(
         )
 
         // Cells
-        Column(
+        LazyColumn( // ColumnをLazyColumnに変更
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth() // fillMaxWidth is still appropriate
+                .weight(1f) // Use weight to take remaining vertical space
                 .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
-            (uiState.notebook!!.cells).forEach { cell ->
+            items(
+                items = uiState.notebook!!.cells,
+                key = { it.id }
+            ) { cell -> // itemsスコープを使用
                 CellComponent(
                     cell = cell,
                     isSelected = cell.id == uiState.selectedCellId,
                     onAction = notebookViewModel::handleAction,
-                    codeCellStateMap = uiState.codeCellStateMap,
+                    codeCellState = uiState.codeCellStateMap[cell.id],
                     suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList(),
                     fontSize = uiState.fontSize
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            with(LocalDensity.current) {
-                Spacer(Modifier.height(LocalWindowInfo.current.containerSize.height.toDp() / 3))
             }
         }
     }
@@ -178,7 +184,7 @@ fun CellComponent(
     cell: Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
-    codeCellStateMap: Map<String, CodeCellState>,
+    codeCellState: CodeCellState?,
     suggestions: List<Definition> = emptyList(),
     fontSize: Int
 ) {
@@ -187,12 +193,21 @@ fun CellComponent(
     else
         MaterialTheme.colorScheme.outlineVariant
 
+    var minHeight by remember(cell.id) { mutableStateOf(100.dp) }
+    val density = LocalDensity.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = minHeight)
+            .onGloballyPositioned {
+                val heightInDp = with(density) { it.size.height.toDp() }
+                if (heightInDp > minHeight) {
+                    minHeight = heightInDp
+                }
+            }
             .clip(RoundedCornerShape(4.dp))
             .border(1.dp, borderColor, RoundedCornerShape(4.dp))
-            .clickable { onAction(NotebookAction.SelectCell(cell.id)) }
             .padding(8.dp)
     ) {
         // Cell header with type indicator and controls
@@ -246,17 +261,18 @@ fun CellComponent(
             CellType.CODE -> CodeCellContent(
                 cell,
                 onAction,
-                codeCellStateMap[cell.id] ?: CodeCellState(),
+                codeCellState ?: CodeCellState(),
                 suggestions,
-                fontSize
+                fontSize,
+                isSelected,
             )
 
             CellType.MARKDOWN -> MarkdownCellContent(
                 cell,
                 isSelected,
                 onAction,
-                fontSize
-            ) // Pass fontSize
+                fontSize,
+            )
         }
     }
 }
@@ -267,7 +283,8 @@ fun CodeCellContent(
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState,
     suggestions: List<Definition> = emptyList(),
-    fontSize: Int
+    fontSize: Int,
+    isSelected: Boolean,
 ) {
     var localTfv by remember(cell.id) {
         mutableStateOf(codeCellState.textFieldValue)
@@ -285,15 +302,13 @@ fun CodeCellContent(
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().clickable {
-        onAction(NotebookAction.SelectCell(cell.id))
-    }) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         CodeEditor(
             codeText = localTfv,
             codeCellState.annotatedString,
-            Modifier.clickable {
-                onAction(NotebookAction.SelectCell(cell.id))
-            },
+            Modifier,
             fontSize,
             { newTextFieldValue ->
                 localTfv = newTextFieldValue
@@ -347,18 +362,30 @@ fun MarkdownCellContent(
     cell: Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
-    fontSize: Int = 16
+    fontSize: Int = 16,
 ) {
     var text by remember(cell.id) {
         mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
     }
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(text.text) {
         onAction(NotebookAction.UpdateMarkdownCell(cell.id, text.text.lines()))
     }
 
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            coroutineScope.launch {
+                focusRequester.requestFocus()
+            }
+        }
+    }
+
     Box(
-        modifier = Modifier.clickable { onAction(NotebookAction.SelectCell(cell.id)) }
+        modifier = Modifier.clickable(enabled = !isSelected) {
+            onAction(NotebookAction.SelectCell(cell.id))
+        }
     ) {
         if (isSelected) {
             OutlinedTextField(
@@ -366,28 +393,27 @@ fun MarkdownCellContent(
                 onValueChange = { newValue -> text = newValue },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .focusRequester(focusRequester)
+                    .heightIn(min = 100.dp, max = 400.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = fontSize.sp,
                     lineHeight = fontSize.sp
                 ), // Use fontSize
-                singleLine = false,
-                maxLines = Int.MAX_VALUE
+                singleLine = false
             )
         } else {
-
             Markdown(
-                content = cell.source.joinToString("\n"),
+                content = text.text,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 100.dp)
                     .padding(8.dp),
-                colors = LocalMarkdownColors.current,// rememberMarkdownColors(),
-                typography = LocalMarkdownTypography.current//rememberMarkdownTypography()
+                colors = LocalMarkdownColors.current,
+                typography = LocalMarkdownTypography.current
             )
         }
     }
-
-
 }
 
 @Composable

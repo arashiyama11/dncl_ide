@@ -94,6 +94,7 @@ sealed interface NotebookAction {
         NotebookAction
 
     data class UpdateMarkdownCell(val cellId: String, val source: List<String>) : NotebookAction
+    data object DeselectCell : NotebookAction
 }
 
 
@@ -707,7 +708,12 @@ class NotebookViewModel(
                 action.cellId,
                 action.source
             )
+            is NotebookAction.DeselectCell -> deselectCell()
         }
+    }
+
+    private fun deselectCell() {
+        _localState.update { it.copy(selectedCellId = null) }
     }
 
     private data class NotebookLocalState(
