@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +43,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +51,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,9 +66,9 @@ import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
-import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
-import io.github.arashiyama11.dncl_ide.domain.notebook.Output
+import io.github.arashiyama11.dncl_ide.ui.model.CellUiModel
+import io.github.arashiyama11.dncl_ide.ui.model.OutputUiModel
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
@@ -117,16 +119,14 @@ fun NotebookContent(
         )
 
         // Cells
-        LazyColumn( // ColumnをLazyColumnに変更
+        Column( // ColumnをLazyColumnに変更
             modifier = Modifier
                 .fillMaxWidth() // fillMaxWidth is still appropriate
                 .weight(1f) // Use weight to take remaining vertical space
                 .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            items(
-                items = uiState.notebook!!.cells,
-                key = { it.id }
-            ) { cell -> // itemsスコープを使用
+            for (cell in uiState.notebook!!.cells) {
                 CellComponent(
                     cell = cell,
                     isSelected = cell.id == uiState.selectedCellId,
@@ -181,12 +181,12 @@ fun NotebookToolbar(
 
 @Composable
 fun CellComponent(
-    cell: Cell,
+    cell: CellUiModel,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState?,
     suggestions: List<Definition> = emptyList(),
-    fontSize: Int
+    fontSize: Int,
 ) {
     val borderColor = if (isSelected)
         MaterialTheme.colorScheme.primary
@@ -194,6 +194,8 @@ fun CellComponent(
         MaterialTheme.colorScheme.outlineVariant
 
     var minHeight by remember(cell.id) { mutableStateOf(100.dp) }
+    var lastHeightPx by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
     Column(
@@ -279,7 +281,7 @@ fun CellComponent(
 
 @Composable
 fun CodeCellContent(
-    cell: Cell,
+    cell: CellUiModel,
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState,
     suggestions: List<Definition> = emptyList(),
@@ -318,6 +320,11 @@ fun CodeCellContent(
                 onAction(NotebookAction.SelectCell(cell.id))
             }
         )
+        /*TextField(
+            localTfv, onValueChange = {
+                localTfv = it
+            }
+        )*/
 
         if (suggestions.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxWidth()) {
@@ -359,7 +366,7 @@ fun CodeCellContent(
 
 @Composable
 fun MarkdownCellContent(
-    cell: Cell,
+    cell: CellUiModel,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     fontSize: Int = 16,
@@ -394,8 +401,8 @@ fun MarkdownCellContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp)
-                    .focusRequester(focusRequester)
-                    .heightIn(min = 100.dp, max = 400.dp),
+                    .focusRequester(focusRequester),
+                // .heightIn(min = 100.dp, max = 400.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = fontSize.sp,
                     lineHeight = fontSize.sp
@@ -417,7 +424,7 @@ fun MarkdownCellContent(
 }
 
 @Composable
-fun OutputDisplay(output: Output, fontSize: Int) {
+fun OutputDisplay(output: OutputUiModel, fontSize: Int) {
     Column(
         modifier = Modifier
             .fillMaxWidth()

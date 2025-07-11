@@ -25,6 +25,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.ui.model.NotebookUiModel
+import io.github.arashiyama11.dncl_ide.ui.model.toUiModel
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
@@ -61,7 +63,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class NotebookUiState(
-    val notebook: Notebook? = null,
+    val notebook: NotebookUiModel? = null,
     val selectedCellId: String? = null,
     val codeCellStateMap: Map<String, CodeCellState> = emptyMap(),
     val loading: Boolean = true,
@@ -112,7 +114,7 @@ class NotebookViewModel(
     private val saveJobs = mutableMapOf<String, Job>()
     private val _localState = MutableStateFlow(
         NotebookLocalState(
-            notebook = null,
+            domainNotebook = null,
             selectedCellId = null,
             codeCellStateMap = emptyMap(),
             loading = true,
@@ -127,7 +129,7 @@ class NotebookViewModel(
         appStateStore.state
     ) { localState, appState ->
         NotebookUiState(
-            notebook = localState.notebook,
+            notebook = localState.domainNotebook?.toUiModel(),
             selectedCellId = localState.selectedCellId,
             codeCellStateMap = localState.codeCellStateMap,
             loading = localState.loading,
@@ -136,7 +138,7 @@ class NotebookViewModel(
             fontSize = appState.fontSize,
             selectedEntryPath = appState.selectedEntryPath,
             unsavedChanges = localState.unsavedChanges,
-            running = appState.running // Map from appState
+            running = appState.running
         )
     }.stateIn(
         viewModelScope,
@@ -183,7 +185,7 @@ class NotebookViewModel(
                                 }.getOrNull()!!
                             notebookMutex.withLock {
                                 _localState.update {
-                                    it.copy(notebook = notebook)
+                                    it.copy(domainNotebook = notebook)
                                 }
                             }
 
@@ -239,7 +241,7 @@ class NotebookViewModel(
                 delay(SAVE_DELAY_MS)
                 val file = notebookFile ?: return@collectLatest
                 val content =
-                    with(notebookFileUseCase) { _localState.value.notebook?.toFileContent() }
+                    with(notebookFileUseCase) { _localState.value.domainNotebook?.toFileContent() }
                         ?: return@collectLatest
                 notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
                 _localState.update { it.copy(unsavedChanges = false) }
@@ -442,7 +444,7 @@ class NotebookViewModel(
                 delay(100) //await clear
 
                 val output = notebookFileUseCase.executeCell(
-                    uiState.value.notebook!!, cellId, environment
+                    _localState.value.domainNotebook!!, cellId, environment
                 )
 
                 appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after execution
@@ -507,7 +509,7 @@ class NotebookViewModel(
                         // ��ードセルの実行
                         delay(100) // UIの更新を待つ
                         notebookFileUseCase.executeCell(
-                            uiState.value.notebook!!,
+                            _localState.value.domainNotebook!!,
                             cell.id,
                             environment
                         )
@@ -622,7 +624,7 @@ class NotebookViewModel(
                     codeCellStateMap = newCodeMap,
                     cellSuggestionsMap = newSugMap,
                     unsavedChanges = existsChange
-                        ?: (state.unsavedChanges || newText != (state.notebook?.cells?.firstOrNull { it.id == cellId }?.source?.joinToString(
+                        ?: (state.unsavedChanges || newText != (state.domainNotebook?.cells?.firstOrNull { it.id == cellId }?.source?.joinToString(
                             "\n"
                         ))),
                 )
@@ -654,7 +656,7 @@ class NotebookViewModel(
     fun onUpdateMarkdownCell(
         cellId: String,
         newSource: List<String>,
-        existsChange: Boolean = _localState.value.notebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
+        existsChange: Boolean = _localState.value.domainNotebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
     ) {
         viewModelScope.launch {
             _localState.update { it.copy(unsavedChanges = existsChange) }
@@ -708,6 +710,7 @@ class NotebookViewModel(
                 action.cellId,
                 action.source
             )
+
             is NotebookAction.DeselectCell -> deselectCell()
         }
     }
@@ -717,7 +720,7 @@ class NotebookViewModel(
     }
 
     private data class NotebookLocalState(
-        val notebook: Notebook?,
+        val domainNotebook: Notebook?,
         val selectedCellId: String?,
         val codeCellStateMap: Map<String, CodeCellState>,
         val loading: Boolean,
@@ -791,10 +794,10 @@ class NotebookViewModel(
         println("Updating local notebook state")
         return notebookMutex.withLock {
             println("save start")
-            val res = _localState.value.notebook?.let { notebook ->
+            val res = _localState.value.domainNotebook?.let { notebook ->
                 transform(notebook).also { nb ->
                     _localState.update {
-                        it.copy(notebook = nb)
+                        it.copy(domainNotebook = nb)
                     }
                 }
             }
