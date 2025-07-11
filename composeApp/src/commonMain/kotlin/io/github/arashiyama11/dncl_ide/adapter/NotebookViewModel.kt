@@ -6,14 +6,15 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.getOrElse
-import io.github.arashiyama11.dncl_ide.common.AppStateStore
-import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.common.Action // Add this import
+import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
+import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
+import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
@@ -25,12 +26,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.ui.model.NotebookUiModel
-import io.github.arashiyama11.dncl_ide.ui.model.toUiModel
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
@@ -46,8 +46,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
@@ -66,13 +66,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.apply
 import kotlin.coroutines.coroutineContext
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 data class NotebookUiState(
-    val notebook: NotebookUiModel? = null,
+    val notebook: Notebook? = null,
     val selectedCellId: String? = null,
     val codeCellStateMap: ImmutableMap<String, CodeCellState> = persistentMapOf(),
     val loading: Boolean = true,
@@ -138,7 +137,7 @@ class NotebookViewModel(
         appStateStore.state
     ) { localState, appState ->
         NotebookUiState(
-            notebook = localState.domainNotebook?.toUiModel(),
+            notebook = localState.domainNotebook,
             selectedCellId = localState.selectedCellId,
             codeCellStateMap = localState.codeCellStateMap,
             loading = localState.loading,
@@ -157,11 +156,12 @@ class NotebookViewModel(
 
     val cellIdsFlow: StateFlow<List<String>> = uiState.map {
         it.notebook?.cells?.map { cell -> cell.id } ?: emptyList()
-    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun cellStateFlow(cellId: String): StateFlow<io.github.arashiyama11.dncl_ide.ui.model.CellUiModel?> = uiState.map { state ->
+    fun cellStateFlow(cellId: String): StateFlow<Cell?> = uiState.map { state ->
         state.notebook?.cells?.find { it.id == cellId }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun isSelectedFlow(cellId: String): StateFlow<Boolean> = uiState.map { state ->
         state.selectedCellId == cellId
@@ -171,9 +171,14 @@ class NotebookViewModel(
         state.codeCellStateMap[cellId] ?: CodeCellState()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
 
-    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> = uiState.map { state ->
-        state.cellSuggestionsMap[cellId] ?: kotlinx.collections.immutable.persistentListOf()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), kotlinx.collections.immutable.persistentListOf())
+    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> =
+        uiState.map { state ->
+            state.cellSuggestionsMap[cellId] ?: persistentListOf()
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            persistentListOf()
+        )
 
     val fontSizeFlow: StateFlow<Int> = uiState.map { it.fontSize }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
@@ -194,6 +199,18 @@ class NotebookViewModel(
 
     private lateinit var environment: Environment
     private var started = false
+
+    init {
+
+        viewModelScope.launch(Dispatchers.Default) {
+            uiState.collect { uiState ->
+                uiState.notebook?.cells?.getOrNull(0).let { cell ->
+                    println("Cell ID: ${cell?.id} -> ${cell.hashCode()}")
+                }
+
+            }
+        }
+    }
 
     @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     fun onStart() {
@@ -299,7 +316,7 @@ class NotebookViewModel(
                 notebookFileUseCase.modifyNotebookOutput(
                     it,
                     selectCellId!!,
-                    listOf(Output("stream", "stdout", listOf(text)))
+                    persistentListOf(Output("stream", "stdout", persistentListOf(text)))
                 )
             }
 
@@ -383,9 +400,9 @@ class NotebookViewModel(
             val newCell = notebookFileUseCase.createCell(
                 id = cellId,
                 type = cellType,
-                source = defaultSource,
+                source = defaultSource.toImmutableList(),
                 executionCount = if (cellType == CellType.CODE) 0 else null,
-                outputs = if (cellType == CellType.CODE) emptyList() else null
+                outputs = if (cellType == CellType.CODE) persistentListOf() else null
             )
             // セル挿入と保存
             updateLocalNotebook { nb ->
@@ -528,8 +545,8 @@ class NotebookViewModel(
                 val clearedNotebook = updateLocalNotebook { nb ->
                     nb.copy(
                         cells = nb.cells.map { cell ->
-                            cell.copy(outputs = emptyList(), executionCount = 0)
-                        }
+                            cell.copy(outputs = persistentListOf(), executionCount = 0)
+                        }.toImmutableList()
                     )
                 } ?: return@launch
 
@@ -666,7 +683,7 @@ class NotebookViewModel(
                     nb,
                     cellId,
                 ) { oldCell ->
-                    oldCell.copy(source = newText.split("\n"))
+                    oldCell.copy(source = newText.split("\n").toImmutableList())
                 }
             }
             // Debounce saving cell to file
@@ -697,7 +714,7 @@ class NotebookViewModel(
                     nb,
                     cellId,
                 ) { oldCell ->
-                    oldCell.copy(source = newSource, type = CellType.MARKDOWN)
+                    oldCell.copy(source = newSource.toImmutableList(), type = CellType.MARKDOWN)
                 }
             }
 

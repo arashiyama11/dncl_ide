@@ -64,12 +64,12 @@ import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
+import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
+import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
-import io.github.arashiyama11.dncl_ide.ui.model.CellUiModel
-import io.github.arashiyama11.dncl_ide.ui.model.OutputUiModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
@@ -283,7 +283,7 @@ fun CellComponent(
 
 @Composable
 fun CodeCellContent(
-    cell: CellUiModel,
+    cell: Cell,
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState,
     suggestions: ImmutableList<Definition>,
@@ -357,11 +357,14 @@ fun CodeCellContent(
 
 @Composable
 fun MarkdownCellContent(
-    cell: CellUiModel,
+    cell: Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     fontSize: Int = 16,
 ) {
+    if (cell.id == "cell-2") {
+        println("Cell ID 2 update detected. ${cell.hashCode()}")
+    }
     var text by remember(cell.id) {
         mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
     }
@@ -416,7 +419,7 @@ fun MarkdownCellContent(
 }
 
 @Composable
-fun OutputDisplay(output: OutputUiModel, fontSize: Int) {
+fun OutputDisplay(output: Output, fontSize: Int) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
