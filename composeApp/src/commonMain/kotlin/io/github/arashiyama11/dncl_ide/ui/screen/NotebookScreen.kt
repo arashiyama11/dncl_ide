@@ -46,10 +46,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,7 +67,6 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
-import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -87,14 +83,9 @@ fun NotebookScreen(
         if (uiState.notebook == null || uiState.loading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
-            CompositionLocalProvider(
-                LocalMarkdownColors provides rememberMarkdownColors(),
-                LocalMarkdownTypography provides rememberMarkdownTypography()
-            ) {
-                NotebookContent(
-                    notebookViewModel = notebookViewModel,
-                )
-            }
+            NotebookContent(
+                notebookViewModel = notebookViewModel,
+            )
         }
     }
 }
@@ -188,10 +179,12 @@ fun CellComponent(
     viewModel: NotebookViewModel,
 ) {
     val cell by viewModel.cellStateFlow(cellId).collectAsStateWithLifecycle()
+    if (cell?.id == "cell-2") {
+        println("Cell ID 2 update detected. ${cell.hashCode()}")
+    }
     cell?.let { cellModel ->
         val isSelected by viewModel.isSelectedFlow(cellId).collectAsStateWithLifecycle()
         val codeCellState by viewModel.codeCellStateFlow(cellId).collectAsStateWithLifecycle()
-        val suggestions by viewModel.suggestionsFlow(cellId).collectAsStateWithLifecycle()
         val fontSize by viewModel.fontSizeFlow.collectAsStateWithLifecycle()
         val onAction = viewModel::handleAction
 
@@ -205,7 +198,7 @@ fun CellComponent(
 
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth()//.animateContentSize()
                 .heightIn(min = minHeight)
                 .onGloballyPositioned { layoutCoordinates ->
                     val heightInDp = with(density) { layoutCoordinates.size.height.toDp() }
@@ -265,9 +258,8 @@ fun CellComponent(
                     cellModel,
                     onAction,
                     codeCellState,
-                    suggestions,
                     fontSize,
-                    isSelected,
+                    viewModel
                 )
 
                 CellType.MARKDOWN -> MarkdownCellContent(
@@ -286,10 +278,11 @@ fun CodeCellContent(
     cell: Cell,
     onAction: (NotebookAction) -> Unit,
     codeCellState: CodeCellState,
-    suggestions: ImmutableList<Definition>,
     fontSize: Int,
-    isSelected: Boolean,
+    viewModel: NotebookViewModel
 ) {
+    val suggestions by viewModel.suggestionsFlow(cell.id).collectAsStateWithLifecycle()
+
     var localTfv by remember(cell.id, codeCellState.textFieldValue) {
         mutableStateOf(codeCellState.textFieldValue)
     }
@@ -362,9 +355,6 @@ fun MarkdownCellContent(
     onAction: (NotebookAction) -> Unit,
     fontSize: Int = 16,
 ) {
-    if (cell.id == "cell-2") {
-        println("Cell ID 2 update detected. ${cell.hashCode()}")
-    }
     var text by remember(cell.id) {
         mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
     }
@@ -473,45 +463,3 @@ fun OutputDisplay(output: Output, fontSize: Int) {
     }
 }
 
-
-@Composable
-fun rememberMarkdownColors(): MarkdownColors {
-    return object : MarkdownColors {
-        override val text: Color = MaterialTheme.colorScheme.onBackground
-        override val codeText: Color = MaterialTheme.colorScheme.onSurface
-        override val inlineCodeText: Color = MaterialTheme.colorScheme.onSurfaceVariant
-        override val linkText: Color = MaterialTheme.colorScheme.primary
-        override val codeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val inlineCodeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val dividerColor: Color = MaterialTheme.colorScheme.outline
-        override val tableText: Color = MaterialTheme.colorScheme.onSurface
-        override val tableBackground: Color = MaterialTheme.colorScheme.surface
-    }
-}
-
-@Composable
-fun rememberMarkdownTypography(): MarkdownTypography {
-    return object : MarkdownTypography {
-        override val text: TextStyle = MaterialTheme.typography.bodyLarge
-        override val code: TextStyle =
-            MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-        override val inlineCode: TextStyle =
-            MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-        override val h1: TextStyle = MaterialTheme.typography.headlineLarge
-        override val h2: TextStyle = MaterialTheme.typography.headlineMedium
-        override val h3: TextStyle = MaterialTheme.typography.headlineSmall
-        override val h4: TextStyle = MaterialTheme.typography.titleLarge
-        override val h5: TextStyle = MaterialTheme.typography.titleMedium
-        override val h6: TextStyle = MaterialTheme.typography.titleSmall
-        override val quote: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary)
-        override val paragraph: TextStyle = MaterialTheme.typography.bodyLarge
-        override val ordered: TextStyle = MaterialTheme.typography.bodyLarge
-        override val bullet: TextStyle = MaterialTheme.typography.bodyLarge
-        override val list: TextStyle = MaterialTheme.typography.bodyLarge
-        override val link: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
-        override val textLink: TextLinkStyles = TextLinkStyles()
-        override val table: TextStyle = MaterialTheme.typography.bodyMedium
-    }
-}

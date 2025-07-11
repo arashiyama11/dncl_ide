@@ -161,7 +161,8 @@ class NotebookViewModel(
 
     fun cellStateFlow(cellId: String): StateFlow<Cell?> = uiState.map { state ->
         state.notebook?.cells?.find { it.id == cellId }
-    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.distinctUntilChanged { a, b -> a?.id == b?.id }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun isSelectedFlow(cellId: String): StateFlow<Boolean> = uiState.map { state ->
         state.selectedCellId == cellId
@@ -169,18 +170,19 @@ class NotebookViewModel(
 
     fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> = uiState.map { state ->
         state.codeCellStateMap[cellId] ?: CodeCellState()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
+    }.distinctUntilChangedBy { it.annotatedString.toString() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
 
     fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> =
         uiState.map { state ->
             state.cellSuggestionsMap[cellId] ?: persistentListOf()
-        }.stateIn(
+        }.distinctUntilChangedBy { it }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
             persistentListOf()
         )
 
-    val fontSizeFlow: StateFlow<Int> = uiState.map { it.fontSize }
+    val fontSizeFlow: StateFlow<Int> = uiState.map { it.fontSize }.distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
 
     val errorChannel = Channel<String>()
