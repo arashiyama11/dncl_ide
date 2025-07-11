@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,8 +52,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -127,14 +126,17 @@ fun NotebookContent(
                 .verticalScroll(rememberScrollState())
         ) {
             for (cell in uiState.notebook!!.cells) {
-                CellComponent(
-                    cell = cell,
-                    isSelected = cell.id == uiState.selectedCellId,
-                    onAction = notebookViewModel::handleAction,
-                    codeCellState = uiState.codeCellStateMap[cell.id],
-                    suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList(),
-                    fontSize = uiState.fontSize
-                )
+                key(cell.id) {
+                    CellComponent(
+                        cell = cell,
+                        isSelected = cell.id == uiState.selectedCellId,
+                        onAction = notebookViewModel::handleAction,
+                        codeCellState = uiState.codeCellStateMap[cell.id],
+                        suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList(),
+                        fontSize = uiState.fontSize
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }

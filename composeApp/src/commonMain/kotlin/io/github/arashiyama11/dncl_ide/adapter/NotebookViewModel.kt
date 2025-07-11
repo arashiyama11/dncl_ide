@@ -29,6 +29,11 @@ import io.github.arashiyama11.dncl_ide.ui.model.NotebookUiModel
 import io.github.arashiyama11.dncl_ide.ui.model.toUiModel
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.apply
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -65,10 +71,10 @@ import kotlin.uuid.Uuid
 data class NotebookUiState(
     val notebook: NotebookUiModel? = null,
     val selectedCellId: String? = null,
-    val codeCellStateMap: Map<String, CodeCellState> = emptyMap(),
+    val codeCellStateMap: ImmutableMap<String, CodeCellState> = persistentMapOf(),
     val loading: Boolean = true,
     val focusedCellId: String? = null,
-    val cellSuggestionsMap: Map<String, List<Definition>> = emptyMap(),
+    val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>> = persistentMapOf(),
     val fontSize: Int = 16,
     val selectedEntryPath: EntryPath? = null,
     val unsavedChanges: Boolean = false,
@@ -116,10 +122,10 @@ class NotebookViewModel(
         NotebookLocalState(
             domainNotebook = null,
             selectedCellId = null,
-            codeCellStateMap = emptyMap(),
+            codeCellStateMap = persistentMapOf(),
             loading = true,
             focusedCellId = null,
-            cellSuggestionsMap = emptyMap(),
+            cellSuggestionsMap = persistentMapOf(),
             unsavedChanges = false
         )
     )
@@ -419,7 +425,7 @@ class NotebookViewModel(
             _localState.update {
                 it.copy(
                     selectedCellId = nextSelected,
-                    codeCellStateMap = updatedStateMap
+                    codeCellStateMap = updatedStateMap.toImmutableMap()
                 )
             }
         }
@@ -615,10 +621,10 @@ class NotebookViewModel(
                     textFieldValue = newTextFieldValue,
                     annotatedString = annotatedStr
                 )
-            }
+            }.toImmutableMap()
             val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
-                this[cellId] = suggestions
-            }
+                this[cellId] = suggestions.toImmutableList()
+            }.toImmutableMap()
             _localState.update { state ->
                 state.copy(
                     codeCellStateMap = newCodeMap,
@@ -722,10 +728,10 @@ class NotebookViewModel(
     private data class NotebookLocalState(
         val domainNotebook: Notebook?,
         val selectedCellId: String?,
-        val codeCellStateMap: Map<String, CodeCellState>,
+        val codeCellStateMap: ImmutableMap<String, CodeCellState>,
         val loading: Boolean,
         val focusedCellId: String?,
-        val cellSuggestionsMap: Map<String, List<Definition>>,
+        val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>>,
         val unsavedChanges: Boolean
     )
 
