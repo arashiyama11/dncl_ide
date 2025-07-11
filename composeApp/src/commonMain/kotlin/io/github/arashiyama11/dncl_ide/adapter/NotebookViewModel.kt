@@ -46,12 +46,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -151,6 +154,29 @@ class NotebookViewModel(
         started = SharingStarted.Lazily,
         initialValue = NotebookUiState()
     )
+
+    val cellIdsFlow: StateFlow<List<String>> = uiState.map {
+        it.notebook?.cells?.map { cell -> cell.id } ?: emptyList()
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun cellStateFlow(cellId: String): StateFlow<io.github.arashiyama11.dncl_ide.ui.model.CellUiModel?> = uiState.map { state ->
+        state.notebook?.cells?.find { it.id == cellId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun isSelectedFlow(cellId: String): StateFlow<Boolean> = uiState.map { state ->
+        state.selectedCellId == cellId
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> = uiState.map { state ->
+        state.codeCellStateMap[cellId] ?: CodeCellState()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
+
+    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> = uiState.map { state ->
+        state.cellSuggestionsMap[cellId] ?: kotlinx.collections.immutable.persistentListOf()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), kotlinx.collections.immutable.persistentListOf())
+
+    val fontSizeFlow: StateFlow<Int> = uiState.map { it.fontSize }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
 
     val errorChannel = Channel<String>()
 
@@ -512,7 +538,7 @@ class NotebookViewModel(
                 for (cell in clearedNotebook.cells) {
                     if (cell.type == CellType.CODE) {
                         selectCellId = cell.id
-                        // ��ードセルの実行
+                        // ードルの実行
                         delay(100) // UIの更新を待つ
                         notebookFileUseCase.executeCell(
                             _localState.value.domainNotebook!!,
