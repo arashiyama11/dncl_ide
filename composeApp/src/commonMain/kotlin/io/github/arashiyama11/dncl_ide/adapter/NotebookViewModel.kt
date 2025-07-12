@@ -66,6 +66,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.apply
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -107,7 +108,7 @@ sealed interface NotebookAction {
     data object DeselectCell : NotebookAction
 }
 
-
+@OptIn(ExperimentalTime::class)
 class NotebookViewModel(
     private val fileUseCase: FileUseCase,
     private val notebookFileUseCase: NotebookFileUseCase,
@@ -117,9 +118,10 @@ class NotebookViewModel(
 ) : ViewModel() {
     companion object {
         private const val SAVE_DELAY_MS = 500L
+        private const val CACHE_EXPIRY_MS = 30000L // 30秒でキャッシュクリア
     }
 
-    private val saveJobs = mutableMapOf<String, Job>()
+    // 最適化されたローカル状態
     private val _localState = MutableStateFlow(
         NotebookLocalState(
             domainNotebook = null,
@@ -128,13 +130,28 @@ class NotebookViewModel(
             loading = true,
             focusedCellId = null,
             cellSuggestionsMap = persistentMapOf(),
-            unsavedChanges = false
+            unsavedChanges = false,
+            lastUpdateTime = Clock.System.now().toEpochMilliseconds()
         )
     )
 
+    // StateFlowキャッシュ - メモリリーク防止
+    private val cellStateFlowCache = mutableMapOf<String, StateFlow<Cell?>>()
+    private val isSelectedFlowCache = mutableMapOf<String, StateFlow<Boolean>>()
+    private val codeCellStateFlowCache = mutableMapOf<String, StateFlow<CodeCellState>>()
+    private val suggestionsFlowCache = mutableMapOf<String, StateFlow<ImmutableList<Definition>>>()
+
+    private val saveJobs = mutableMapOf<String, Job>()
+
+    // 最適化されたuiState - 不要な変換を削減
     val uiState = combine(
-        _localState,
-        appStateStore.state
+        _localState.distinctUntilChangedBy {
+            // ハッシュベースの高速比較
+            it.hashCode()
+        },
+        appStateStore.state.distinctUntilChangedBy {
+            Triple(it.fontSize, it.selectedEntryPath, it.running)
+        }
     ) { localState, appState ->
         NotebookUiState(
             notebook = localState.domainNotebook,
@@ -150,40 +167,65 @@ class NotebookViewModel(
         )
     }.stateIn(
         viewModelScope,
-        started = SharingStarted.Lazily,
+        started = SharingStarted.Eagerly, // Lazilyから変更でコールドスタート回避
         initialValue = NotebookUiState()
     )
 
-    val cellIdsFlow: StateFlow<List<String>> = uiState.map {
-        it.notebook?.cells?.map { cell -> cell.id } ?: emptyList()
-    }.distinctUntilChanged()
+    // セルIDリストの最適化 - 変更検知を高速化
+    val cellIdsFlow: StateFlow<List<String>> = _localState
+        .map { it.domainNotebook?.cells?.map { cell -> cell.id } ?: emptyList() }
+        .distinctUntilChanged { old, new ->
+            old.size == new.size && old.zip(new).all { it.first == it.second }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun cellStateFlow(cellId: String): StateFlow<Cell?> = uiState.map { state ->
-        state.notebook?.cells?.find { it.id == cellId }
-    }.distinctUntilChanged { a, b -> a?.id == b?.id }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    // キャッシュされたStateFlow取得 - メモリ効率向上
+    fun cellStateFlow(cellId: String): StateFlow<Cell?> {
+        return cellStateFlowCache.getOrPut(cellId) {
+            _localState
+                .map { state -> state.domainNotebook?.cells?.find { it.id == cellId } }
+                .distinctUntilChangedBy { it?.hashCode() } // オブジェクトハッシュで高速比較
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        }
+    }
 
-    fun isSelectedFlow(cellId: String): StateFlow<Boolean> = uiState.map { state ->
-        state.selectedCellId == cellId
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun isSelectedFlow(cellId: String): StateFlow<Boolean> {
+        return isSelectedFlowCache.getOrPut(cellId) {
+            _localState
+                .map { it.selectedCellId == cellId }
+                .distinctUntilChanged()
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        }
+    }
 
-    fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> = uiState.map { state ->
-        state.codeCellStateMap[cellId] ?: CodeCellState()
-    }.distinctUntilChangedBy { it.annotatedString.toString() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
+    fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> {
+        return codeCellStateFlowCache.getOrPut(cellId) {
+            _localState
+                .map {
+                    it.codeCellStateMap[cellId] ?: run {
+                        println("warning: codeCellStateMap does not contain cellId: $cellId")
+                        CodeCellState()
+                    }
+                }
+                .distinctUntilChangedBy { "${it.textFieldValue.text}:${it.annotatedString.text}" }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
+        }
+    }
 
-    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> =
-        uiState.map { state ->
-            state.cellSuggestionsMap[cellId] ?: persistentListOf()
-        }.distinctUntilChangedBy { it }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            persistentListOf()
-        )
+    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> {
+        return suggestionsFlowCache.getOrPut(cellId) {
+            _localState
+                .map { it.cellSuggestionsMap[cellId] ?: persistentListOf() }
+                .distinctUntilChangedBy { it.size }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), persistentListOf())
+        }
+    }
 
-    val fontSizeFlow: StateFlow<Int> = uiState.map { it.fontSize }.distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
+    // フォントサイズFlowの最適化
+    val fontSizeFlow: StateFlow<Int> = appStateStore.state
+        .map { it.fontSize }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 16)
 
     val errorChannel = Channel<String>()
 
@@ -203,18 +245,31 @@ class NotebookViewModel(
     private var started = false
 
     init {
-
-        viewModelScope.launch(Dispatchers.Default) {
-            uiState.collect { uiState ->
-                uiState.notebook?.cells?.getOrNull(0).let { cell ->
-                    println("Cell ID: ${cell?.id} -> ${cell.hashCode()}")
-                }
-
+        // 定期的なキャッシュクリーンアップ
+        viewModelScope.launch {
+            while (isActive) {
+                delay(CACHE_EXPIRY_MS)
+                cleanupExpiredCaches()
             }
         }
     }
 
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
+    private fun cleanupExpiredCaches() {
+        val currentTime = Clock.System.now().toEpochMilliseconds()
+        val lastUpdate = _localState.value.lastUpdateTime
+
+        if (currentTime - lastUpdate > CACHE_EXPIRY_MS) {
+            // 使用されていないキャッシュをクリア
+            cellStateFlowCache.clear()
+            isSelectedFlowCache.clear()
+            codeCellStateFlowCache.clear()
+            suggestionsFlowCache.clear()
+        }
+    }
+
+
+    context(scope: CoroutineScope)
+    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
     fun onStart() {
         if (started) return
         started = true
@@ -481,6 +536,7 @@ class NotebookViewModel(
      */
     fun executeCell(cellId: String) {
         selectCellId = cellId
+        clearCellOutput(cellId)
         cancelExecution().invokeOnCompletion { cause ->
 
             executeScope.launch {
@@ -508,7 +564,7 @@ class NotebookViewModel(
                         file,
                         nb,
                         cellId,
-                        output ?: return@launch println("warning: output is null")
+                        output
                     )
                 }
                 _localState.update {
@@ -777,7 +833,8 @@ class NotebookViewModel(
         val loading: Boolean,
         val focusedCellId: String?,
         val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>>,
-        val unsavedChanges: Boolean
+        val unsavedChanges: Boolean,
+        val lastUpdateTime: Long = 0L // 最後の更新時刻
     )
 
     /**

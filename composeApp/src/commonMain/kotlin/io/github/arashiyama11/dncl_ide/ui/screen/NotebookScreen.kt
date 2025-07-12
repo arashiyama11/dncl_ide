@@ -30,7 +30,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -54,12 +53,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.model.MarkdownColors
-import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
-import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
@@ -104,12 +100,13 @@ fun NotebookContent(
 @Composable
 fun NotebookToolbarComponent(viewModel: NotebookViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     NotebookToolbar(
         selectedEntryPath = uiState.selectedEntryPath,
-        onExecuteAllCells = { viewModel.handleAction(NotebookAction.ExecuteAllCells) },
-        onCancelExecution = { viewModel.handleAction(NotebookAction.CancelExecution) },
+        onExecuteAllCells = remember { { viewModel.handleAction(NotebookAction.ExecuteAllCells) } },
+        onCancelExecution = remember { { viewModel.handleAction(NotebookAction.CancelExecution) } },
         unsavedChanges = uiState.unsavedChanges,
-        onSave = { viewModel.saveNotebook() },
+        onSave = viewModel::saveNotebook,
         running = uiState.running
     )
 }
@@ -117,6 +114,8 @@ fun NotebookToolbarComponent(viewModel: NotebookViewModel) {
 @Composable
 fun CellListComponent(viewModel: NotebookViewModel, modifier: Modifier = Modifier) {
     val cellIds by viewModel.cellIdsFlow.collectAsStateWithLifecycle()
+
+    //LazyColumnだとUX悪い
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -462,4 +461,3 @@ fun OutputDisplay(output: Output, fontSize: Int) {
         }
     }
 }
-
