@@ -418,6 +418,10 @@ fun OutputDisplay(output: Output, fontSize: Int) {
     ) {
         when (output.outputType) {
             "stream" -> {
+                // stdout/stderr を name で判定
+                val isStderr = output.name == "stderr"
+                val textColor = if (isStderr) MaterialTheme.colorScheme.error else Color.Unspecified
+
                 output.text?.let { textLines ->
                     Text(
                         text = textLines.joinToString("\n"),
@@ -425,6 +429,7 @@ fun OutputDisplay(output: Output, fontSize: Int) {
                             fontSize = fontSize.sp,
                             lineHeight = (fontSize + 2).sp
                         ),
+                        color = textColor
                     )
                 }
             }
