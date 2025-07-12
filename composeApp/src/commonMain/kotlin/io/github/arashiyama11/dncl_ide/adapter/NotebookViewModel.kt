@@ -477,7 +477,7 @@ class NotebookViewModel(
                 val outputKey = when (cellOutput.output.outputType) {
                     "error" -> "error"
                     "stream" -> cellOutput.output.name ?: "stdout"
-                    else -> cellOutput.output.outputType ?: "stdout"
+                    else -> cellOutput.output.outputType
                 }
 
                 val text = cellOutput.output.text?.joinToString("") ?: ""
@@ -487,24 +487,27 @@ class NotebookViewModel(
                     if (pendingCount.value < 20) {
                         scope.launch(Dispatchers.Main) {
                             val outputs = outputMap.map { (key, builder) ->
+                                // 出力文字列を処理
+                                val processedText = processOutputText(builder.toString())
+
                                 when {
                                     key == "error" -> Output(
                                         outputType = "error",
-                                        text = persistentListOf(builder.toString()),
-                                        evalue = builder.toString(),
+                                        text = persistentListOf(processedText),
+                                        evalue = processedText,
                                         ename = "Error"
                                     )
 
                                     key == "stderr" -> Output(
                                         outputType = "stream",
                                         name = "stderr",
-                                        text = persistentListOf(builder.toString())
+                                        text = persistentListOf(processedText)
                                     )
 
                                     else -> Output(
                                         outputType = "stream",
                                         name = key,
-                                        text = persistentListOf(builder.toString())
+                                        text = persistentListOf(processedText)
                                     )
                                 }
                             }
@@ -514,24 +517,27 @@ class NotebookViewModel(
                 } else {
                     withContext(Dispatchers.Main) {
                         val outputs = outputMap.map { (key, builder) ->
+                            // 出力文字列を処理
+                            val processedText = processOutputText(builder.toString())
+
                             when {
                                 key == "error" -> Output(
                                     outputType = "error",
-                                    text = persistentListOf(builder.toString()),
-                                    evalue = builder.toString(),
+                                    text = persistentListOf(processedText),
+                                    evalue = processedText,
                                     ename = "Error"
                                 )
 
                                 key == "stderr" -> Output(
                                     outputType = "stream",
                                     name = "stderr",
-                                    text = persistentListOf(builder.toString())
+                                    text = persistentListOf(processedText)
                                 )
 
                                 else -> Output(
                                     outputType = "stream",
                                     name = key,
-                                    text = persistentListOf(builder.toString())
+                                    text = persistentListOf(processedText)
                                 )
                             }
                         }
@@ -659,14 +665,7 @@ class NotebookViewModel(
 
                 appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after execution
 
-                val file = notebookFile ?: return@launch
-
-
                 notebookMutex.withLock {
-                    val currentState = _localState.value
-                    val notebook = currentState.domainNotebook ?: return@withLock
-
-                    // 全ての出力をoutputChannelを通して処理
                     outputChannel.send(CellOutput(output))
                 }
             }
@@ -1028,5 +1027,27 @@ class NotebookViewModel(
             e.printStackTrace()
             return newTextFiledValue
         }
+    }
+
+    /**
+     * 出力文字列を処理して、末尾の空行とnullを適切に処理する
+     */
+    private fun processOutputText(text: String): String {
+        if (text.isEmpty()) return text
+
+        // 行に分割
+        val lines = text.lines().toMutableList()
+
+        // 最後が空行なら削除
+        while (lines.isNotEmpty() && lines.last().trim().isEmpty()) {
+            lines.removeAt(lines.size - 1)
+        }
+
+        // 最後の行がnullで、かつ他に内容がある場合はnullを削除
+        if (lines.size > 1 && lines.last().trim() == "null") {
+            lines.removeAt(lines.size - 1)
+        }
+
+        return lines.joinToString("\n")
     }
 }
