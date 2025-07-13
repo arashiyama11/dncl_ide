@@ -192,19 +192,10 @@ fun CellComponent(
         else
             MaterialTheme.colorScheme.outlineVariant
 
-        var minHeight by remember(cellId) { mutableStateOf(100.dp) }
-        val density = LocalDensity.current
-
         Column(
             modifier = Modifier
-                .fillMaxWidth()//.animateContentSize()
-                .heightIn(min = minHeight)
-                .onGloballyPositioned { layoutCoordinates ->
-                    val heightInDp = with(density) { layoutCoordinates.size.height.toDp() }
-                    if (heightInDp > minHeight) {
-                        minHeight = heightInDp
-                    }
-                }
+                .fillMaxWidth()
+                .heightIn(min = 96.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .border(1.dp, borderColor, RoundedCornerShape(4.dp))
                 .padding(8.dp)
@@ -341,8 +332,22 @@ fun CodeCellContent(
             }
         }
 
-        cell.outputs?.forEach { output ->
-            OutputDisplay(output, fontSize)
+        val density = LocalDensity.current
+        var minHeight by remember(cell.id) { mutableStateOf(0.dp) }
+
+        Column(
+            modifier = Modifier.onGloballyPositioned {
+                val heightInDp = with(density) { it.size.height.toDp() }
+                if (heightInDp > minHeight) {
+                    minHeight = heightInDp
+                }
+            }.heightIn(min = minHeight)
+        ) {
+            cell.outputs?.forEach { output ->
+                key(output) {
+                    OutputDisplay(output, fontSize)
+                }
+            }
         }
     }
 }
