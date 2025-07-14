@@ -75,6 +75,8 @@ data class CellOutput(
     val isError: Boolean = false
 )
 
+data class ExecuteRequest(val cellId: String)
+
 data class NotebookUiState(
     val notebook: Notebook? = null,
     val selectedCellId: String? = null,
@@ -234,6 +236,11 @@ class NotebookViewModel(
 
     private val saveReqChannel = Channel<Unit>(capacity = 64)
 
+    // 実行キューシステム
+    private val executeRequestChannel = Channel<ExecuteRequest>(capacity = Channel.UNLIMITED)
+    private val executionMutex = Mutex()
+    private var isExecuting = false
+
     private val notebookMutex = Mutex()
     val pendingCount = atomic(0)
 
@@ -379,6 +386,11 @@ class NotebookViewModel(
 
         executeScope.launch {
             watchStdoutChannel()
+        }
+
+        // 実行キューを処理するコルーチンを開始
+        viewModelScope.launch {
+            processExecuteQueue()
         }
     }
 
@@ -646,29 +658,42 @@ class NotebookViewModel(
 
     /**
      * Execute the cell with the given ID
+     * キューシステムを使用して堅牢な実行を保証
      */
     fun executeCell(cellId: String) {
-        selectCellId = cellId
-        clearCellOutput(cellId)
-        cancelExecution().invokeOnCompletion { cause ->
+        executeRequestChannel.trySend(ExecuteRequest(cellId))
+    }
 
-            executeScope.launch {
-                appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
+    /**
+     * Execute all cells in the notebook
+     * 全てのコードセルを個別にキューに追加して順次実行
+     */
+    fun executeAllCells() {
+        viewModelScope.launch {
+            val currentState = _localState.value
+            val notebook = currentState.domainNotebook ?: return@launch
 
-                saveNotebook()
+            // まず全てのセルの出力をクリア
+            val clearedNotebook = notebook.copy(
+                cells = notebook.cells.map { cell ->
+                    if (cell.type == CellType.CODE) {
+                        cell.copy(outputs = persistentListOf(), executionCount = 0)
+                    } else {
+                        cell
+                    }
+                }.toImmutableList()
+            )
 
-                delay(100) //await clear
-
-                val output = notebookFileUseCase.executeCell(
-                    _localState.value.domainNotebook!!, cellId, environment
-                )
-
-                appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after execution
-
-                notebookMutex.withLock {
-                    outputChannel.send(CellOutput(output))
-                }
+            notebookMutex.withLock {
+                _localState.update { it.copy(domainNotebook = clearedNotebook) }
             }
+
+            // 各コードセルを順次キューに追加
+            clearedNotebook.cells
+                .filter { it.type == CellType.CODE }
+                .forEach { cell ->
+                    executeRequestChannel.send(ExecuteRequest(cell.id))
+                }
         }
     }
 
@@ -686,53 +711,6 @@ class NotebookViewModel(
                 _localState.update {
                     it.copy(domainNotebook = newNotebook)
                 }
-            }
-        }
-    }
-
-    /**
-     * Execute all cells in the notebook
-     */
-    fun executeAllCells() {
-        viewModelScope.launch {
-            appStateStore.dispatch(Action.SetRunning(true)) // Set running to true
-            cancelExecution().join()
-
-
-            executeScope.launch {
-                val notebookToExecute = notebookMutex.withLock {
-                    val currentState = _localState.value
-                    val notebook = currentState.domainNotebook ?: return@withLock null
-                    val newNotebook = notebook.copy(
-                        cells = notebook.cells.map { cell ->
-                            cell.copy(outputs = persistentListOf(), executionCount = 0)
-                        }.toImmutableList()
-                    )
-                    _localState.update { it.copy(domainNotebook = newNotebook) }
-                    newNotebook
-                }
-
-                if (notebookToExecute == null) {
-                    appStateStore.dispatch(Action.SetRunning(false))
-                    return@launch
-                }
-
-
-                // 各セルを順番に実行
-                for (cell in notebookToExecute.cells) {
-                    if (cell.type == CellType.CODE) {
-                        selectCellId = cell.id
-                        // ードルの実行
-                        delay(100) // UIの更新を待つ
-                        notebookFileUseCase.executeCell(
-                            _localState.value.domainNotebook!!,
-                            cell.id,
-                            environment
-                        )
-                        delay(200) // 実行完了を少し待つ
-                    }
-                }
-                appStateStore.dispatch(Action.SetRunning(false)) // Set running to false after all cells execute
             }
         }
     }
@@ -996,6 +974,61 @@ class NotebookViewModel(
                 appStateStore.dispatch(Action.SetRunning(false))
             }
         }
+    }
+
+    /**
+     * 実行キューを処理するメソッド
+     * 一度に1つの実行リクエストのみを処理し、同時実行を防ぐ
+     */
+    private suspend fun processExecuteQueue() {
+        executeRequestChannel.consumeAsFlow().onEach { println("recieve request $it") }
+            .collect { request ->
+                println("Processing request: $request")
+                selectCellId = request.cellId
+                executionMutex.withLock {
+                    if (isExecuting) {
+                        println("既に実行中のため、リクエストをスキップ: $request")
+                        return@withLock
+                    }
+
+                    isExecuting = true
+                    appStateStore.dispatch(Action.SetRunning(true))
+
+                    try {
+                        executeCellInternal(request.cellId)
+                    } catch (e: Exception) {
+                        println("実行中にエラーが発生: ${e.message}")
+                        e.printStackTrace()
+                    } finally {
+                        isExecuting = false
+                        appStateStore.dispatch(Action.SetRunning(false))
+                    }
+                }
+            }
+    }
+
+    /**
+     * 単一セルの実際の実行処理（内部用）
+     */
+    private suspend fun executeCellInternal(cellId: String) {
+        selectCellId = cellId
+        clearCellOutput(cellId).join()
+        cancelExecution().join()
+
+        executeScope.launch {
+            saveNotebook()
+            delay(100) // 出力クリアを待つ
+
+            val output = notebookFileUseCase.executeCell(
+                _localState.value.domainNotebook!!, cellId, environment
+            )
+
+            notebookMutex.withLock {
+                outputChannel.send(CellOutput(output))
+            }
+
+            delay(1000) // 出力のflushを実装したら不要になるはず
+        }.join()
     }
 
     fun autoIndent(
