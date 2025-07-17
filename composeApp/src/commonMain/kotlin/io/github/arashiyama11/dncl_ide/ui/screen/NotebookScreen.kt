@@ -411,7 +411,7 @@ fun MarkdownCellContent(
 
 @Composable
 fun OutputDisplay(output: Output, fontSize: Int) {
-    var minHeight by remember { mutableStateOf(100.dp) }
+    var minHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     Column(
         modifier = Modifier

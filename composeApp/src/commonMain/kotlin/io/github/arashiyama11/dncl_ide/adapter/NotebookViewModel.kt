@@ -5,7 +5,10 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import arrow.core.Either
 import arrow.core.getOrElse
+import io.github.arashiyama11.dncl_ide.util.OutputEvent
+import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.common.Action // Add this import
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -23,11 +26,10 @@ import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
@@ -64,20 +66,11 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlin.apply
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
-
-// 出力データを統一的に管理するためのデータクラス
-data class CellOutput(
-    val output: Output,
-    val isError: Boolean = false,
-    val isEnd: Boolean = false
-)
 
 data class ExecuteRequest(val cellId: String)
 
@@ -244,8 +237,6 @@ class NotebookViewModel(
 
     val errorChannel = Channel<String>()
 
-    private var outputChannel = Channel<CellOutput>(capacity = 1024)
-
     private val saveReqChannel = Channel<Unit>(capacity = 64)
 
     // 実行キューシステム
@@ -254,12 +245,11 @@ class NotebookViewModel(
     private var isExecuting = false
 
     private val notebookMutex = Mutex()
-    val pendingCount = atomic(0)
 
     private var notebookFile: NotebookFile? = null
     private var selectCellId: String? = null
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
-    //private var watchJob: Job? = null
+    private lateinit var outputHandler: OutputHandler
 
     private lateinit var environment: Environment
     private var started = false
@@ -293,6 +283,33 @@ class NotebookViewModel(
     fun onStart() {
         if (started) return
         started = true
+
+        outputHandler = OutputHandler(executeScope) { outputs ->
+            viewModelScope.launch(Dispatchers.Main) {
+                notebookMutex.withLock {
+                    val currentState = _localState.value
+                    val notebook = currentState.domainNotebook ?: return@withLock
+                    var newNotebook = notebook
+                    outputs.forEach { (cellId, outputString) ->
+                        if (cellId == null) return@forEach
+                        val output = Output(
+                            outputType = "stream",
+                            name = "stdout",
+                            text = persistentListOf(processOutputText(outputString))
+                        )
+                        newNotebook = notebookFileUseCase.modifyNotebookOutput(
+                            newNotebook,
+                            cellId,
+                            persistentListOf(output)
+                        )
+                    }
+                    _localState.update {
+                        it.copy(domainNotebook = newNotebook)
+                    }
+                }
+            }
+        }
+
         appStateStore.state.distinctUntilChangedBy { it.selectedEntryPath }
             .onEach { appState ->
                 val entryPath = appState.selectedEntryPath
@@ -345,31 +362,10 @@ class NotebookViewModel(
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
-                        // Skip literal "null" to avoid unwanted null output
                         if (outputStr.trim() == "null") return@createBuiltInFunctionEnvironment
-                        if (!outputChannel.isClosedForSend)
-                            outputChannel.send(
-                                CellOutput(
-                                    Output(
-                                        "stream",
-                                        "stdout",
-                                        persistentListOf(outputStr)
-                                    )
-                                )
-                            )
-                        pendingCount.incrementAndGet()
+                        outputHandler.send(OutputEvent.Stdout(outputStr, selectCellId))
                     }, onClear = {
-                        if (!outputChannel.isClosedForSend)
-                            outputChannel.send(
-                                CellOutput(
-                                    Output(
-                                        "stream",
-                                        "stdout",
-                                        persistentListOf()
-                                    ), true
-                                )
-                            )
-                        pendingCount.incrementAndGet()
+                        outputHandler.send(OutputEvent.Clear(selectCellId))
                     }, onImport = { importPath ->
                         // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
@@ -396,190 +392,9 @@ class NotebookViewModel(
             }
         }
 
-        executeScope.launch {
-            watchStdoutChannel()
-        }
-
         // 実行キューを処理するコルーチンを開始
         viewModelScope.launch {
             processExecuteQueue()
-        }
-    }
-
-    context(scope: CoroutineScope)
-    @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
-    private suspend fun watchStdoutChannel() {
-        try {
-            println("starting watchOutputChannel")
-            val channel = outputChannel
-            var isBusy = false
-            val outputMap = mutableMapOf<String, StringBuilder>() // outputType別に管理
-
-            suspend fun updateNotebook(outputs: List<Output>) {
-                notebookMutex.withLock {
-                    val currentState = _localState.value
-                    val notebook = currentState.domainNotebook ?: return@withLock
-                    val newNotebook = notebookFileUseCase.modifyNotebookOutput(
-                        notebook,
-                        selectCellId!!,
-                        outputs.toImmutableList()
-                    )
-                    _localState.update {
-                        it.copy(
-                            domainNotebook = newNotebook,
-                            codeCellStateMap = it.codeCellStateMap
-                        )
-                    }
-                }
-            }
-
-            for (cellOutput in channel) {
-                if (channel.isClosedForReceive || !coroutineContext.isActive || !scope.coroutineContext.isActive || scope.coroutineContext.job.isCancelled) {
-                    println("output channel closed or coroutine context is not active, exiting watchOutputChannel")
-                    return
-                }
-
-                pendingCount.decrementAndGet()
-                if (outputChannel.isEmpty || pendingCount.value < 0) {
-                    pendingCount.update { 0 }
-                }
-
-                val x = 4L - pendingCount.value.toLong()
-                val t = x * x * x + x * 10L
-                if (t > 0 && !cellOutput.isEnd) {
-                    delay(t)
-                }
-
-                // busy終了時
-                if (cellOutput.isEnd || outputChannel.isEmpty && isBusy) {
-                    println("end busy")
-                    isBusy = false
-                    withContext(Dispatchers.Main.immediate) {
-                        val outputs = notebookMutex.withLock {
-                            outputMap.map { (outputKey, builder) ->
-                                when (outputKey) {
-                                    "error" -> Output(
-                                        outputType = "error",
-                                        text = persistentListOf(builder.toString()),
-                                        evalue = builder.toString(),
-                                        ename = "Error"
-                                    )
-
-                                    "stderr" -> Output(
-                                        outputType = "stream",
-                                        name = "stderr",
-                                        text = persistentListOf(builder.toString())
-                                    )
-
-                                    else -> Output(
-                                        outputType = "stream",
-                                        name = outputKey,
-                                        text = persistentListOf(builder.toString())
-                                    )
-                                }
-                            }
-                        }
-                        updateNotebook(outputs)
-                    }
-                    pendingCount.update { 0 }
-                }
-
-                // busy開始時
-                if (!outputChannel.isEmpty && !isBusy) {
-                    println("start busy")
-                    isBusy = true
-                }
-
-                // クリア処理
-                if (cellOutput.isError && cellOutput.output.text?.isEmpty() == true) {
-                    notebookMutex.withLock {
-                        outputMap.clear()
-                    }
-                    if (!isBusy) withContext(Dispatchers.Main) {
-                        updateNotebook(emptyList())
-                    }
-                    continue
-                }
-
-                // 出力タイプを判定してキーを決定
-                val outputKey = when (cellOutput.output.outputType) {
-                    "error" -> "error"
-                    "stream" -> cellOutput.output.name ?: "stdout"
-                    else -> cellOutput.output.outputType
-                }
-
-                val text = cellOutput.output.text?.joinToString("") ?: ""
-                notebookMutex.withLock {
-                    outputMap.getOrPut(outputKey) { StringBuilder() }.append(text + "\n")
-                }
-
-                if (isBusy) {
-                    //continue
-                    if (pendingCount.value < 20) {
-                        scope.launch(Dispatchers.Main) {
-                            val outputs = notebookMutex.withLock {
-                                outputMap.map { (key, builder) ->
-                                    // 出力文字列を処理
-                                    val processedText = processOutputText(builder.toString())
-
-                                    when (key) {
-                                        "error" -> Output(
-                                            outputType = "error",
-                                            text = persistentListOf(processedText),
-                                            evalue = processedText,
-                                            ename = "Error"
-                                        )
-
-                                        "stderr" -> Output(
-                                            outputType = "stream",
-                                            name = "stderr",
-                                            text = persistentListOf(processedText)
-                                        )
-
-                                        else -> Output(
-                                            outputType = "stream",
-                                            name = key,
-                                            text = persistentListOf(processedText)
-                                        )
-                                    }
-                                }
-                            }
-                            updateNotebook(outputs)
-                        }
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        val outputs = outputMap.map { (key, builder) ->
-                            // 出力文字列を処理
-                            val processedText = processOutputText(builder.toString())
-
-                            when (key) {
-                                "error" -> Output(
-                                    outputType = "error",
-                                    text = persistentListOf(processedText),
-                                    evalue = processedText,
-                                    ename = "Error"
-                                )
-
-                                "stderr" -> Output(
-                                    outputType = "stream",
-                                    name = "stderr",
-                                    text = persistentListOf(processedText)
-                                )
-
-                                else -> Output(
-                                    outputType = "stream",
-                                    name = key,
-                                    text = persistentListOf(processedText)
-                                )
-                            }
-                        }
-                        updateNotebook(outputs)
-                    }
-                }
-            }
-        } finally {
-            println("watchOutputChannel finished, closing outputChannel")
         }
     }
 
@@ -813,7 +628,7 @@ class NotebookViewModel(
             // Generate suggestions using SuggestionUseCase
             var suggestions = emptyList<Definition>()
             if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
-                val parser = Parser(Lexer(newText))
+                val parser: Either<DnclError, Parser> = Parser(Lexer(newText))
 
                 val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
                 suggestions = if (parsedProgram.isRight()) {
@@ -978,18 +793,37 @@ class NotebookViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun cancelExecution(): Job {
         return viewModelScope.launch(Dispatchers.Default) {
-            outputChannel.close()
+            outputHandler.stop()
 
             val currentExecuteScopeJob = executeScope.coroutineContext.job
             currentExecuteScopeJob.cancelAndJoin()
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            //if (!stdoutChannel.isEmpty) {
-            outputChannel = Channel(capacity = 1024)
-            executeScope.launch {
-                watchStdoutChannel()
+            outputHandler = OutputHandler(executeScope) { outputs ->
+                viewModelScope.launch(Dispatchers.Main) {
+                    notebookMutex.withLock {
+                        val currentState = _localState.value
+                        val notebook = currentState.domainNotebook ?: return@withLock
+                        var newNotebook = notebook
+                        outputs.forEach { (cellId, outputString) ->
+                            if (cellId == null) return@forEach
+                            val output = Output(
+                                outputType = "stream",
+                                name = "stdout",
+                                text = persistentListOf(processOutputText(outputString))
+                            )
+                            newNotebook = notebookFileUseCase.modifyNotebookOutput(
+                                newNotebook,
+                                cellId,
+                                persistentListOf(output)
+                            )
+                        }
+                        _localState.update {
+                            it.copy(domainNotebook = newNotebook)
+                        }
+                    }
+                }
             }
 
-            pendingCount.update { 0 }
             // Only set running to false if there was an active job to cancel
             if (currentExecuteScopeJob.isCancelled) {
                 appStateStore.dispatch(Action.SetRunning(false))
@@ -1038,10 +872,24 @@ class NotebookViewModel(
             )
 
             notebookMutex.withLock {
-                outputChannel.send(CellOutput(output, isEnd = true))
+                val processedOutput = output.copy(text = output.text?.let {
+                    persistentListOf(
+                        processOutputText(
+                            it.joinToString("\n")
+                        )
+                    )
+                })
+                val newNotebook = notebookFileUseCase.modifyNotebookOutput(
+                    _localState.value.domainNotebook!!,
+                    cellId,
+                    persistentListOf(processedOutput)
+                )
+                _localState.update {
+                    it.copy(domainNotebook = newNotebook)
+                }
             }
 
-
+            outputHandler.send(OutputEvent.End(cellId))
 
             delay(200) // 出力のflushを実装したら不要になるはず。
             isExecuting = false
