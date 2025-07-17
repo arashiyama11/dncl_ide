@@ -43,14 +43,17 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -123,6 +126,8 @@ class NotebookViewModel(
     private val suggestionUseCase: SuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>
 ) : ViewModel() {
+
+
     companion object {
         private const val SAVE_DELAY_MS = 500L
         private const val CACHE_EXPIRY_MS = 30000L // 30秒でキャッシュクリア
@@ -185,6 +190,12 @@ class NotebookViewModel(
             old.size == new.size && old.zip(new).all { it.first == it.second }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        uiState.distinctUntilChangedBy { it.running }.onEach {
+            println("Running changed: ${it.running}")
+        }.launchIn(viewModelScope)
+    }
 
     // キャッシュされたStateFlow取得 - メモリ効率向上
     fun cellStateFlow(cellId: String): StateFlow<Cell?> {
@@ -444,26 +455,28 @@ class NotebookViewModel(
                     println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
-                        val outputs = outputMap.map { (outputKey, builder) ->
-                            when (outputKey) {
-                                "error" -> Output(
-                                    outputType = "error",
-                                    text = persistentListOf(builder.toString()),
-                                    evalue = builder.toString(),
-                                    ename = "Error"
-                                )
+                        val outputs = notebookMutex.withLock {
+                            outputMap.map { (outputKey, builder) ->
+                                when (outputKey) {
+                                    "error" -> Output(
+                                        outputType = "error",
+                                        text = persistentListOf(builder.toString()),
+                                        evalue = builder.toString(),
+                                        ename = "Error"
+                                    )
 
-                                "stderr" -> Output(
-                                    outputType = "stream",
-                                    name = "stderr",
-                                    text = persistentListOf(builder.toString())
-                                )
+                                    "stderr" -> Output(
+                                        outputType = "stream",
+                                        name = "stderr",
+                                        text = persistentListOf(builder.toString())
+                                    )
 
-                                else -> Output(
-                                    outputType = "stream",
-                                    name = outputKey,
-                                    text = persistentListOf(builder.toString())
-                                )
+                                    else -> Output(
+                                        outputType = "stream",
+                                        name = outputKey,
+                                        text = persistentListOf(builder.toString())
+                                    )
+                                }
                             }
                         }
                         updateNotebook(outputs)
@@ -479,7 +492,9 @@ class NotebookViewModel(
 
                 // クリア処理
                 if (cellOutput.isError && cellOutput.output.text?.isEmpty() == true) {
-                    outputMap.clear()
+                    notebookMutex.withLock {
+                        outputMap.clear()
+                    }
                     if (!isBusy) withContext(Dispatchers.Main) {
                         updateNotebook(emptyList())
                     }
@@ -494,34 +509,39 @@ class NotebookViewModel(
                 }
 
                 val text = cellOutput.output.text?.joinToString("") ?: ""
-                outputMap.getOrPut(outputKey) { StringBuilder() }.append(text + "\n")
+                notebookMutex.withLock {
+                    outputMap.getOrPut(outputKey) { StringBuilder() }.append(text + "\n")
+                }
 
                 if (isBusy) {
+                    //continue
                     if (pendingCount.value < 20) {
                         scope.launch(Dispatchers.Main) {
-                            val outputs = outputMap.map { (key, builder) ->
-                                // 出力文字列を処理
-                                val processedText = processOutputText(builder.toString())
+                            val outputs = notebookMutex.withLock {
+                                outputMap.map { (key, builder) ->
+                                    // 出力文字列を処理
+                                    val processedText = processOutputText(builder.toString())
 
-                                when (key) {
-                                    "error" -> Output(
-                                        outputType = "error",
-                                        text = persistentListOf(processedText),
-                                        evalue = processedText,
-                                        ename = "Error"
-                                    )
+                                    when (key) {
+                                        "error" -> Output(
+                                            outputType = "error",
+                                            text = persistentListOf(processedText),
+                                            evalue = processedText,
+                                            ename = "Error"
+                                        )
 
-                                    "stderr" -> Output(
-                                        outputType = "stream",
-                                        name = "stderr",
-                                        text = persistentListOf(processedText)
-                                    )
+                                        "stderr" -> Output(
+                                            outputType = "stream",
+                                            name = "stderr",
+                                            text = persistentListOf(processedText)
+                                        )
 
-                                    else -> Output(
-                                        outputType = "stream",
-                                        name = key,
-                                        text = persistentListOf(processedText)
-                                    )
+                                        else -> Output(
+                                            outputType = "stream",
+                                            name = key,
+                                            text = persistentListOf(processedText)
+                                        )
+                                    }
                                 }
                             }
                             updateNotebook(outputs)
@@ -533,15 +553,15 @@ class NotebookViewModel(
                             // 出力文字列を処理
                             val processedText = processOutputText(builder.toString())
 
-                            when {
-                                key == "error" -> Output(
+                            when (key) {
+                                "error" -> Output(
                                     outputType = "error",
                                     text = persistentListOf(processedText),
                                     evalue = processedText,
                                     ename = "Error"
                                 )
 
-                                key == "stderr" -> Output(
+                                "stderr" -> Output(
                                     outputType = "stream",
                                     name = "stderr",
                                     text = persistentListOf(processedText)
@@ -982,28 +1002,19 @@ class NotebookViewModel(
      * 一度に1つの実行リクエストのみを処理し、同時実行を防ぐ
      */
     private suspend fun processExecuteQueue() {
-        executeRequestChannel.consumeAsFlow().onEach { println("recieve request $it") }
-            .collect { request ->
-                println("Processing request: $request")
+        executeRequestChannel
+            .consumeAsFlow()
+            .zipWithPrevious()
+            .onEach { (prev, current) ->
+                if (prev?.cellId == current.cellId) {
+                    cancelExecution().join()
+                }
+            }
+            .buffer(32)
+            .collect { (_, request) ->
                 selectCellId = request.cellId
                 executionMutex.withLock {
-                    if (isExecuting) {
-                        println("既に実行中のため、リクエストをスキップ: $request")
-                        return@withLock
-                    }
-
-                    isExecuting = true
-                    appStateStore.dispatch(Action.SetRunning(true))
-
-                    try {
-                        executeCellInternal(request.cellId)
-                    } catch (e: Exception) {
-                        println("実行中にエラーが発生: ${e.message}")
-                        e.printStackTrace()
-                    } finally {
-                        isExecuting = false
-                        appStateStore.dispatch(Action.SetRunning(false))
-                    }
+                    executeCellInternal(request.cellId)
                 }
             }
     }
@@ -1019,6 +1030,8 @@ class NotebookViewModel(
         executeScope.launch {
             saveNotebook()
             delay(100) // 出力クリアを待つ
+            isExecuting = true
+            appStateStore.dispatch(Action.SetRunning(true))
 
             val output = notebookFileUseCase.executeCell(
                 _localState.value.domainNotebook!!, cellId, environment
@@ -1028,7 +1041,11 @@ class NotebookViewModel(
                 outputChannel.send(CellOutput(output, isEnd = true))
             }
 
+
+
             delay(200) // 出力のflushを実装したら不要になるはず。
+            isExecuting = false
+            appStateStore.dispatch(Action.SetRunning(false))
         }.join()
     }
 
@@ -1083,5 +1100,13 @@ class NotebookViewModel(
         }
 
         return lines.joinToString("\n")
+    }
+}
+
+fun <T> Flow<T>.zipWithPrevious(): Flow<Pair<T?, T>> = flow {
+    var previous: T? = null
+    collect { value ->
+        emit(previous to value)
+        previous = value
     }
 }

@@ -178,9 +178,6 @@ fun CellComponent(
     viewModel: NotebookViewModel,
 ) {
     val cell by viewModel.cellStateFlow(cellId).collectAsStateWithLifecycle()
-    if (cell?.id == "cell-2") {
-        println("Cell ID 2 update detected. ${cell.hashCode()}")
-    }
     cell?.let { cellModel ->
         val isSelected by viewModel.isSelectedFlow(cellId).collectAsStateWithLifecycle()
         val codeCellState by viewModel.codeCellStateFlow(cellId).collectAsStateWithLifecycle()
@@ -343,8 +340,8 @@ fun CodeCellContent(
                 }
             }.heightIn(min = minHeight)
         ) {
-            cell.outputs?.forEach { output ->
-                key(output) {
+            cell.outputs?.forEachIndexed { i, output ->
+                key(i) {
                     OutputDisplay(output, fontSize)
                 }
             }
@@ -414,12 +411,21 @@ fun MarkdownCellContent(
 
 @Composable
 fun OutputDisplay(output: Output, fontSize: Int) {
+    var minHeight by remember { mutableStateOf(100.dp) }
+    val density = LocalDensity.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
             .border(1.dp, Color.LightGray, RoundedCornerShape(4.dp))
             .padding(8.dp)
+            .onGloballyPositioned {
+                val heightInDp = with(density) { it.size.height.toDp() }
+                if (heightInDp > minHeight) {
+                    minHeight = heightInDp
+                }
+            }.heightIn(min = minHeight)
+        //.heightIn(min = 500.dp)
     ) {
         when (output.outputType) {
             "stream" -> {
