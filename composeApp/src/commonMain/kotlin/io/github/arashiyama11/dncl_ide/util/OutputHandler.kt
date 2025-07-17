@@ -1,120 +1,141 @@
 package io.github.arashiyama11.dncl_ide.util
 
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-sealed class OutputEvent {
-    data class Stdout(val value: String, val cellId: String? = null) : OutputEvent()
-    data class Clear(val cellId: String? = null) : OutputEvent()
-    data class End(val cellId: String? = null) : OutputEvent()
+sealed interface OutputEvent {
+    data class Append(val cellId: String?, val text: String) : OutputEvent
+    data class Clear(val cellId: String?, val immediately: Boolean = true) : OutputEvent
+    data class Replace(val cellId: String?, val text: String) : OutputEvent
+    data class CommitFrame(val cellId: String?) : OutputEvent
+}
+
+interface Stdout {
+    fun append(cellId: String? = null, text: String)
+    fun flush(cellId: String? = null)
+    fun clear(cellId: String? = null)
+    fun commitFrame(cellId: String? = null)
+    fun replace(cellId: String? = null, text: String) = clear(cellId).also { append(cellId, text) }
+}
+
+class StdoutImpl(
+    private val eventFlow: MutableSharedFlow<OutputEvent>
+) : Stdout {
+    private val buffer = mutableMapOf<String?, StringBuilder>()
+    private val bufferMutex = Mutex()
+
+    override fun append(cellId: String?, text: String) {
+        launch {
+            bufferMutex.withLock {
+                buffer.getOrPut(cellId) { StringBuilder() }.append(text)
+            }
+        }
+    }
+
+    override fun flush(cellId: String?) {
+        launch {
+            bufferMutex.withLock {
+                buffer[cellId]?.let {
+                    if (it.isNotEmpty()) {
+                        eventFlow.emit(OutputEvent.Append(cellId, it.toString()))
+                        it.clear()
+                    }
+                }
+            }
+        }
+    }
+
+    override fun clear(cellId: String?) {
+        launch {
+            bufferMutex.withLock {
+                buffer.remove(cellId)
+            }
+            eventFlow.emit(OutputEvent.Clear(cellId))
+        }
+    }
+
+    override fun commitFrame(cellId: String?) {
+        launch {
+            flush(cellId)
+            eventFlow.emit(OutputEvent.CommitFrame(cellId))
+        }
+    }
+
+    override fun replace(cellId: String?, text: String) {
+        launch {
+            bufferMutex.withLock {
+                buffer.remove(cellId)
+            }
+            eventFlow.emit(OutputEvent.Replace(cellId, text))
+        }
+    }
+
+    private fun launch(block: suspend () -> Unit) {
+        CoroutineScope(Dispatchers.Default).launch {
+            block()
+        }
+    }
 }
 
 class OutputHandler(
     private val scope: CoroutineScope,
-    private val onUpdate: (output: Map<String?, String>) -> Unit
-) {
-    private val eventChannel = Channel<OutputEvent>(Channel.UNLIMITED)
-    private val outputMutex = Mutex()
-    private val outputBuffers = mutableMapOf<String?, StringBuilder>()
-    private val pendingOutputCount = atomic(0)
-    private var watchJob: Job? = null
+    private val onUpdate: (Map<String?, String>) -> Unit
+) : Stdout {
+    private val eventChannel = Channel<OutputEvent>(Channel.BUFFERED)
+    private val eventFlow = MutableSharedFlow<OutputEvent>()
+    private val stdoutImpl = StdoutImpl(eventFlow)
+    private var job: Job? = null
+    private val outputs = mutableMapOf<String?, String>()
+    private val outputsMutex = Mutex()
+    var onFrameCommit: (() -> Unit)? = null
 
     init {
         start()
     }
 
-    fun send(event: OutputEvent) {
-        scope.launch {
-            eventChannel.send(event)
-        }
-    }
-
     private fun start() {
-        watchJob = scope.launch(Dispatchers.Default) {
-            var isBusy = false
-            for (event in eventChannel) {
-                if (!isActive) break
-
-                when (event) {
-                    is OutputEvent.Stdout -> {
-                        outputMutex.withLock {
-                            outputBuffers.getOrPut(event.cellId) { StringBuilder() }
-                                .append(event.value).append("\n")
+        job = scope.launch {
+            eventFlow.collect { event ->
+                outputsMutex.withLock {
+                    when (event) {
+                        is OutputEvent.Append -> {
+                            val current = outputs.getOrPut(event.cellId) { "" }
+                            outputs[event.cellId] = current + event.text
                         }
-                        pendingOutputCount.incrementAndGet()
-                    }
-
-                    is OutputEvent.Clear -> {
-                        outputMutex.withLock {
-                            outputBuffers[event.cellId]?.clear()
+                        is OutputEvent.Clear -> {
+                            if (event.immediately) {
+                                outputs.remove(event.cellId)
+                            }
                         }
-                        pendingOutputCount.incrementAndGet()
-                    }
-
-                    is OutputEvent.End -> {
-                        // End event can trigger a final update
-                    }
-                }
-
-                val count = pendingOutputCount.value
-                if (count > 0) {
-                    val x = 4L - count.toLong()
-                    val t = x * x * x + x * 10L
-                    if (t > 0) delay(t)
-                }
-
-                if ((event is OutputEvent.End || eventChannel.isEmpty) && isBusy) {
-                    isBusy = false
-                    flush()
-                    pendingOutputCount.update { 0 }
-                }
-
-                if (!eventChannel.isEmpty && !isBusy) {
-                    isBusy = true
-                }
-
-                if (!isBusy) {
-                    flush()
-                } else {
-                    if (pendingOutputCount.value < 20) {
-                        flush()
+                        is OutputEvent.Replace -> {
+                            outputs[event.cellId] = event.text
+                        }
+                        is OutputEvent.CommitFrame -> {
+                            onFrameCommit?.invoke()
+                        }
                     }
                 }
+                onUpdate(outputs)
             }
         }
-    }
-
-    private suspend fun flush() {
-        val currentOutputs = outputMutex.withLock {
-            outputBuffers.mapValues { it.value.toString() }
-        }
-        onUpdate(currentOutputs)
     }
 
     fun stop() {
-        watchJob?.cancel()
-        eventChannel.close()
+        job?.cancel()
     }
 
-    fun clear(cellId: String? = null) {
-        scope.launch {
-            outputMutex.withLock {
-                if (cellId == null) {
-                    outputBuffers.clear()
-                } else {
-                    outputBuffers.remove(cellId)
-                }
-            }
-            flush()
-        }
-    }
+    override fun append(cellId: String?, text: String) = stdoutImpl.append(cellId, text)
+    override fun flush(cellId: String?) = stdoutImpl.flush(cellId)
+    override fun clear(cellId: String?) = stdoutImpl.clear(cellId)
+    override fun commitFrame(cellId: String?) = stdoutImpl.commitFrame(cellId)
+    override fun replace(cellId: String?, text: String) = stdoutImpl.replace(cellId, text)
 }

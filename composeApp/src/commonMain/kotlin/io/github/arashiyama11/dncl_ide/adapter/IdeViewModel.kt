@@ -352,11 +352,11 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.Stdout -> {
-                        outputHandler.send(OutputEvent.Stdout(output.value))
+                        outputHandler.append(text = output.value)
                     }
 
                     is DnclOutput.Clear -> {
-                        outputHandler.send(OutputEvent.Clear())
+                        outputHandler.clear()
                     }
 
                     is DnclOutput.LineEvaluation -> {
@@ -388,7 +388,7 @@ class IdeViewModel(
                     }
                 }
             }
-            outputHandler.send(OutputEvent.End())
+            outputHandler.commitFrame()
             delay(50)
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) }
@@ -569,10 +569,4 @@ class IdeViewModel(
         val textSuggestions: List<Definition>,
         val isFocused: Boolean
     )
-
-    private suspend fun MutableStateFlow<LocalIdeState>.updateOnMain(block: (LocalIdeState) -> LocalIdeState) {
-        withContext(Dispatchers.Main) {
-            this@updateOnMain.update(block)
-        }
-    }
 }

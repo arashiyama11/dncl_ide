@@ -239,9 +239,8 @@ class NotebookViewModel(
 
     private val saveReqChannel = Channel<Unit>(capacity = 64)
 
-    // 実行キューシステム
-    private val executeRequestChannel = Channel<ExecuteRequest>(capacity = Channel.UNLIMITED)
-    private val executionMutex = Mutex()
+    
+
     private var isExecuting = false
 
     private val notebookMutex = Mutex()
@@ -363,9 +362,9 @@ class NotebookViewModel(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
                         if (outputStr.trim() == "null") return@createBuiltInFunctionEnvironment
-                        outputHandler.send(OutputEvent.Stdout(outputStr, selectCellId))
+                        outputHandler.append(selectCellId, outputStr)
                     }, onClear = {
-                        outputHandler.send(OutputEvent.Clear(selectCellId))
+                        outputHandler.clear(selectCellId)
                     }, onImport = { importPath ->
                         // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
@@ -392,10 +391,7 @@ class NotebookViewModel(
             }
         }
 
-        // 実行キューを処理するコルーチンを開始
-        viewModelScope.launch {
-            processExecuteQueue()
-        }
+        
     }
 
     /**
@@ -497,7 +493,9 @@ class NotebookViewModel(
      * キューシステムを使用して堅牢な実行を保証
      */
     fun executeCell(cellId: String) {
-        executeRequestChannel.trySend(ExecuteRequest(cellId))
+        viewModelScope.launch {
+            executeCellInternal(cellId)
+        }
     }
 
     /**
@@ -524,12 +522,14 @@ class NotebookViewModel(
                 _localState.update { it.copy(domainNotebook = clearedNotebook) }
             }
 
-            // 各コードセルを順次キューに追加
-            clearedNotebook.cells
-                .filter { it.type == CellType.CODE }
-                .forEach { cell ->
-                    executeRequestChannel.send(ExecuteRequest(cell.id))
-                }
+            // 各コードセルを順次実行
+            executeScope.launch {
+                clearedNotebook.cells
+                    .filter { it.type == CellType.CODE }
+                    .forEach { cell ->
+                        executeCellInternal(cell.id)
+                    }
+            }
         }
     }
 
@@ -831,27 +831,7 @@ class NotebookViewModel(
         }
     }
 
-    /**
-     * 実行キューを処理するメソッド
-     * 一度に1つの実行リクエストのみを処理し、同時実行を防ぐ
-     */
-    private suspend fun processExecuteQueue() {
-        executeRequestChannel
-            .consumeAsFlow()
-            .zipWithPrevious()
-            .onEach { (prev, current) ->
-                if (prev?.cellId == current.cellId) {
-                    cancelExecution().join()
-                }
-            }
-            .buffer(32)
-            .collect { (_, request) ->
-                selectCellId = request.cellId
-                executionMutex.withLock {
-                    executeCellInternal(request.cellId)
-                }
-            }
-    }
+    
 
     /**
      * 単一セルの実際の実行処理（内部用）
@@ -889,7 +869,7 @@ class NotebookViewModel(
                 }
             }
 
-            outputHandler.send(OutputEvent.End(cellId))
+            outputHandler.commitFrame(cellId)
 
             delay(200) // 出力のflushを実装したら不要になるはず。
             isExecuting = false
