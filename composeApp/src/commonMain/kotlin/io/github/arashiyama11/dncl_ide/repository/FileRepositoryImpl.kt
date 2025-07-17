@@ -182,6 +182,13 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         SystemFileSystem.createDirectories(path.toPath()).also { updateRootFolder() }
     }
 
+    override suspend fun deleteEntry(path: EntryPath) {
+        withContext(Dispatchers.IO) {
+            SystemFileSystem.delete(path.toPath(), false)
+            updateRootFolder()
+        }
+    }
+
     override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {
         _selectedEntryPath.value = entryPath
         setting[SELECTED_ENTRY_PATH] = entryPath.toString()

@@ -56,4 +56,8 @@ class FileUseCase(private val fileRepository: FileRepository) {
     suspend fun getFileContent(programFile: ProgramFile): FileContent {
         return fileRepository.getFileContent(programFile)
     }
+
+    suspend fun deleteEntry(entryPath: EntryPath) {
+        fileRepository.deleteEntry(entryPath)
+    }
 }

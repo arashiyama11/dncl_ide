@@ -33,6 +33,7 @@ interface FileRepository {
 
 
     suspend fun createFolder(path: EntryPath)
+    suspend fun deleteEntry(path: EntryPath)
 
     suspend fun selectFile(entryPath: EntryPath)
     suspend fun getFileContent(programFile: ProgramFile): FileContent

@@ -67,6 +67,12 @@ abstract class BaseSelectViewModel(
         }
     }
 
+    fun onEntryDelete(path: EntryPath) {
+        viewModelScope.launch {
+            fileUseCase.deleteEntry(path)
+        }
+    }
+
     open fun onFileAddClicked(path: EntryPath? = null) {
         val currentState = appStateStore.state.value
         _localState.update {

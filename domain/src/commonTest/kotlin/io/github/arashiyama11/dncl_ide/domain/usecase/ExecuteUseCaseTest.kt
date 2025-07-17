@@ -370,6 +370,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         }
 
         override suspend fun createFolder(path: EntryPath) {}
+        override suspend fun deleteEntry(path: EntryPath) {}
         override suspend fun selectFile(entryPath: EntryPath) {}
         override suspend fun getFileContent(programFile: ProgramFile): FileContent =
             mockGetFileContent(programFile)

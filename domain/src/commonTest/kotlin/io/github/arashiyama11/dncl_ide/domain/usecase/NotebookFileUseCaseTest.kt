@@ -39,6 +39,7 @@ class NotebookFileUseCaseTest {
             throw NotImplementedError()
 
         override suspend fun createFolder(path: EntryPath) = throw NotImplementedError()
+        override suspend fun deleteEntry(path: EntryPath) = throw NotImplementedError()
         override suspend fun selectFile(entryPath: EntryPath) = throw NotImplementedError()
         override suspend fun getFileContent(programFile: ProgramFile): FileContent =
             throw NotImplementedError()
