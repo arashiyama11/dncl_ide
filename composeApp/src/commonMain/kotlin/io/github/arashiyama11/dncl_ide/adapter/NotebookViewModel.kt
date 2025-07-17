@@ -72,7 +72,8 @@ import kotlin.uuid.Uuid
 // 出力データを統一的に管理するためのデータクラス
 data class CellOutput(
     val output: Output,
-    val isError: Boolean = false
+    val isError: Boolean = false,
+    val isEnd: Boolean = false
 )
 
 data class ExecuteRequest(val cellId: String)
@@ -434,12 +435,12 @@ class NotebookViewModel(
 
                 val x = 4L - pendingCount.value.toLong()
                 val t = x * x * x + x * 10L
-                if (t > 0) {
+                if (t > 0 && !cellOutput.isEnd) {
                     delay(t)
                 }
 
                 // busy終了時
-                if (outputChannel.isEmpty && isBusy) {
+                if (cellOutput.isEnd || outputChannel.isEmpty && isBusy) {
                     println("end busy")
                     isBusy = false
                     withContext(Dispatchers.Main.immediate) {
@@ -502,15 +503,15 @@ class NotebookViewModel(
                                 // 出力文字列を処理
                                 val processedText = processOutputText(builder.toString())
 
-                                when {
-                                    key == "error" -> Output(
+                                when (key) {
+                                    "error" -> Output(
                                         outputType = "error",
                                         text = persistentListOf(processedText),
                                         evalue = processedText,
                                         ename = "Error"
                                     )
 
-                                    key == "stderr" -> Output(
+                                    "stderr" -> Output(
                                         outputType = "stream",
                                         name = "stderr",
                                         text = persistentListOf(processedText)
@@ -1024,10 +1025,10 @@ class NotebookViewModel(
             )
 
             notebookMutex.withLock {
-                outputChannel.send(CellOutput(output))
+                outputChannel.send(CellOutput(output, isEnd = true))
             }
 
-            delay(1000) // 出力のflushを実装したら不要になるはず
+            delay(200) // 出力のflushを実装したら不要になるはず。
         }.join()
     }
 
