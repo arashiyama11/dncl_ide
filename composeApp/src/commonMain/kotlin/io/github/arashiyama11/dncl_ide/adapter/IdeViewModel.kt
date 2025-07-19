@@ -352,11 +352,11 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.Stdout -> {
-                        outputHandler.append(text = output.value)
+                        outputHandler.stdout.append(text = output.value)
                     }
 
                     is DnclOutput.Clear -> {
-                        outputHandler.clear()
+                        outputHandler.stdout.clear()
                     }
 
                     is DnclOutput.LineEvaluation -> {
@@ -388,7 +388,7 @@ class IdeViewModel(
                     }
                 }
             }
-            outputHandler.commitFrame()
+            outputHandler.stdout.commitFrame()
             delay(50)
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) }

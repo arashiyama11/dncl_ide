@@ -362,9 +362,9 @@ class NotebookViewModel(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     onStdout = { outputStr ->
                         if (outputStr.trim() == "null") return@createBuiltInFunctionEnvironment
-                        outputHandler.append(selectCellId, outputStr)
+                        outputHandler.stdoutFor(selectCellId!!).append(outputStr)
                     }, onClear = {
-                        outputHandler.clear(selectCellId)
+                        outputHandler.stdoutFor(selectCellId!!).clear()
                     }, onImport = { importPath ->
                         // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
@@ -869,7 +869,7 @@ class NotebookViewModel(
                 }
             }
 
-            outputHandler.commitFrame(cellId)
+            outputHandler.stdoutFor(cellId).commitFrame()
 
             delay(200) // 出力のflushを実装したら不要になるはず。
             isExecuting = false

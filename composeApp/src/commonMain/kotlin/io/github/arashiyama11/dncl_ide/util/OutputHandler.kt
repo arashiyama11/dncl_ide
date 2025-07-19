@@ -3,11 +3,7 @@ package io.github.arashiyama11.dncl_ide.util
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,20 +16,20 @@ sealed interface OutputEvent {
 }
 
 interface Stdout {
-    fun append(cellId: String? = null, text: String)
-    fun flush(cellId: String? = null)
-    fun clear(cellId: String? = null)
-    fun commitFrame(cellId: String? = null)
-    fun replace(cellId: String? = null, text: String) = clear(cellId).also { append(cellId, text) }
+    fun append(text: String)
+    fun flush()
+    fun clear()
+    fun commitFrame()
+    fun replace(text: String)
 }
 
-class StdoutImpl(
+private class OutputBroker(
     private val eventFlow: MutableSharedFlow<OutputEvent>
-) : Stdout {
+) {
     private val buffer = mutableMapOf<String?, StringBuilder>()
     private val bufferMutex = Mutex()
 
-    override fun append(cellId: String?, text: String) {
+    fun append(cellId: String?, text: String) {
         launch {
             bufferMutex.withLock {
                 buffer.getOrPut(cellId) { StringBuilder() }.append(text)
@@ -41,7 +37,7 @@ class StdoutImpl(
         }
     }
 
-    override fun flush(cellId: String?) {
+    fun flush(cellId: String?) {
         launch {
             bufferMutex.withLock {
                 buffer[cellId]?.let {
@@ -54,7 +50,7 @@ class StdoutImpl(
         }
     }
 
-    override fun clear(cellId: String?) {
+    fun clear(cellId: String?) {
         launch {
             bufferMutex.withLock {
                 buffer.remove(cellId)
@@ -63,14 +59,14 @@ class StdoutImpl(
         }
     }
 
-    override fun commitFrame(cellId: String?) {
+    fun commitFrame(cellId: String?) {
         launch {
             flush(cellId)
             eventFlow.emit(OutputEvent.CommitFrame(cellId))
         }
     }
 
-    override fun replace(cellId: String?, text: String) {
+    fun replace(cellId: String?, text: String) {
         launch {
             bufferMutex.withLock {
                 buffer.remove(cellId)
@@ -86,17 +82,31 @@ class StdoutImpl(
     }
 }
 
+private class StdoutImpl(
+    private val cellId: String?,
+    private val broker: OutputBroker
+) : Stdout {
+    override fun append(text: String) = broker.append(cellId, text)
+    override fun flush() = broker.flush(cellId)
+    override fun clear() = broker.clear(cellId)
+    override fun commitFrame() = broker.commitFrame(cellId)
+    override fun replace(text: String) = broker.replace(cellId, text)
+}
+
 class OutputHandler(
     private val scope: CoroutineScope,
     private val onUpdate: (Map<String?, String>) -> Unit
-) : Stdout {
-    private val eventChannel = Channel<OutputEvent>(Channel.BUFFERED)
+) {
     private val eventFlow = MutableSharedFlow<OutputEvent>()
-    private val stdoutImpl = StdoutImpl(eventFlow)
+    private val broker = OutputBroker(eventFlow)
     private var job: Job? = null
     private val outputs = mutableMapOf<String?, String>()
     private val outputsMutex = Mutex()
     var onFrameCommit: (() -> Unit)? = null
+
+    val stdout: Stdout = StdoutImpl(null, broker)
+
+    fun stdoutFor(cellId: String): Stdout = StdoutImpl(cellId, broker)
 
     init {
         start()
@@ -132,10 +142,4 @@ class OutputHandler(
     fun stop() {
         job?.cancel()
     }
-
-    override fun append(cellId: String?, text: String) = stdoutImpl.append(cellId, text)
-    override fun flush(cellId: String?) = stdoutImpl.flush(cellId)
-    override fun clear(cellId: String?) = stdoutImpl.clear(cellId)
-    override fun commitFrame(cellId: String?) = stdoutImpl.commitFrame(cellId)
-    override fun replace(cellId: String?, text: String) = stdoutImpl.replace(cellId, text)
 }
