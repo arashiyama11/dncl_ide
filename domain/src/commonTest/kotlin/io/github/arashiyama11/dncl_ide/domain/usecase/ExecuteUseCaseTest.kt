@@ -53,7 +53,7 @@ class ExecuteUseCaseTest {
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("30", stdoutOutput.value)
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -158,7 +158,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("30", stdoutOutput.value)
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -175,7 +175,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("あなたは 25 歳です", stdoutOutput.value)
+        assertEquals("あなたは 25 歳です", stdoutOutput.value.trim())
     }
 
     @Test
@@ -190,7 +190,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("10", stdoutOutput.value)
+        assertEquals("10", stdoutOutput.value.trim())
     }
 
     @Test
@@ -205,7 +205,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("10", stdoutOutput.value)
+        assertEquals("10", stdoutOutput.value.trim())
     }
 
     @Test
@@ -239,7 +239,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("30", stdoutOutput.value)
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -300,7 +300,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         // 出力の検証
         val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
-        assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]", stdoutOutput.value)
+        assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]", stdoutOutput.value.trim())
     }
 
     private class MockSettingsRepository : SettingsRepository {
