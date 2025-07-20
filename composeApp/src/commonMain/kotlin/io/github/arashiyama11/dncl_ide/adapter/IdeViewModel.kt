@@ -151,7 +151,7 @@ class IdeViewModel(
     }
 
     fun onStart(isDarkTheme: StateFlow<Boolean>) {
-        outputHandler = OutputHandler(executeScope) { outputs ->
+        outputHandler = OutputHandler(viewModelScope) { outputs ->
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
                     it.copy(output = outputs[null] ?: "")
@@ -289,19 +289,14 @@ class IdeViewModel(
         }
 
         appStateStore.dispatch(Action.SetRunning(true))
+        viewModelScope.launch {
+            outputHandler.stdout.clear()
+        }
 
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
         executeScope.coroutineContext.job.cancel().also {
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            outputHandler.stop()
-            outputHandler = OutputHandler(executeScope) { outputs ->
-                viewModelScope.launch(Dispatchers.Main) {
-                    _localState.update {
-                        it.copy(output = outputs[null] ?: "")
-                    }
-                }
-            }
         }
 
         inputChannel?.close()
@@ -351,12 +346,24 @@ class IdeViewModel(
                         appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
-                    is DnclOutput.Stdout -> {
+                    is DnclOutput.StdoutAppend -> {
                         outputHandler.stdout.append(text = output.value)
                     }
 
-                    is DnclOutput.Clear -> {
+                    is DnclOutput.StdoutClear -> {
                         outputHandler.stdout.clear()
+                    }
+
+                    is DnclOutput.StdoutFlush -> {
+                        outputHandler.stdout.flush()
+                    }
+
+                    is DnclOutput.StdoutCommitFrame -> {
+                        outputHandler.stdout.commitFrame()
+                    }
+
+                    is DnclOutput.StdoutReplace -> {
+                        outputHandler.stdout.replace(text = output.value)
                     }
 
                     is DnclOutput.LineEvaluation -> {
@@ -388,7 +395,7 @@ class IdeViewModel(
                     }
                 }
             }
-            outputHandler.stdout.commitFrame()
+            outputHandler.stdout.flush()
             delay(50)
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) }
@@ -402,14 +409,6 @@ class IdeViewModel(
         executeJob?.cancel()
         executeScope.coroutineContext.job.cancel().also {
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            outputHandler.stop()
-            outputHandler = OutputHandler(executeScope) { outputs ->
-                viewModelScope.launch(Dispatchers.Main) {
-                    _localState.update {
-                        it.copy(output = outputs[null] ?: "")
-                    }
-                }
-            }
         }
         _localState.update { it.copy(currentEvaluatingLine = null) }
         appStateStore.dispatch(Action.SetRunning(false))

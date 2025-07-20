@@ -36,7 +36,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
-class NotebookFileUseCase(private val fileRepository: FileRepository) {
+open class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     private val json = Json {
         prettyPrint = true
@@ -47,7 +47,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this.toSerializable()))
 
-    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
+    open suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
         withContext(
             Dispatchers.Default
         ) {
@@ -90,14 +90,14 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                         }
 
                         else -> {
-                            DnclOutput.Stdout(it.toString())
+                            DnclOutput.StdoutAppend(it.toString())
                         }
                     }
                 }
             }
 
             when (output) {
-                is DnclOutput.Stdout -> {
+                is DnclOutput.StdoutAppend -> {
                     Output(
                         outputType = "stream",
                         name = "stdout",
@@ -166,7 +166,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         return fileRepository.saveFile(notebookFile.path, fileContent, cursorPosition)
     }
 
-    suspend fun getNotebook(notebookFile: NotebookFile): Notebook {
+    open suspend fun getNotebook(notebookFile: NotebookFile): Notebook {
         return fileRepository.getNotebookFileContent(notebookFile).toNotebook()
     }
 
@@ -192,7 +192,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         return notebook.copy(cells = updatedCells.toImmutableList())
     }
 
-    fun modifyNotebookOutput(
+    open fun modifyNotebookOutput(
         notebook: Notebook,
         cellId: String,
         newOutputs: ImmutableList<Output>

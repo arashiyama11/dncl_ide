@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
@@ -25,15 +26,28 @@ class EvaluatorTest {
     private lateinit var evaluator0Origin: Evaluator
     private val builtInEnv = runBlocking {
         EvaluatorFactory.createBuiltInFunctionEnvironment(
-            onStdout = {
-                stdout += "$it\n"
-            },
-            onClear = {
-                stdout = ""
+            stdout = object : Stdout {
+                override fun append(text: String) {
+                    stdout += "$text\n"
+                }
+
+                override fun flush() {
+                }
+
+                override fun clear() {
+                    stdout = ""
+                }
+
+                override fun commitFrame() {
+                }
+
+                override fun replace(text: String) {
+                }
             },
             onImport = { DnclObject.Null(astNode) },
         )
     }
+
 
     @BeforeTest
     fun setUp() {

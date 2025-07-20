@@ -7,9 +7,6 @@ import kotlin.jvm.JvmInline
 
 sealed interface DnclOutput {
     @JvmInline
-    value class Stdout(val value: String) : DnclOutput
-
-    @JvmInline
     value class Error(val value: String) : DnclOutput
 
     @JvmInline
@@ -21,8 +18,15 @@ sealed interface DnclOutput {
     @JvmInline
     value class EnvironmentUpdate(val environment: Environment) : DnclOutput
 
-    object Clear : DnclOutput
-
     @JvmInline
     value class WaitingForInput(val isWaiting: Boolean) : DnclOutput
+
+    @JvmInline
+    value class StdoutAppend(val value: String) : DnclOutput
+    data object StdoutFlush : DnclOutput
+    data object StdoutClear : DnclOutput
+    data object StdoutCommitFrame : DnclOutput
+    
+    @JvmInline
+    value class StdoutReplace(val value: String) : DnclOutput
 }

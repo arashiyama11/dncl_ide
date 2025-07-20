@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.ensureActive
@@ -99,7 +100,7 @@ class ExecuteUseCase(
                 )
             )
         }
-        return channelFlow<DnclOutput> {
+        return channelFlow {
             outputChannel = channel
             withContext(Dispatchers.Default) {
                 val delayDuration = settingsRepository.onEvalDelay.value.toLong()
@@ -166,14 +167,30 @@ class ExecuteUseCase(
 
                 val globalEnv = Environment(
                     EvaluatorFactory.createBuiltInFunctionEnvironment(
-                        onStdout = { text ->
-                            send(DnclOutput.Stdout(text))
-                        },
-                        onClear = {
-                            send(DnclOutput.Clear)
+                        stdout = object : Stdout {
+                            override suspend fun append(text: String) {
+                                send(DnclOutput.StdoutAppend(text))
+                            }
+
+                            override suspend fun flush() {
+                                send(DnclOutput.StdoutFlush)
+                            }
+
+                            override suspend fun clear() {
+                                send(DnclOutput.StdoutClear)
+                            }
+
+                            override suspend fun commitFrame() {
+                                send(DnclOutput.StdoutCommitFrame)
+                            }
+
+                            override suspend fun replace(text: String) {
+                                send(DnclOutput.StdoutReplace(text))
+                            }
                         },
                         onImport = { onImport(it) }
-                    ))
+                    )
+                )
 
                 evaluator.evalProgram(ast, globalEnv).let { err ->
                     if (err.isLeft()) {

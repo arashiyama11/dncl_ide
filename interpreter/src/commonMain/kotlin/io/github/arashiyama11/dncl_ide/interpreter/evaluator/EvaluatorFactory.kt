@@ -5,6 +5,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 
@@ -52,8 +53,7 @@ object EvaluatorFactory {
 
 
     suspend fun createBuiltInFunctionEnvironment(
-        onStdout: suspend CallBuiltInFunctionScope.(String) -> Unit,
-        onClear: suspend CallBuiltInFunctionScope.() -> Unit = {},
+        stdout: Stdout,
         onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
     ): Environment =
         Environment().apply {
@@ -61,7 +61,8 @@ object EvaluatorFactory {
                 val func: suspend CallBuiltInFunctionScope.() -> DnclObject? = when (it) {
                     AllBuiltInFunction.PRINT -> {
                         {
-                            onStdout(args.joinToString(" ") { it.toString() })
+                            stdout.append(args.joinToString(" ", postfix = "\n") { it.toString() })
+                            stdout.flush()
                             null
                         }
                     }
@@ -499,7 +500,7 @@ object EvaluatorFactory {
                         }
                     }
 
-                    AllBuiltInFunction.REPLACE -> {
+                    AllBuiltInFunction.STRING_REPLACE -> {
                         l@{
                             checkArgSize(3)?.let { return@l it }
                             when {
@@ -688,7 +689,7 @@ object EvaluatorFactory {
 
                     AllBuiltInFunction.CLEAR -> {
                         {
-                            onClear()
+                            stdout.clear()
                             DnclObject.Null(astNode)
                         }
                     }
@@ -714,6 +715,38 @@ object EvaluatorFactory {
                                     args[0].astNode
                                 )
                             }
+                        }
+                    }
+
+                    AllBuiltInFunction.APPEND -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            stdout.append(args[0].toString())
+                            DnclObject.Null(astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.FLUSH -> {
+                        l@{
+                            checkArgSize(0)?.let { return@l it }
+                            stdout.flush()
+                            DnclObject.Null(astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.COMMIT_FRAME -> {
+                        l@{
+                            checkArgSize(0)?.let { return@l it }
+                            stdout.commitFrame()
+                            DnclObject.Null(astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.STDOUT_REPLACE -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            stdout.replace(args[0].toString())
+                            DnclObject.Null(astNode)
                         }
                     }
                 }

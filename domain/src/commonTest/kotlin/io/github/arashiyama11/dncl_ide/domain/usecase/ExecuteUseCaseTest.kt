@@ -52,7 +52,7 @@ class ExecuteUseCaseTest {
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("30", stdoutOutput.value)
     }
 
@@ -157,7 +157,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("30", stdoutOutput.value)
     }
 
@@ -174,7 +174,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("あなたは 25 歳です", stdoutOutput.value)
     }
 
@@ -189,7 +189,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("10", stdoutOutput.value)
     }
 
@@ -204,7 +204,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 1).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("10", stdoutOutput.value)
     }
 
@@ -238,7 +238,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("30", stdoutOutput.value)
     }
 
@@ -299,7 +299,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
         assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]", stdoutOutput.value)
     }
 

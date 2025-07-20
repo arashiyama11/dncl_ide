@@ -61,7 +61,7 @@ sealed interface StatePermission {
 }
 
 // DON'T DELETE GENERICS
-class AppStateStore<out T : StatePermission>(
+open class AppStateStore<out T : StatePermission>(
     fileRepository: FileRepository,
     settingsRepository: SettingsRepository,
     appScope: AppScope

@@ -14,7 +14,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.InternalError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
 
-class SyntaxHighLighter {
+open class SyntaxHighLighter {
     fun highlightWithParsedData(
         text: String,
         isDarkTheme: Boolean,

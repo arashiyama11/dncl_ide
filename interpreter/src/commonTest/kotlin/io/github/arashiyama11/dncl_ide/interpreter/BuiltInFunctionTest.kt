@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
@@ -24,15 +25,28 @@ class BuiltInFunctionTest {
 
     private val builtInEnv = runBlocking {
         EvaluatorFactory.createBuiltInFunctionEnvironment(
-            onStdout = {
-                stdout += "$it\n"
-            },
-            onClear = {
-                clearCalled = true
+            stdout = object : Stdout {
+                override fun append(text: String) {
+                    stdout += "$text\n"
+                }
+
+                override fun flush() {
+                }
+
+                override fun clear() {
+                    clearCalled = true
+                }
+
+                override fun commitFrame() {
+                }
+
+                override fun replace(text: String) {
+                }
             },
             onImport = { DnclObject.Null(astNode) },
         )
     }
+
 
     @BeforeTest
     fun setUp() {

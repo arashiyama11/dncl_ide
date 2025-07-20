@@ -11,7 +11,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlin.math.max
 import kotlin.math.min
 
-class SuggestionUseCase() {
+open class SuggestionUseCase {
     fun suggestWhenFailingParse(
         code: String,
         position: Int
@@ -27,7 +27,7 @@ class SuggestionUseCase() {
 
     }
 
-    fun suggestWithParsedData(
+    open fun suggestWithParsedData(
         code: String,
         position: Int,
         tokens: List<Either<DnclError, Token>>,
