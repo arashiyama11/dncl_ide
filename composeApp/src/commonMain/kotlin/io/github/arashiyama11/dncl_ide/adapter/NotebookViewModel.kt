@@ -7,8 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import arrow.core.getOrElse
-import io.github.arashiyama11.dncl_ide.util.OutputHandler
-import io.github.arashiyama11.dncl_ide.common.Action // Add this import
+import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
 import io.github.arashiyama11.dncl_ide.common.StatePermission
@@ -23,6 +22,7 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
@@ -30,7 +30,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
+import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
@@ -66,7 +66,6 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.apply
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
@@ -126,30 +125,21 @@ class NotebookViewModel(
         private const val CACHE_EXPIRY_MS = 30000L // 30秒でキャッシュクリア
     }
 
-    private data class NotebookLocalState(
-        val domainNotebook: Notebook?,
-        val selectedCellId: String?,
-        val codeCellStateMap: ImmutableMap<String, CodeCellState>,
-        val loading: Boolean,
-        val focusedCellId: String?,
-        val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>>,
-        val unsavedChanges: Boolean,
+    private data class NotebookVMState(
+        val notebookFile: NotebookFile? = null,
+        val domainNotebook: Notebook? = null,
+        val selectedCellId: String? = null,
+        val codeCellStateMap: ImmutableMap<String, CodeCellState> = persistentMapOf(),
+        val loading: Boolean = true,
+        val focusedCellId: String? = null,
+        val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>> = persistentMapOf(),
+        val unsavedChanges: Boolean = false,
         val lastUpdateTime: Long = 0L // 最後の更新時刻
     )
 
-    // 最適化されたローカル状態
-    private val _localState = MutableStateFlow(
-        NotebookLocalState(
-            domainNotebook = null,
-            selectedCellId = null,
-            codeCellStateMap = persistentMapOf(),
-            loading = true,
-            focusedCellId = null,
-            cellSuggestionsMap = persistentMapOf(),
-            unsavedChanges = false,
-            lastUpdateTime = Clock.System.now().toEpochMilliseconds()
-        )
-    )
+    // 単一の状態ソース
+    private val _state = MutableStateFlow(NotebookVMState())
+
 
     // StateFlowキャッシュ - メモリリーク防止
     private val cellStateFlowCache = mutableMapOf<String, StateFlow<Cell?>>()
@@ -159,36 +149,32 @@ class NotebookViewModel(
 
     private val saveJobs = mutableMapOf<String, Job>()
 
-    // 最適化されたuiState - 不要な変換を削減
+    // UI状態
     val uiState = combine(
-        _localState.distinctUntilChangedBy {
-            // ハッシュベースの高速比較
-            it.hashCode()
-        },
+        _state,
         appStateStore.state.distinctUntilChangedBy {
             Triple(it.fontSize, it.selectedEntryPath, it.running)
         }
-    ) { localState, appState ->
+    ) { state, appState ->
         NotebookUiState(
-            notebook = localState.domainNotebook,
-            selectedCellId = localState.selectedCellId,
-            codeCellStateMap = localState.codeCellStateMap,
-            loading = localState.loading,
-            focusedCellId = localState.focusedCellId,
-            cellSuggestionsMap = localState.cellSuggestionsMap,
+            notebook = state.domainNotebook,
+            selectedCellId = state.selectedCellId,
+            codeCellStateMap = state.codeCellStateMap,
+            loading = state.loading,
+            focusedCellId = state.focusedCellId,
+            cellSuggestionsMap = state.cellSuggestionsMap,
             fontSize = appState.fontSize,
             selectedEntryPath = appState.selectedEntryPath,
-            unsavedChanges = localState.unsavedChanges,
+            unsavedChanges = state.unsavedChanges,
             running = appState.running
         )
     }.stateIn(
         viewModelScope,
-        started = SharingStarted.Eagerly, // Lazilyから変更でコールドスタート回避
+        started = SharingStarted.Eagerly,
         initialValue = NotebookUiState()
     )
 
-    // セルIDリストの最適化 - 変更検知を高速化
-    val cellIdsFlow: StateFlow<List<String>> = _localState
+    val cellIdsFlow: StateFlow<List<String>> = _state
         .map { it.domainNotebook?.cells?.map { cell -> cell.id } ?: emptyList() }
         .distinctUntilChanged { old, new ->
             old.size == new.size && old.zip(new).all { it.first == it.second }
@@ -196,19 +182,18 @@ class NotebookViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
-    // キャッシュされたStateFlow取得 - メモリ効率向上
     fun cellStateFlow(cellId: String): StateFlow<Cell?> {
         return cellStateFlowCache.getOrPut(cellId) {
-            _localState
+            _state
                 .map { state -> state.domainNotebook?.cells?.find { it.id == cellId } }
-                .distinctUntilChangedBy { it?.hashCode() } // オブジェクトハッシュで高速比較
+                .distinctUntilChangedBy { it?.hashCode() }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
         }
     }
 
     fun isSelectedFlow(cellId: String): StateFlow<Boolean> {
         return isSelectedFlowCache.getOrPut(cellId) {
-            _localState
+            _state
                 .map { it.selectedCellId == cellId }
                 .distinctUntilChanged()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -217,7 +202,7 @@ class NotebookViewModel(
 
     fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> {
         return codeCellStateFlowCache.getOrPut(cellId) {
-            _localState
+            _state
                 .map {
                     it.codeCellStateMap[cellId] ?: CodeCellState()
                 }
@@ -228,14 +213,13 @@ class NotebookViewModel(
 
     fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> {
         return suggestionsFlowCache.getOrPut(cellId) {
-            _localState
+            _state
                 .map { it.cellSuggestionsMap[cellId] ?: persistentListOf() }
                 .distinctUntilChangedBy { it.size }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), persistentListOf())
         }
     }
 
-    // フォントサイズFlowの最適化
     val fontSizeFlow: StateFlow<Int> = appStateStore.state
         .map { it.fontSize }
         .distinctUntilChanged()
@@ -247,12 +231,8 @@ class NotebookViewModel(
 
     private val executionRequestChannel = Channel<ExecuteRequest>(Channel.UNLIMITED)
 
-    private var isExecuting = false
-
     private val notebookMutex = Mutex()
 
-    private var notebookFile: NotebookFile? = null
-    private var selectCellId: String? = null
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
 
@@ -287,7 +267,6 @@ class NotebookViewModel(
             println("Running changed: ${it.running}")
         }.launchIn(viewModelScope)
 
-        // 定期的なキャッシュクリーンアップ
         viewModelScope.launch {
             while (isActive) {
                 delay(CACHE_EXPIRY_MS)
@@ -298,12 +277,13 @@ class NotebookViewModel(
         viewModelScope.launch {
             saveReqChannel.consumeAsFlow().collectLatest {
                 delay(SAVE_DELAY_MS)
-                val file = notebookFile ?: return@collectLatest
+                val state = _state.value
+                val file = state.notebookFile ?: return@collectLatest
                 val content =
-                    with(notebookFileUseCase) { _localState.value.domainNotebook?.toFileContent() }
+                    with(notebookFileUseCase) { state.domainNotebook?.toFileContent() }
                         ?: return@collectLatest
                 notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
-                _localState.update { it.copy(unsavedChanges = false) }
+                _state.update { it.copy(unsavedChanges = false) }
             }
         }
 
@@ -317,10 +297,9 @@ class NotebookViewModel(
 
     private fun cleanupExpiredCaches() {
         val currentTime = Clock.System.now().toEpochMilliseconds()
-        val lastUpdate = _localState.value.lastUpdateTime
+        val lastUpdate = _state.value.lastUpdateTime
 
         if (currentTime - lastUpdate > CACHE_EXPIRY_MS) {
-            // 使用されていないキャッシュをクリア
             cellStateFlowCache.clear()
             isSelectedFlowCache.clear()
             codeCellStateFlowCache.clear()
@@ -338,7 +317,7 @@ class NotebookViewModel(
         outputHandler = OutputHandler(CoroutineScope(Dispatchers.Default)) { outputs ->
             viewModelScope.launch(Dispatchers.Main) {
                 notebookMutex.withLock {
-                    val currentState = _localState.value
+                    val currentState = _state.value
                     val notebook = currentState.domainNotebook ?: return@withLock
                     var newNotebook = notebook
                     outputs.forEach { (cellId, outputString) ->
@@ -352,7 +331,6 @@ class NotebookViewModel(
                             ?: persistentListOf()
 
                         if (outputs.lastOrNull()?.outputType == "stream") {
-                            // 既存の出力がストリームの場合、テキストを追加
                             val lastOutput = outputs.last()
                             val updatedText = output.text.orEmpty()
                             newNotebook = notebookFileUseCase.modifyNotebookOutput(
@@ -368,7 +346,7 @@ class NotebookViewModel(
                             (outputs + output).toPersistentList()
                         )
                     }
-                    _localState.update { it.copy(domainNotebook = newNotebook) }
+                    _state.update { it.copy(domainNotebook = newNotebook) }
                 }
             }
         }
@@ -384,7 +362,6 @@ class NotebookViewModel(
                     if (entryPath?.isNotebookFile() == true) {
                         val notebookFile = fileUseCase.getEntryByPath(entryPath)
                         if (notebookFile is NotebookFile) {
-                            this@NotebookViewModel.notebookFile = notebookFile
                             val notebook =
                                 runCatching { notebookFileUseCase.getNotebook(notebookFile) }.onFailure {
                                     errorChannel.send("ノートブックの読み込みに失敗しました: ${it.message}")
@@ -407,8 +384,9 @@ class NotebookViewModel(
                                 }.toImmutableMap()
 
                             notebookMutex.withLock {
-                                _localState.update {
+                                _state.update {
                                     it.copy(
+                                        notebookFile = notebookFile,
                                         domainNotebook = notebook,
                                         codeCellStateMap = initialCodeCellStateMap,
                                         loading = false
@@ -427,9 +405,8 @@ class NotebookViewModel(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     stdout = DynamicStdout(),
                     onImport = { importPath ->
-                        // IMPORT 処理をユースケースに委譲
                         println("Importing from: $importPath")
-                        notebookFile?.let { file ->
+                        _state.value.notebookFile?.let { file ->
                             with(notebookFileUseCase) {
                                 importAndExecute(
                                     file,
@@ -449,12 +426,9 @@ class NotebookViewModel(
         }
     }
 
-    /**
-     * Add a new cell of the specified type after the cell with the given ID
-     */
     fun addCellAfter(afterCellId: String?, cellType: CellType) {
         viewModelScope.launch {
-            val file = notebookFile ?: return@launch
+            val file = _state.value.notebookFile ?: return@launch
             val cellId = generateCellId()
             val defaultSource =
                 if (cellType == CellType.CODE) listOf("1+2") else listOf("## 新しいセル")
@@ -467,7 +441,7 @@ class NotebookViewModel(
             )
 
             notebookMutex.withLock {
-                val currentState = _localState.value
+                val currentState = _state.value
                 val notebook = currentState.domainNotebook ?: return@withLock
                 val newNotebook = notebookFileUseCase.insertCellAndSave(
                     file,
@@ -490,7 +464,7 @@ class NotebookViewModel(
                     )
                 } else null
 
-                _localState.update {
+                _state.update {
                     val newMap = if (newCodeCellState != null) {
                         it.codeCellStateMap + (cellId to newCodeCellState)
                     } else {
@@ -506,15 +480,12 @@ class NotebookViewModel(
         }
     }
 
-    /**
-     * Delete the cell with the given ID
-     */
     fun deleteCell(cellId: String) {
         viewModelScope.launch {
-            val file = notebookFile ?: return@launch
+            val state = _state.value
+            val file = state.notebookFile ?: return@launch
             notebookMutex.withLock {
-                val currentState = _localState.value
-                val notebook = currentState.domainNotebook ?: return@withLock
+                val notebook = state.domainNotebook ?: return@withLock
 
                 val newNotebook = notebookFileUseCase.deleteCellAndSave(
                     file,
@@ -531,8 +502,8 @@ class NotebookViewModel(
                     else -> null
                 }
 
-                val updatedStateMap = currentState.codeCellStateMap - cellId
-                _localState.update {
+                val updatedStateMap = state.codeCellStateMap - cellId
+                _state.update {
                     it.copy(
                         domainNotebook = newNotebook,
                         selectedCellId = nextSelected,
@@ -543,26 +514,17 @@ class NotebookViewModel(
         }
     }
 
-    /**
-     * Execute the cell with the given ID
-     * キューシステムを使用して堅牢な実行を保証
-     */
     fun executeCell(cellId: String) {
         viewModelScope.launch {
             executionRequestChannel.send(ExecuteRequest(cellId))
         }
     }
 
-    /**
-     * Execute all cells in the notebook
-     * 全てのコードセルを個別にキューに追加して順次実行
-     */
     fun executeAllCells() {
         viewModelScope.launch {
-            val currentState = _localState.value
+            val currentState = _state.value
             val notebook = currentState.domainNotebook ?: return@launch
 
-            // まず全てのセルの出力をクリア
             val clearedNotebook = notebook.copy(
                 cells = notebook.cells.map { cell ->
                     if (cell.type == CellType.CODE) {
@@ -574,10 +536,9 @@ class NotebookViewModel(
             )
 
             notebookMutex.withLock {
-                _localState.update { it.copy(domainNotebook = clearedNotebook) }
+                _state.update { it.copy(domainNotebook = clearedNotebook) }
             }
 
-            // 各コードセルを順次実行
             clearedNotebook.cells
                 .filter { it.type == CellType.CODE }
                 .forEach {
@@ -589,7 +550,7 @@ class NotebookViewModel(
     }
 
     fun clearCellOutput(cellId: String) {
-        val domainNotebook = _localState.value.domainNotebook ?: return
+        val domainNotebook = _state.value.domainNotebook ?: return
         viewModelScope.launch {
             outputHandler.stdoutFor(cellId).clear()
         }
@@ -598,7 +559,7 @@ class NotebookViewModel(
             cellId,
             persistentListOf()
         )
-        _localState.update {
+        _state.update {
             it.copy(
                 domainNotebook = nb,
                 unsavedChanges = true
@@ -607,22 +568,16 @@ class NotebookViewModel(
 
     }
 
-    /**
-     * Select the cell with the given ID
-     */
     fun selectCell(cellId: String) {
-        _localState.update { it.copy(selectedCellId = cellId) }
+        _state.update { it.copy(selectedCellId = cellId) }
     }
 
-    /**
-     * Change the type of the cell with the given ID
-     */
     fun changeCellType(cellId: String, newType: CellType) {
         viewModelScope.launch {
-            val file = notebookFile ?: return@launch
+            val state = _state.value
+            val file = state.notebookFile ?: return@launch
             notebookMutex.withLock {
-                val currentState = _localState.value
-                val notebook = currentState.domainNotebook ?: return@withLock
+                val notebook = state.domainNotebook ?: return@withLock
                 val updatedNotebook = notebookFileUseCase.changeCellTypeAndSave(
                     file,
                     notebook,
@@ -639,7 +594,7 @@ class NotebookViewModel(
                         textFieldValue = TextFieldValue(text),
                         annotatedString = annotatedString
                     )
-                    _localState.update {
+                    _state.update {
                         it.copy(
                             domainNotebook = updatedNotebook,
                             selectedCellId = cellId,
@@ -648,7 +603,7 @@ class NotebookViewModel(
                         )
                     }
                 } else {
-                    _localState.update {
+                    _state.update {
                         it.copy(
                             domainNotebook = updatedNotebook,
                             selectedCellId = cellId,
@@ -661,34 +616,29 @@ class NotebookViewModel(
         }
     }
 
-    //existsChangeだめっぽい。確定とかの話
     fun onUpdateCodeCell(
         cellId: String,
         textFieldValue: TextFieldValue,
         existsChange: Boolean? = null
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
-            // インデント調整
             val newTextFieldValue = autoIndent(
                 uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
                 textFieldValue
             )
             val newText = newTextFieldValue.text
-            // シンタックスハイライト用処理
             val lexer = Lexer(newText)
             val tokens = lexer.toList()
             val (annotatedStr, _) = syntaxHighLighter.highlightWithParsedData(
                 newText, true, null, tokens
             )
 
-            // Generate suggestions using SuggestionUseCase
             var suggestions = emptyList<Definition>()
             if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
                 val parser: Either<DnclError, Parser> = Parser(Lexer(newText))
 
                 val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
                 suggestions = if (parsedProgram.isRight()) {
-                    // Use parsed data for better suggestions
                     suggestionUseCase.suggestWithParsedData(
                         newText,
                         newTextFieldValue.selection.end,
@@ -696,7 +646,6 @@ class NotebookViewModel(
                         parsedProgram.getOrNull()!!
                     )
                 } else {
-                    // Fallback when parsing fails
                     suggestionUseCase.suggestWhenFailingParse(
                         newText,
                         newTextFieldValue.selection.end
@@ -705,14 +654,14 @@ class NotebookViewModel(
             }
 
             notebookMutex.withLock {
-                val currentState = _localState.value
+                val currentState = _state.value
                 val notebook = currentState.domainNotebook ?: return@withLock
 
                 val newNotebook = notebookFileUseCase.modifyNotebookCell(
                     notebook,
                     cellId,
                 ) { oldCell ->
-                    oldCell.copy(source = newText.split("\n").toImmutableList())
+                    oldCell.copy(source = newText.split('\n').toImmutableList())
                 }
 
                 val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
@@ -725,7 +674,7 @@ class NotebookViewModel(
                     this[cellId] = suggestions.toImmutableList()
                 }.toImmutableMap()
 
-                _localState.update { state ->
+                _state.update { state ->
                     state.copy(
                         domainNotebook = newNotebook,
                         codeCellStateMap = newCodeMap,
@@ -746,11 +695,11 @@ class NotebookViewModel(
     fun onUpdateMarkdownCell(
         cellId: String,
         newSource: List<String>,
-        existsChange: Boolean = _localState.value.domainNotebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
+        existsChange: Boolean = _state.value.domainNotebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
     ) {
         viewModelScope.launch {
             notebookMutex.withLock {
-                val currentState = _localState.value
+                val currentState = _state.value
                 val notebook = currentState.domainNotebook ?: return@withLock
                 val newNotebook = notebookFileUseCase.modifyNotebookCell(
                     notebook,
@@ -758,7 +707,7 @@ class NotebookViewModel(
                 ) { oldCell ->
                     oldCell.copy(source = newSource.toImmutableList(), type = CellType.MARKDOWN)
                 }
-                _localState.update {
+                _state.update {
                     it.copy(
                         domainNotebook = newNotebook,
                         codeCellStateMap = it.codeCellStateMap,
@@ -801,12 +750,9 @@ class NotebookViewModel(
     }
 
     private fun deselectCell() {
-        _localState.update { it.copy(selectedCellId = null) }
+        _state.update { it.copy(selectedCellId = null) }
     }
 
-    /**
-     * Generate a unique ID for a new cell
-     */
     @OptIn(ExperimentalUuidApi::class)
     private fun generateCellId(): String {
         return Uuid.random().toString()
@@ -818,33 +764,26 @@ class NotebookViewModel(
             val currentExecuteScopeJob = executeScope.coroutineContext.job
             currentExecuteScopeJob.cancelAndJoin()
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            // Only set running to false if there was an active job to cancel
             if (currentExecuteScopeJob.isCancelled) {
                 appStateStore.dispatch(Action.SetRunning(false))
             }
         }
     }
 
-
-    /**
-     * 単一セルの実際の実行処理（内部用）
-     */
     private suspend fun executeCellInternal(cellId: String) {
         println("Executing cell: $cellId")
         _currentStdout = outputHandler.stdoutFor(cellId)
-        selectCellId = cellId
+        _state.update { it.copy(selectedCellId = cellId) }
         clearCellOutput(cellId)
         cancelExecution().join()
 
         saveNotebook()
-        delay(100) // 出力クリアを待つ
-        isExecuting = true
+        delay(100)
         appStateStore.dispatch(Action.SetRunning(true))
 
-        val currentNotebook = _localState.value.domainNotebook
+        val currentNotebook = _state.value.domainNotebook
         if (currentNotebook == null) {
             errorChannel.send("ノートブックが読み込まれていません。")
-            isExecuting = false
             appStateStore.dispatch(Action.SetRunning(false))
             return
         }
@@ -860,16 +799,19 @@ class NotebookViewModel(
                     _currentStdout.append(output.text.orEmpty().joinToString("\n"))
                 }
             } else if (output.outputType == "error") {
-                notebookFileUseCase.appendOutput(
-                    notebookFile!!,
-                    currentNotebook,
-                    cellId,
-                    output
-                ).also { nb ->
-                    _localState.update {
-                        it.copy(
-                            domainNotebook = nb
-                        )
+                val notebookFile = _state.value.notebookFile
+                if (notebookFile != null) {
+                    notebookFileUseCase.appendOutput(
+                        notebookFile,
+                        currentNotebook,
+                        cellId,
+                        output
+                    ).also { nb ->
+                        _state.update {
+                            it.copy(
+                                domainNotebook = nb
+                            )
+                        }
                     }
                 }
             }
@@ -877,7 +819,6 @@ class NotebookViewModel(
 
 
         _currentStdout.flush()
-        isExecuting = false
         appStateStore.dispatch(Action.SetRunning(false))
     }
 
@@ -890,8 +831,8 @@ class NotebookViewModel(
         try {
             val cursorPos = newTextFiledValue.selection.start
             val textBeforeCursor = newTextFiledValue.text.substring(0, cursorPos - 1)
-            val currentLine = textBeforeCursor.substringAfterLast("\n", textBeforeCursor)
-            val indent = currentLine.takeWhile { it == ' ' || it == '\t' || it == '　' }
+            val currentLine = textBeforeCursor.substringAfterLast('\n', textBeforeCursor)
+            val indent = currentLine.takeWhile { it == ' ' || it == '\t' }
             val insertion = if (currentLine.lastOrNull() == ':') "$indent  " else indent
             val newText =
                 newTextFiledValue.text.substring(
