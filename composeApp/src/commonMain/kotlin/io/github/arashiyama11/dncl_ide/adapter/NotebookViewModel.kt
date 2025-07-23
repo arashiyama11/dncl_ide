@@ -31,7 +31,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
-import io.github.arashiyama11.dncl_ide.util.StdoutImpl
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
@@ -40,7 +39,6 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toPersistentList
-import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -50,17 +48,14 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -131,6 +126,17 @@ class NotebookViewModel(
         private const val CACHE_EXPIRY_MS = 30000L // 30秒でキャッシュクリア
     }
 
+    private data class NotebookLocalState(
+        val domainNotebook: Notebook?,
+        val selectedCellId: String?,
+        val codeCellStateMap: ImmutableMap<String, CodeCellState>,
+        val loading: Boolean,
+        val focusedCellId: String?,
+        val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>>,
+        val unsavedChanges: Boolean,
+        val lastUpdateTime: Long = 0L // 最後の更新時刻
+    )
+
     // 最適化されたローカル状態
     private val _localState = MutableStateFlow(
         NotebookLocalState(
@@ -189,11 +195,6 @@ class NotebookViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    init {
-        uiState.distinctUntilChangedBy { it.running }.onEach {
-            println("Running changed: ${it.running}")
-        }.launchIn(viewModelScope)
-    }
 
     // キャッシュされたStateFlow取得 - メモリ効率向上
     fun cellStateFlow(cellId: String): StateFlow<Cell?> {
@@ -244,6 +245,7 @@ class NotebookViewModel(
 
     private val saveReqChannel = Channel<Unit>(capacity = 64)
 
+    private val executionRequestChannel = Channel<ExecuteRequest>(Channel.UNLIMITED)
 
     private var isExecuting = false
 
@@ -281,12 +283,35 @@ class NotebookViewModel(
     }
 
     init {
+        uiState.distinctUntilChangedBy { it.running }.onEach {
+            println("Running changed: ${it.running}")
+        }.launchIn(viewModelScope)
+
         // 定期的なキャッシュクリーンアップ
         viewModelScope.launch {
             while (isActive) {
                 delay(CACHE_EXPIRY_MS)
                 cleanupExpiredCaches()
             }
+        }
+
+        viewModelScope.launch {
+            saveReqChannel.consumeAsFlow().collectLatest {
+                delay(SAVE_DELAY_MS)
+                val file = notebookFile ?: return@collectLatest
+                val content =
+                    with(notebookFileUseCase) { _localState.value.domainNotebook?.toFileContent() }
+                        ?: return@collectLatest
+                notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
+                _localState.update { it.copy(unsavedChanges = false) }
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            executionRequestChannel.consumeAsFlow()
+                .collect { request ->
+                    executeCellInternal(request.cellId)
+                }
         }
     }
 
@@ -422,20 +447,6 @@ class NotebookViewModel(
                     }
                 ))
         }
-
-        viewModelScope.launch {
-            saveReqChannel.consumeAsFlow().collectLatest {
-                delay(SAVE_DELAY_MS)
-                val file = notebookFile ?: return@collectLatest
-                val content =
-                    with(notebookFileUseCase) { _localState.value.domainNotebook?.toFileContent() }
-                        ?: return@collectLatest
-                notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
-                _localState.update { it.copy(unsavedChanges = false) }
-            }
-        }
-
-
     }
 
     /**
@@ -538,7 +549,7 @@ class NotebookViewModel(
      */
     fun executeCell(cellId: String) {
         viewModelScope.launch {
-            executeCellInternal(cellId)
+            executionRequestChannel.send(ExecuteRequest(cellId))
         }
     }
 
@@ -567,13 +578,13 @@ class NotebookViewModel(
             }
 
             // 各コードセルを順次実行
-            executeScope.launch {
-                clearedNotebook.cells
-                    .filter { it.type == CellType.CODE }
-                    .forEach { cell ->
-                        executeCellInternal(cell.id)
+            clearedNotebook.cells
+                .filter { it.type == CellType.CODE }
+                .forEach {
+                    viewModelScope.launch {
+                        executionRequestChannel.send(ExecuteRequest(it.id))
                     }
-            }
+                }
         }
     }
 
@@ -654,7 +665,7 @@ class NotebookViewModel(
     fun onUpdateCodeCell(
         cellId: String,
         textFieldValue: TextFieldValue,
-        existsChange: Boolean? = null//uiState.value.codeCellStateMap[cellId]?.textFieldValue?.text != textFieldValue.text
+        existsChange: Boolean? = null
     ): Job {
         return viewModelScope.launch(Dispatchers.Default) {
             // インデント調整
@@ -726,18 +737,8 @@ class NotebookViewModel(
                     )
                 }
             }
-            // Debounce saving cell to file
             saveJobs[cellId]?.cancel()
             saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
-                //delay(SAVE_DELAY_MS)
-                /*updateLocalNotebook { nb ->
-                    notebookFileUseCase.modifyNotebookCell(
-                        nb,
-                        cellId,
-                    ) { oldCell ->
-                        oldCell.copy(source = newText.split("\n"))
-                    }
-                }*/
             }
         }
     }
@@ -767,23 +768,10 @@ class NotebookViewModel(
             }
 
             saveJobs[cellId]?.cancel()
-            saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
-                /*  delay(SAVE_DELAY_MS)
-                  notebookFileUseCase.modifyNotebookCell(
-                      _localState.value.notebook ?: return@launch,
-                      cellId
-                  ) { oldCell -> oldCell.copy(source = newSource) }*/
-            }
         }
     }
 
-    fun saveNotebook() = saveReqChannel.trySend(Unit)/*viewModelScope.launch {
-        val file = notebookFile ?: return@launch
-        val content = with(notebookFileUseCase) { _localState.value.notebook?.toFileContent() }
-            ?: return@launch
-        notebookFileUseCase.saveNotebookFile(file, content, CursorPosition(0)).join()
-        _localState.update { it.copy(unsavedChanges = false) }
-    }*/
+    fun saveNotebook() = saveReqChannel.trySend(Unit)
 
     fun handleAction(action: NotebookAction) {
         when (action) {
@@ -816,17 +804,6 @@ class NotebookViewModel(
         _localState.update { it.copy(selectedCellId = null) }
     }
 
-    private data class NotebookLocalState(
-        val domainNotebook: Notebook?,
-        val selectedCellId: String?,
-        val codeCellStateMap: ImmutableMap<String, CodeCellState>,
-        val loading: Boolean,
-        val focusedCellId: String?,
-        val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>>,
-        val unsavedChanges: Boolean,
-        val lastUpdateTime: Long = 0L // 最後の更新時刻
-    )
-
     /**
      * Generate a unique ID for a new cell
      */
@@ -841,33 +818,6 @@ class NotebookViewModel(
             val currentExecuteScopeJob = executeScope.coroutineContext.job
             currentExecuteScopeJob.cancelAndJoin()
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            /*outputHandler = OutputHandler(executeScope) { outputs ->
-                viewModelScope.launch(Dispatchers.Main) {
-                    notebookMutex.withLock {
-                        val currentState = _localState.value
-                        val notebook = currentState.domainNotebook ?: return@withLock
-                        var newNotebook = notebook
-                        outputs.forEach { (cellId, outputString) ->
-                            if (cellId == null) return@forEach
-                            val output = Output(
-                                outputType = "stream",
-                                name = "stdout",
-                                text = persistentListOf(processOutputText(outputString))
-                            )
-                            newNotebook = notebookFileUseCase.modifyNotebookOutput(
-                                newNotebook,
-                                cellId,
-                                persistentListOf(output)
-                            )
-                        }
-                        _localState.update {
-                            it.copy(domainNotebook = newNotebook)
-                        }
-                    }
-                }
-            }
-            _currentStdout = outputHandler.stdout*/
-
             // Only set running to false if there was an active job to cancel
             if (currentExecuteScopeJob.isCancelled) {
                 appStateStore.dispatch(Action.SetRunning(false))
@@ -880,56 +830,55 @@ class NotebookViewModel(
      * 単一セルの実際の実行処理（内部用）
      */
     private suspend fun executeCellInternal(cellId: String) {
+        println("Executing cell: $cellId")
         _currentStdout = outputHandler.stdoutFor(cellId)
         selectCellId = cellId
         clearCellOutput(cellId)
         cancelExecution().join()
 
-        executeScope.launch {
-            saveNotebook()
-            delay(100) // 出力クリアを待つ
-            isExecuting = true
-            appStateStore.dispatch(Action.SetRunning(true))
+        saveNotebook()
+        delay(100) // 出力クリアを待つ
+        isExecuting = true
+        appStateStore.dispatch(Action.SetRunning(true))
 
-            val currentNotebook = _localState.value.domainNotebook
-            if (currentNotebook == null) {
-                errorChannel.send("ノートブックが読み込まれていません。")
-                isExecuting = false
-                appStateStore.dispatch(Action.SetRunning(false))
-                return@launch
-            }
+        val currentNotebook = _localState.value.domainNotebook
+        if (currentNotebook == null) {
+            errorChannel.send("ノートブックが読み込まれていません。")
+            isExecuting = false
+            appStateStore.dispatch(Action.SetRunning(false))
+            return
+        }
 
-            val output = notebookFileUseCase.executeCell(
-                currentNotebook, cellId, environment
-            )
+        val output = notebookFileUseCase.executeCell(
+            currentNotebook, cellId, environment
+        )
 
-            notebookMutex.withLock {
-                if (output.outputType == "stream") {
-                    val outputText = output.text.orEmpty().joinToString("\n")
-                    if (outputText != "null") {
-                        _currentStdout.append(output.text.orEmpty().joinToString("\n"))
-                    }
-                } else if (output.outputType == "error") {
-                    notebookFileUseCase.appendOutput(
-                        notebookFile!!,
-                        currentNotebook,
-                        cellId,
-                        output
-                    ).also { nb ->
-                        _localState.update {
-                            it.copy(
-                                domainNotebook = nb
-                            )
-                        }
+        notebookMutex.withLock {
+            if (output.outputType == "stream") {
+                val outputText = output.text.orEmpty().joinToString("\n")
+                if (outputText != "null") {
+                    _currentStdout.append(output.text.orEmpty().joinToString("\n"))
+                }
+            } else if (output.outputType == "error") {
+                notebookFileUseCase.appendOutput(
+                    notebookFile!!,
+                    currentNotebook,
+                    cellId,
+                    output
+                ).also { nb ->
+                    _localState.update {
+                        it.copy(
+                            domainNotebook = nb
+                        )
                     }
                 }
             }
+        }
 
 
-            _currentStdout.flush()
-            isExecuting = false
-            appStateStore.dispatch(Action.SetRunning(false))
-        }.join()
+        _currentStdout.flush()
+        isExecuting = false
+        appStateStore.dispatch(Action.SetRunning(false))
     }
 
     fun autoIndent(
@@ -961,35 +910,5 @@ class NotebookViewModel(
             e.printStackTrace()
             return newTextFiledValue
         }
-    }
-
-    /**
-     * 出力文字列を処理して、末尾の空行とnullを適切に処理する
-     */
-    private fun processOutputText(text: String): String {
-        if (text.isEmpty()) return text
-
-        // 行に分割
-        val lines = text.lines().toMutableList()
-
-        // 最後が空行なら削除
-        while (lines.isNotEmpty() && lines.last().trim().isEmpty()) {
-            lines.removeAt(lines.size - 1)
-        }
-
-        // 最後の行がnullで、かつ他に内容がある場合はnullを削除
-        if (lines.size > 1 && lines.last().trim() == "null") {
-            lines.removeAt(lines.size - 1)
-        }
-
-        return lines.joinToString("\n")
-    }
-}
-
-fun <T> Flow<T>.zipWithPrevious(): Flow<Pair<T?, T>> = flow {
-    var previous: T? = null
-    collect { value ->
-        emit(previous to value)
-        previous = value
     }
 }
