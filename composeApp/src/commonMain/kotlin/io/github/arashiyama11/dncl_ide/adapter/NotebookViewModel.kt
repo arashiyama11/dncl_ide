@@ -15,7 +15,6 @@ import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
-import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
@@ -50,23 +49,16 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -84,6 +76,7 @@ data class NotebookUiState(
     val selectedEntryPath: EntryPath? = null,
     val unsavedChanges: Boolean = false,
     val running: Boolean = false,
+    val cellIds: List<String> = emptyList()
 )
 
 data class CodeCellState(
@@ -122,10 +115,9 @@ class NotebookViewModel(
 
     companion object {
         private const val SAVE_DELAY_MS = 500L
-        private const val CACHE_EXPIRY_MS = 30000L // 30秒でキャッシュクリア
     }
 
-    private data class NotebookVMState(
+    private data class NotebookState(
         val notebookFile: NotebookFile? = null,
         val domainNotebook: Notebook? = null,
         val selectedCellId: String? = null,
@@ -134,18 +126,10 @@ class NotebookViewModel(
         val focusedCellId: String? = null,
         val cellSuggestionsMap: ImmutableMap<String, ImmutableList<Definition>> = persistentMapOf(),
         val unsavedChanges: Boolean = false,
-        val lastUpdateTime: Long = 0L // 最後の更新時刻
     )
 
     // 単一の状態ソース
-    private val _state = MutableStateFlow(NotebookVMState())
-
-
-    // StateFlowキャッシュ - メモリリーク防止
-    private val cellStateFlowCache = mutableMapOf<String, StateFlow<Cell?>>()
-    private val isSelectedFlowCache = mutableMapOf<String, StateFlow<Boolean>>()
-    private val codeCellStateFlowCache = mutableMapOf<String, StateFlow<CodeCellState>>()
-    private val suggestionsFlowCache = mutableMapOf<String, StateFlow<ImmutableList<Definition>>>()
+    private val _state = MutableStateFlow(NotebookState())
 
     private val saveJobs = mutableMapOf<String, Job>()
 
@@ -166,7 +150,8 @@ class NotebookViewModel(
             fontSize = appState.fontSize,
             selectedEntryPath = appState.selectedEntryPath,
             unsavedChanges = state.unsavedChanges,
-            running = appState.running
+            running = appState.running,
+            cellIds = state.domainNotebook?.cells?.map { it.id } ?: emptyList()
         )
     }.stateIn(
         viewModelScope,
@@ -174,64 +159,11 @@ class NotebookViewModel(
         initialValue = NotebookUiState()
     )
 
-    val cellIdsFlow: StateFlow<List<String>> = _state
-        .map { it.domainNotebook?.cells?.map { cell -> cell.id } ?: emptyList() }
-        .distinctUntilChanged { old, new ->
-            old.size == new.size && old.zip(new).all { it.first == it.second }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
-    fun cellStateFlow(cellId: String): StateFlow<Cell?> {
-        return cellStateFlowCache.getOrPut(cellId) {
-            _state
-                .map { state -> state.domainNotebook?.cells?.find { it.id == cellId } }
-                .distinctUntilChangedBy { it?.hashCode() }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-        }
-    }
-
-    fun isSelectedFlow(cellId: String): StateFlow<Boolean> {
-        return isSelectedFlowCache.getOrPut(cellId) {
-            _state
-                .map { it.selectedCellId == cellId }
-                .distinctUntilChanged()
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-        }
-    }
-
-    fun codeCellStateFlow(cellId: String): StateFlow<CodeCellState> {
-        return codeCellStateFlowCache.getOrPut(cellId) {
-            _state
-                .map {
-                    it.codeCellStateMap[cellId] ?: CodeCellState()
-                }
-                .distinctUntilChangedBy { "${it.textFieldValue.text}:${it.annotatedString.text}" }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CodeCellState())
-        }
-    }
-
-    fun suggestionsFlow(cellId: String): StateFlow<ImmutableList<Definition>> {
-        return suggestionsFlowCache.getOrPut(cellId) {
-            _state
-                .map { it.cellSuggestionsMap[cellId] ?: persistentListOf() }
-                .distinctUntilChangedBy { it.size }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), persistentListOf())
-        }
-    }
-
-    val fontSizeFlow: StateFlow<Int> = appStateStore.state
-        .map { it.fontSize }
-        .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 16)
-
     val errorChannel = Channel<String>()
 
     private val saveReqChannel = Channel<Unit>(capacity = 64)
 
     private val executionRequestChannel = Channel<ExecuteRequest>(Channel.UNLIMITED)
-
-    private val notebookMutex = Mutex()
 
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
@@ -268,13 +200,6 @@ class NotebookViewModel(
         }.launchIn(viewModelScope)
 
         viewModelScope.launch {
-            while (isActive) {
-                delay(CACHE_EXPIRY_MS)
-                cleanupExpiredCaches()
-            }
-        }
-
-        viewModelScope.launch {
             saveReqChannel.consumeAsFlow().collectLatest {
                 delay(SAVE_DELAY_MS)
                 val state = _state.value
@@ -295,18 +220,6 @@ class NotebookViewModel(
         }
     }
 
-    private fun cleanupExpiredCaches() {
-        val currentTime = Clock.System.now().toEpochMilliseconds()
-        val lastUpdate = _state.value.lastUpdateTime
-
-        if (currentTime - lastUpdate > CACHE_EXPIRY_MS) {
-            cellStateFlowCache.clear()
-            isSelectedFlowCache.clear()
-            codeCellStateFlowCache.clear()
-            suggestionsFlowCache.clear()
-        }
-    }
-
 
     context(scope: CoroutineScope)
     @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
@@ -316,37 +229,37 @@ class NotebookViewModel(
 
         outputHandler = OutputHandler(CoroutineScope(Dispatchers.Default)) { outputs ->
             viewModelScope.launch(Dispatchers.Main) {
-                notebookMutex.withLock {
-                    val currentState = _state.value
-                    val notebook = currentState.domainNotebook ?: return@withLock
-                    var newNotebook = notebook
+                _state.update { currentState ->
+                    var newNotebook = currentState.domainNotebook ?: return@update currentState
                     outputs.forEach { (cellId, outputString) ->
-                        if (cellId == null) return@forEach
-                        val output = Output(
-                            outputType = "stream",
-                            name = "stdout",
-                            text = persistentListOf(outputString)
-                        )
-                        val outputs = newNotebook.cells.firstOrNull { it.id == cellId }?.outputs
-                            ?: persistentListOf()
-
-                        if (outputs.lastOrNull()?.outputType == "stream") {
-                            val lastOutput = outputs.last()
-                            val updatedText = output.text.orEmpty()
-                            newNotebook = notebookFileUseCase.modifyNotebookOutput(
-                                newNotebook,
-                                cellId,
-                                (outputs.dropLast(1) + lastOutput.copy(text = updatedText.toPersistentList())).toPersistentList()
+                        if (cellId != null) {
+                            val output = Output(
+                                outputType = "stream",
+                                name = "stdout",
+                                text = persistentListOf(outputString)
                             )
-                            return@forEach
+                            val cellOutputs =
+                                newNotebook.cells.firstOrNull { it.id == cellId }?.outputs
+                                    ?: persistentListOf()
+
+                            newNotebook = if (cellOutputs.lastOrNull()?.outputType == "stream") {
+                                val lastOutput = cellOutputs.last()
+                                val updatedText = output.text.orEmpty()
+                                notebookFileUseCase.modifyNotebookOutput(
+                                    newNotebook,
+                                    cellId,
+                                    (cellOutputs.dropLast(1) + lastOutput.copy(text = updatedText.toPersistentList())).toPersistentList()
+                                )
+                            } else {
+                                notebookFileUseCase.modifyNotebookOutput(
+                                    newNotebook,
+                                    cellId,
+                                    (cellOutputs + output).toPersistentList()
+                                )
+                            }
                         }
-                        newNotebook = notebookFileUseCase.modifyNotebookOutput(
-                            newNotebook,
-                            cellId,
-                            (outputs + output).toPersistentList()
-                        )
                     }
-                    _state.update { it.copy(domainNotebook = newNotebook) }
+                    currentState.copy(domainNotebook = newNotebook)
                 }
             }
         }
@@ -383,15 +296,13 @@ class NotebookViewModel(
                                     )
                                 }.toImmutableMap()
 
-                            notebookMutex.withLock {
-                                _state.update {
-                                    it.copy(
-                                        notebookFile = notebookFile,
-                                        domainNotebook = notebook,
-                                        codeCellStateMap = initialCodeCellStateMap,
-                                        loading = false
-                                    )
-                                }
+                            _state.update {
+                                it.copy(
+                                    notebookFile = notebookFile,
+                                    domainNotebook = notebook,
+                                    codeCellStateMap = initialCodeCellStateMap,
+                                    loading = false
+                                )
                             }
                         } else {
                             errorChannel.send("ノートブックを開くことができません: $notebookFile")
@@ -426,130 +337,7 @@ class NotebookViewModel(
         }
     }
 
-    fun addCellAfter(afterCellId: String?, cellType: CellType) {
-        viewModelScope.launch {
-            val file = _state.value.notebookFile ?: return@launch
-            val cellId = generateCellId()
-            val defaultSource =
-                if (cellType == CellType.CODE) listOf("1+2") else listOf("## 新しいセル")
-            val newCell = notebookFileUseCase.createCell(
-                id = cellId,
-                type = cellType,
-                source = defaultSource.toImmutableList(),
-                executionCount = if (cellType == CellType.CODE) 0 else null,
-                outputs = if (cellType == CellType.CODE) persistentListOf() else null
-            )
-
-            notebookMutex.withLock {
-                val currentState = _state.value
-                val notebook = currentState.domainNotebook ?: return@withLock
-                val newNotebook = notebookFileUseCase.insertCellAndSave(
-                    file,
-                    notebook,
-                    newCell,
-                    afterCellId
-                )
-
-                val newCodeCellState = if (cellType == CellType.CODE) {
-                    val text = newCell.source.joinToString("\n")
-                    val (annotatedString, _) = syntaxHighLighter.highlightWithParsedData(
-                        text,
-                        true,
-                        null,
-                        emptyList()
-                    )
-                    CodeCellState(
-                        textFieldValue = TextFieldValue(text),
-                        annotatedString = annotatedString
-                    )
-                } else null
-
-                _state.update {
-                    val newMap = if (newCodeCellState != null) {
-                        it.codeCellStateMap + (cellId to newCodeCellState)
-                    } else {
-                        it.codeCellStateMap
-                    }
-                    it.copy(
-                        domainNotebook = newNotebook,
-                        selectedCellId = cellId,
-                        codeCellStateMap = newMap.toImmutableMap()
-                    )
-                }
-            }
-        }
-    }
-
-    fun deleteCell(cellId: String) {
-        viewModelScope.launch {
-            val state = _state.value
-            val file = state.notebookFile ?: return@launch
-            notebookMutex.withLock {
-                val notebook = state.domainNotebook ?: return@withLock
-
-                val newNotebook = notebookFileUseCase.deleteCellAndSave(
-                    file,
-                    notebook,
-                    cellId
-                )
-
-                val originalCells = notebook.cells
-                val cellIndex = originalCells.indexOfFirst { it.id == cellId }
-                val nextSelected = when {
-                    newNotebook.cells.isEmpty() -> null
-                    cellIndex > 0 -> originalCells[cellIndex - 1].id
-                    newNotebook.cells.isNotEmpty() -> newNotebook.cells.first().id
-                    else -> null
-                }
-
-                val updatedStateMap = state.codeCellStateMap - cellId
-                _state.update {
-                    it.copy(
-                        domainNotebook = newNotebook,
-                        selectedCellId = nextSelected,
-                        codeCellStateMap = updatedStateMap.toImmutableMap()
-                    )
-                }
-            }
-        }
-    }
-
-    fun executeCell(cellId: String) {
-        viewModelScope.launch {
-            executionRequestChannel.send(ExecuteRequest(cellId))
-        }
-    }
-
-    fun executeAllCells() {
-        viewModelScope.launch {
-            val currentState = _state.value
-            val notebook = currentState.domainNotebook ?: return@launch
-
-            val clearedNotebook = notebook.copy(
-                cells = notebook.cells.map { cell ->
-                    if (cell.type == CellType.CODE) {
-                        cell.copy(outputs = persistentListOf(), executionCount = 0)
-                    } else {
-                        cell
-                    }
-                }.toImmutableList()
-            )
-
-            notebookMutex.withLock {
-                _state.update { it.copy(domainNotebook = clearedNotebook) }
-            }
-
-            clearedNotebook.cells
-                .filter { it.type == CellType.CODE }
-                .forEach {
-                    viewModelScope.launch {
-                        executionRequestChannel.send(ExecuteRequest(it.id))
-                    }
-                }
-        }
-    }
-
-    fun clearCellOutput(cellId: String) {
+    private fun clearCellOutput(cellId: String) {
         val domainNotebook = _state.value.domainNotebook ?: return
         viewModelScope.launch {
             outputHandler.stdoutFor(cellId).clear()
@@ -568,189 +356,269 @@ class NotebookViewModel(
 
     }
 
-    fun selectCell(cellId: String) {
-        _state.update { it.copy(selectedCellId = cellId) }
-    }
-
-    fun changeCellType(cellId: String, newType: CellType) {
-        viewModelScope.launch {
-            val state = _state.value
-            val file = state.notebookFile ?: return@launch
-            notebookMutex.withLock {
-                val notebook = state.domainNotebook ?: return@withLock
-                val updatedNotebook = notebookFileUseCase.changeCellTypeAndSave(
-                    file,
-                    notebook,
-                    cellId,
-                    newType
-                )
-
-                if (newType == CellType.CODE) {
-                    val cell = updatedNotebook.cells.first { it.id == cellId }
-                    val text = cell.source.joinToString("\n")
-                    val (annotatedString, _) =
-                        syntaxHighLighter.highlightWithParsedData(text, true, null, emptyList())
-                    val newCodeCellState = CodeCellState(
-                        textFieldValue = TextFieldValue(text),
-                        annotatedString = annotatedString
-                    )
-                    _state.update {
-                        it.copy(
-                            domainNotebook = updatedNotebook,
-                            selectedCellId = cellId,
-                            focusedCellId = cellId,
-                            codeCellStateMap = (it.codeCellStateMap + (cellId to newCodeCellState)).toImmutableMap()
-                        )
-                    }
-                } else {
-                    _state.update {
-                        it.copy(
-                            domainNotebook = updatedNotebook,
-                            selectedCellId = cellId,
-                            focusedCellId = cellId,
-                            codeCellStateMap = (it.codeCellStateMap - cellId).toImmutableMap()
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun onUpdateCodeCell(
-        cellId: String,
-        textFieldValue: TextFieldValue,
-        existsChange: Boolean? = null
-    ): Job {
-        return viewModelScope.launch(Dispatchers.Default) {
-            val newTextFieldValue = autoIndent(
-                uiState.value.codeCellStateMap[cellId]?.textFieldValue ?: textFieldValue,
-                textFieldValue
-            )
-            val newText = newTextFieldValue.text
-            val lexer = Lexer(newText)
-            val tokens = lexer.toList()
-            val (annotatedStr, _) = syntaxHighLighter.highlightWithParsedData(
-                newText, true, null, tokens
-            )
-
-            var suggestions = emptyList<Definition>()
-            if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
-                val parser: Either<DnclError, Parser> = Parser(Lexer(newText))
-
-                val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
-                suggestions = if (parsedProgram.isRight()) {
-                    suggestionUseCase.suggestWithParsedData(
-                        newText,
-                        newTextFieldValue.selection.end,
-                        tokens,
-                        parsedProgram.getOrNull()!!
-                    )
-                } else {
-                    suggestionUseCase.suggestWhenFailingParse(
-                        newText,
-                        newTextFieldValue.selection.end
-                    )
-                }
-            }
-
-            notebookMutex.withLock {
-                val currentState = _state.value
-                val notebook = currentState.domainNotebook ?: return@withLock
-
-                val newNotebook = notebookFileUseCase.modifyNotebookCell(
-                    notebook,
-                    cellId,
-                ) { oldCell ->
-                    oldCell.copy(source = newText.split('\n').toImmutableList())
-                }
-
-                val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
-                    this[cellId] = CodeCellState(
-                        textFieldValue = newTextFieldValue,
-                        annotatedString = annotatedStr
-                    )
-                }.toImmutableMap()
-                val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
-                    this[cellId] = suggestions.toImmutableList()
-                }.toImmutableMap()
-
-                _state.update { state ->
-                    state.copy(
-                        domainNotebook = newNotebook,
-                        codeCellStateMap = newCodeMap,
-                        cellSuggestionsMap = newSugMap,
-                        unsavedChanges = existsChange
-                            ?: (state.unsavedChanges || newText != (notebook.cells.firstOrNull { it.id == cellId }?.source?.joinToString(
-                                "\n"
-                            ))),
-                    )
-                }
-            }
-            saveJobs[cellId]?.cancel()
-            saveJobs[cellId] = viewModelScope.launch(Dispatchers.Default) {
-            }
-        }
-    }
-
-    fun onUpdateMarkdownCell(
-        cellId: String,
-        newSource: List<String>,
-        existsChange: Boolean = _state.value.domainNotebook?.cells?.firstOrNull { it.id == cellId }?.source != newSource
-    ) {
-        viewModelScope.launch {
-            notebookMutex.withLock {
-                val currentState = _state.value
-                val notebook = currentState.domainNotebook ?: return@withLock
-                val newNotebook = notebookFileUseCase.modifyNotebookCell(
-                    notebook,
-                    cellId,
-                ) { oldCell ->
-                    oldCell.copy(source = newSource.toImmutableList(), type = CellType.MARKDOWN)
-                }
-                _state.update {
-                    it.copy(
-                        domainNotebook = newNotebook,
-                        codeCellStateMap = it.codeCellStateMap,
-                        unsavedChanges = existsChange || it.unsavedChanges
-                    )
-                }
-            }
-
-            saveJobs[cellId]?.cancel()
-        }
-    }
-
     fun saveNotebook() = saveReqChannel.trySend(Unit)
 
     fun handleAction(action: NotebookAction) {
         when (action) {
-            is NotebookAction.SelectCell -> selectCell(action.cellId)
-            is NotebookAction.ExecuteCell -> executeCell(action.cellId)
-            is NotebookAction.DeleteCell -> deleteCell(action.cellId)
-            is NotebookAction.ExecuteAllCells -> executeAllCells()
+            is NotebookAction.SelectCell -> _state.update { it.copy(selectedCellId = action.cellId) }
+            is NotebookAction.ExecuteCell -> viewModelScope.launch {
+                executionRequestChannel.send(
+                    ExecuteRequest(action.cellId)
+                )
+            }
+
+            is NotebookAction.DeleteCell -> {
+                viewModelScope.launch {
+                    val state = _state.value
+                    val file = state.notebookFile ?: return@launch
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+
+                        val newNotebook = notebookFileUseCase.deleteCellAndSave(
+                            file,
+                            notebook,
+                            action.cellId
+                        )
+
+                        val originalCells = notebook.cells
+                        val cellIndex = originalCells.indexOfFirst { it.id == action.cellId }
+                        val nextSelected = when {
+                            newNotebook.cells.isEmpty() -> null
+                            cellIndex > 0 -> originalCells[cellIndex - 1].id
+                            newNotebook.cells.isNotEmpty() -> newNotebook.cells.first().id
+                            else -> null
+                        }
+
+                        val updatedStateMap = currentState.codeCellStateMap - action.cellId
+                        currentState.copy(
+                            domainNotebook = newNotebook,
+                            selectedCellId = nextSelected,
+                            codeCellStateMap = updatedStateMap.toImmutableMap()
+                        )
+                    }
+                }
+            }
+
+            is NotebookAction.ExecuteAllCells -> {
+                viewModelScope.launch {
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+                        val clearedNotebook = notebook.copy(
+                            cells = notebook.cells.map { cell ->
+                                if (cell.type == CellType.CODE) {
+                                    cell.copy(outputs = persistentListOf(), executionCount = 0)
+                                } else {
+                                    cell
+                                }
+                            }.toImmutableList()
+                        )
+
+                        clearedNotebook.cells
+                            .filter { it.type == CellType.CODE }
+                            .forEach {
+                                executionRequestChannel.trySend(ExecuteRequest(it.id))
+                            }
+                        currentState.copy(domainNotebook = clearedNotebook)
+                    }
+                }
+            }
+
             is NotebookAction.CancelExecution -> {
                 cancelExecution()
                 saveNotebook()
             }
 
-            is NotebookAction.AddCellAfter -> addCellAfter(action.cellId, action.cellType)
-            is NotebookAction.ChangeCellType -> changeCellType(action.cellId, action.cellType)
-            is NotebookAction.UpdateCodeCell -> onUpdateCodeCell(
-                action.cellId,
-                action.textFieldValue
-            )
+            is NotebookAction.AddCellAfter -> {
+                viewModelScope.launch {
+                    val file = _state.value.notebookFile ?: return@launch
+                    val cellId = generateCellId()
+                    val defaultSource =
+                        if (action.cellType == CellType.CODE) listOf("1+2") else listOf("## 新しいセル")
+                    val newCell = notebookFileUseCase.createCell(
+                        id = cellId,
+                        type = action.cellType,
+                        source = defaultSource.toImmutableList(),
+                        executionCount = if (action.cellType == CellType.CODE) 0 else null,
+                        outputs = if (action.cellType == CellType.CODE) persistentListOf() else null
+                    )
 
-            is NotebookAction.UpdateMarkdownCell -> onUpdateMarkdownCell(
-                action.cellId,
-                action.source
-            )
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+                        val newNotebook = notebookFileUseCase.insertCellAndSave(
+                            file,
+                            notebook,
+                            newCell,
+                            action.cellId
+                        )
 
-            is NotebookAction.DeselectCell -> deselectCell()
+                        val newCodeCellState = if (action.cellType == CellType.CODE) {
+                            val text = newCell.source.joinToString("\n")
+                            val (annotatedString, _) = syntaxHighLighter.highlightWithParsedData(
+                                text,
+                                true,
+                                null,
+                                emptyList()
+                            )
+                            CodeCellState(
+                                textFieldValue = TextFieldValue(text),
+                                annotatedString = annotatedString
+                            )
+                        } else null
+
+                        val newMap = if (newCodeCellState != null) {
+                            currentState.codeCellStateMap + (cellId to newCodeCellState)
+                        } else {
+                            currentState.codeCellStateMap
+                        }
+                        currentState.copy(
+                            domainNotebook = newNotebook,
+                            selectedCellId = cellId,
+                            codeCellStateMap = newMap.toImmutableMap()
+                        )
+                    }
+                }
+            }
+
+            is NotebookAction.ChangeCellType -> {
+                viewModelScope.launch {
+                    val state = _state.value
+                    val file = state.notebookFile ?: return@launch
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+                        val updatedNotebook = notebookFileUseCase.changeCellTypeAndSave(
+                            file,
+                            notebook,
+                            action.cellId,
+                            action.cellType
+                        )
+
+                        if (action.cellType == CellType.CODE) {
+                            val cell = updatedNotebook.cells.first { it.id == action.cellId }
+                            val text = cell.source.joinToString("\n")
+                            val (annotatedString, _)
+                                    = syntaxHighLighter.highlightWithParsedData(
+                                text,
+                                true,
+                                null,
+                                emptyList()
+                            )
+                            val newCodeCellState = CodeCellState(
+                                textFieldValue = TextFieldValue(text),
+                                annotatedString = annotatedString
+                            )
+                            currentState.copy(
+                                domainNotebook = updatedNotebook,
+                                selectedCellId = action.cellId,
+                                focusedCellId = action.cellId,
+                                codeCellStateMap = (currentState.codeCellStateMap + (action.cellId to newCodeCellState)).toImmutableMap()
+                            )
+                        } else {
+                            currentState.copy(
+                                domainNotebook = updatedNotebook,
+                                selectedCellId = action.cellId,
+                                focusedCellId = action.cellId,
+                                codeCellStateMap = (currentState.codeCellStateMap - action.cellId).toImmutableMap()
+                            )
+                        }
+                    }
+                }
+            }
+
+            is NotebookAction.UpdateCodeCell -> {
+                viewModelScope.launch(Dispatchers.Default) {
+                    val newTextFieldValue = autoIndent(
+                        uiState.value.codeCellStateMap[action.cellId]?.textFieldValue
+                            ?: action.textFieldValue,
+                        action.textFieldValue
+                    )
+                    val newText = newTextFieldValue.text
+                    val lexer = Lexer(newText)
+                    val tokens = lexer.toList()
+                    val (annotatedStr, _) = syntaxHighLighter.highlightWithParsedData(
+                        newText, true, null, tokens
+                    )
+
+                    var suggestions = emptyList<Definition>()
+                    if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
+                        val parser: Either<DnclError, Parser> = Parser(Lexer(newText))
+
+                        val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
+                        suggestions = if (parsedProgram.isRight()) {
+                            suggestionUseCase.suggestWithParsedData(
+                                newText,
+                                newTextFieldValue.selection.end,
+                                tokens,
+                                parsedProgram.getOrNull()!!
+                            )
+                        } else {
+                            suggestionUseCase.suggestWhenFailingParse(
+                                newText,
+                                newTextFieldValue.selection.end
+                            )
+                        }
+                    }
+
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+
+                        val newNotebook = notebookFileUseCase.modifyNotebookCell(
+                            notebook,
+                            action.cellId,
+                        ) { oldCell ->
+                            oldCell.copy(source = newText.split('\n').toImmutableList())
+                        }
+
+                        val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
+                            this[action.cellId] = CodeCellState(
+                                textFieldValue = newTextFieldValue,
+                                annotatedString = annotatedStr
+                            )
+                        }.toImmutableMap()
+                        val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
+                            this[action.cellId] = suggestions.toImmutableList()
+                        }.toImmutableMap()
+
+                        currentState.copy(
+                            domainNotebook = newNotebook,
+                            codeCellStateMap = newCodeMap,
+                            cellSuggestionsMap = newSugMap,
+                            unsavedChanges = (currentState.unsavedChanges || newText != (notebook.cells.firstOrNull { it.id == action.cellId }?.source?.joinToString(
+                                "\n"
+                            ))),
+                        )
+                    }
+                    saveJobs[action.cellId]?.cancel()
+                    saveJobs[action.cellId] = viewModelScope.launch(Dispatchers.Default) {
+                    }
+                }
+            }
+
+            is NotebookAction.UpdateMarkdownCell -> {
+                viewModelScope.launch {
+                    _state.update { currentState ->
+                        val notebook = currentState.domainNotebook ?: return@update currentState
+                        val newNotebook = notebookFileUseCase.modifyNotebookCell(
+                            notebook,
+                            action.cellId,
+                        ) { oldCell ->
+                            oldCell.copy(
+                                source = action.source.toImmutableList(),
+                                type = CellType.MARKDOWN
+                            )
+                        }
+                        currentState.copy(
+                            domainNotebook = newNotebook,
+                            codeCellStateMap = currentState.codeCellStateMap,
+                            unsavedChanges = (currentState.unsavedChanges || _state.value.domainNotebook?.cells?.firstOrNull { it.id == action.cellId }?.source != action.source)
+                        )
+                    }
+
+                    saveJobs[action.cellId]?.cancel()
+                }
+            }
+
+            is NotebookAction.DeselectCell -> _state.update { it.copy(selectedCellId = null) }
         }
-    }
-
-    private fun deselectCell() {
-        _state.update { it.copy(selectedCellId = null) }
     }
 
     @OptIn(ExperimentalUuidApi::class)
@@ -792,27 +660,25 @@ class NotebookViewModel(
             currentNotebook, cellId, environment
         )
 
-        notebookMutex.withLock {
-            if (output.outputType == "stream") {
-                val outputText = output.text.orEmpty().joinToString("\n")
-                if (outputText != "null") {
-                    _currentStdout.append(output.text.orEmpty().joinToString("\n"))
-                }
-            } else if (output.outputType == "error") {
-                val notebookFile = _state.value.notebookFile
-                if (notebookFile != null) {
-                    notebookFileUseCase.appendOutput(
+        if (output.outputType == "stream") {
+            val outputText = output.text.orEmpty().joinToString("\n")
+            if (outputText != "null") {
+                _currentStdout.append(output.text.orEmpty().joinToString("\n"))
+            }
+        } else if (output.outputType == "error") {
+            _state.update { currentState ->
+                val notebookFile = currentState.notebookFile
+                val currentNotebook = currentState.domainNotebook
+                if (notebookFile != null && currentNotebook != null) {
+                    val nb = notebookFileUseCase.appendOutput(
                         notebookFile,
                         currentNotebook,
                         cellId,
                         output
-                    ).also { nb ->
-                        _state.update {
-                            it.copy(
-                                domainNotebook = nb
-                            )
-                        }
-                    }
+                    )
+                    currentState.copy(domainNotebook = nb)
+                } else {
+                    currentState
                 }
             }
         }

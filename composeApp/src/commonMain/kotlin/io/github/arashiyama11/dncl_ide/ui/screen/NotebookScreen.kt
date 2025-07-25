@@ -53,11 +53,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.Markdown
-import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
+import io.github.arashiyama11.dncl_ide.adapter.NotebookUiState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
-import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
@@ -73,6 +72,8 @@ fun NotebookScreen(
     notebookViewModel: NotebookViewModel = koinViewModel(),
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
+    val onAction = remember(notebookViewModel) { notebookViewModel::handleAction }
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
@@ -80,7 +81,9 @@ fun NotebookScreen(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
             NotebookContent(
-                notebookViewModel = notebookViewModel,
+                uiState = uiState,
+                onAction = onAction,
+                onSave = notebookViewModel::saveNotebook
             )
         }
     }
@@ -88,45 +91,51 @@ fun NotebookScreen(
 
 @Composable
 fun NotebookContent(
-    notebookViewModel: NotebookViewModel,
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        NotebookToolbarComponent(notebookViewModel)
-        CellListComponent(notebookViewModel, Modifier.weight(1f))
+        NotebookToolbarComponent(uiState, onAction, onSave)
+        CellListComponent(uiState, onAction, Modifier.weight(1f))
     }
 }
 
 @Composable
-fun NotebookToolbarComponent(viewModel: NotebookViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
+fun NotebookToolbarComponent(
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    onSave: () -> Unit
+) {
     NotebookToolbar(
         selectedEntryPath = uiState.selectedEntryPath,
-        onExecuteAllCells = remember { { viewModel.handleAction(NotebookAction.ExecuteAllCells) } },
-        onCancelExecution = remember { { viewModel.handleAction(NotebookAction.CancelExecution) } },
+        onExecuteAllCells = { onAction(NotebookAction.ExecuteAllCells) },
+        onCancelExecution = { onAction(NotebookAction.CancelExecution) },
         unsavedChanges = uiState.unsavedChanges,
-        onSave = viewModel::saveNotebook,
+        onSave = onSave,
         running = uiState.running
     )
 }
 
 @Composable
-fun CellListComponent(viewModel: NotebookViewModel, modifier: Modifier = Modifier) {
-    val cellIds by viewModel.cellIdsFlow.collectAsStateWithLifecycle()
-
-    //LazyColumnだとUX悪い
+fun CellListComponent(
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        for (cellId in cellIds) {
+        for (cellId in uiState.cellIds) {
             key(cellId) {
                 CellComponent(
+                    uiState = uiState,
                     cellId = cellId,
-                    viewModel = viewModel
+                    onAction = onAction
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -174,101 +183,101 @@ fun NotebookToolbar(
 
 @Composable
 fun CellComponent(
+    uiState: NotebookUiState,
     cellId: String,
-    viewModel: NotebookViewModel,
+    onAction: (NotebookAction) -> Unit,
 ) {
-    val cell by viewModel.cellStateFlow(cellId).collectAsStateWithLifecycle()
-    cell?.let { cellModel ->
-        val isSelected by viewModel.isSelectedFlow(cellId).collectAsStateWithLifecycle()
-        val codeCellState by viewModel.codeCellStateFlow(cellId).collectAsStateWithLifecycle()
-        val fontSize by viewModel.fontSizeFlow.collectAsStateWithLifecycle()
-        val onAction = viewModel::handleAction
+    val cell = uiState.notebook?.cells?.find { it.id == cellId } ?: return
+    val isSelected = uiState.selectedCellId == cellId
+    val codeCellState = uiState.codeCellStateMap[cellId]
+    val fontSize = uiState.fontSize
 
-        val borderColor = if (isSelected)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.outlineVariant
+    val borderColor = if (isSelected)
+        MaterialTheme.colorScheme.primary
+    else
+        MaterialTheme.colorScheme.outlineVariant
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 96.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .border(1.dp, borderColor, RoundedCornerShape(4.dp))
-                .padding(8.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(4.dp))
+            .padding(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Text(
+                text = when (cell.type) {
+                    CellType.CODE -> "code"
+                    CellType.MARKDOWN -> "markdown"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (cell.type == CellType.CODE) {
+                IconButton(onClick = { onAction(NotebookAction.ExecuteCell(cellId)) }) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Execute Cell")
+                }
+            }
+
+            IconButton(onClick = { onAction(NotebookAction.DeleteCell(cellId)) }) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete Cell")
+                }
+
+            TextButton(onClick = {
+                val newType = when (cell.type) {
+                    CellType.CODE -> CellType.MARKDOWN
+                    CellType.MARKDOWN -> CellType.CODE
+                }
+                onAction(NotebookAction.ChangeCellType(cellId, newType))
+            }) {
                 Text(
-                    text = when (cellModel.type) {
-                        CellType.CODE -> "code"
-                        CellType.MARKDOWN -> "markdown"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                if (cellModel.type == CellType.CODE) {
-                    IconButton(onClick = { onAction(NotebookAction.ExecuteCell(cellId)) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Execute Cell")
+                    text = when (cell.type) {
+                        CellType.CODE -> "To Markdown"
+                        CellType.MARKDOWN -> "To Code"
                     }
-                }
-
-                IconButton(onClick = { onAction(NotebookAction.DeleteCell(cellId)) }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Cell")
-                }
-
-                TextButton(onClick = {
-                    val newType = when (cellModel.type) {
-                        CellType.CODE -> CellType.MARKDOWN
-                        CellType.MARKDOWN -> CellType.CODE
-                    }
-                    onAction(NotebookAction.ChangeCellType(cellId, newType))
-                }) {
-                    Text(
-                        text = when (cellModel.type) {
-                            CellType.CODE -> "To Markdown"
-                            CellType.MARKDOWN -> "To Code"
-                        }
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-            when (cellModel.type) {
-                CellType.CODE -> CodeCellContent(
-                    cellModel,
-                    onAction,
-                    codeCellState,
-                    fontSize,
-                    viewModel
-                )
-
-                CellType.MARKDOWN -> MarkdownCellContent(
-                    cellModel,
-                    isSelected,
-                    onAction,
-                    fontSize,
                 )
             }
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+        when (cell.type) {
+            CellType.CODE -> if (codeCellState != null) {
+                CodeCellContent(
+                    uiState = uiState,
+                    cell = cell,
+                    onAction = onAction,
+                    codeCellState = codeCellState,
+                    fontSize = fontSize,
+                )
+            }
+
+            CellType.MARKDOWN -> MarkdownCellContent(
+                cell = cell,
+                isSelected = isSelected,
+                onAction = onAction,
+                fontSize = fontSize,
+            )
         }
     }
 }
 
 @Composable
 fun CodeCellContent(
-    cell: Cell,
+    uiState: NotebookUiState,
+    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
     onAction: (NotebookAction) -> Unit,
-    codeCellState: CodeCellState,
+    codeCellState: io.github.arashiyama11.dncl_ide.adapter.CodeCellState,
     fontSize: Int,
-    viewModel: NotebookViewModel
 ) {
-    val suggestions by viewModel.suggestionsFlow(cell.id).collectAsStateWithLifecycle()
+    val suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList()
 
     var localTfv by remember(cell.id, codeCellState.textFieldValue) {
         mutableStateOf(codeCellState.textFieldValue)
@@ -351,7 +360,7 @@ fun CodeCellContent(
 
 @Composable
 fun MarkdownCellContent(
-    cell: Cell,
+    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     fontSize: Int = 16,
