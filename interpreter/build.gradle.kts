@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -11,7 +13,7 @@ kotlin {
 // which platforms this KMP module supports.
 // See: https://kotlinlang.org/docs/multiplatform-discover-project.html#targets
     androidLibrary {
-        namespace = "io.github.arashiyama11.dncl_ideinterpreter"
+        namespace = "io.github.arashiyama11.dncl_ide.interpreter"
         compileSdk = 35
         minSdk = 24
 
@@ -103,4 +105,55 @@ kotlin {
         }
     }
 
+}
+
+tasks.register<JavaExec>("runInterpreter") {
+    group = "application"
+    description = "Runs the interpreter main with custom args"
+
+    val jvmMain = kotlin.targets
+        .getByName("desktop")
+        .compilations
+        .getByName("main")
+
+    classpath = files(jvmMain.output.classesDirs, jvmMain.runtimeDependencyFiles)
+    mainClass.set("io.github.arashiyama11.dncl_ide.interpreter.MainKt")
+
+    // コマンドラインの -PinterpreterArgs="arg1 arg2 ..." から取得
+    val interpreterArgs: String? by project
+    args = interpreterArgs
+        ?.split("\\s+".toRegex())
+        ?: emptyList()
+}
+
+
+tasks.register<Jar>("fatJar") {
+    group = "build"
+    description = "Assemble a fat (über) JAR containing all runtime dependencies"
+
+    // 出力 JAR 名のサフィックス
+    archiveClassifier.set("all")
+
+    // main コンパイル成果物を含める
+    from(
+        kotlin.targets["desktop"]
+            .compilations["main"]
+            .output
+    )
+
+    // ランタイムクラスパスの JAR を展開して取り込む
+    dependsOn(configurations["desktopRuntimeClasspath"])
+    from({
+        configurations["desktopRuntimeClasspath"]
+            .filter { it.name.endsWith(".jar") }
+            .map { zipTree(it) }
+    })
+
+    // 重複ファイルは無視
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Main-Kt のフルパスを指定
+    manifest {
+        attributes["Main-Class"] = "io.github.arashiyama11.dncl_ide.interpreter.MainKt"
+    }
 }

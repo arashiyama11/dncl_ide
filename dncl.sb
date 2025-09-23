@@ -1,0 +1,10 @@
+(version 1)
+(deny default)
+
+; プロセス実行を許可
+(allow process-exec)
+
+; ホーム直下の Gradle キャッシュのみ読み書きを許可
+(allow file-read*  (subpath "/Users/nyuto/.gradle"))
+(allow file-write* (subpath "/Users/nyuto/.gradle"))
+

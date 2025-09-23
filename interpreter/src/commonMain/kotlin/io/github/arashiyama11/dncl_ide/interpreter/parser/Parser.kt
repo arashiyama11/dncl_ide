@@ -281,11 +281,12 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun parseFunctionStatement(): Either<DnclError, AstNode.FunctionStatement> = either {
         val start = currentToken
         nextToken().bind()
-        val name = (currentToken as? Token.Identifier)
+        val nameToken = (currentToken as? Token.Identifier)
             ?: currentToken as? Token.Japanese ?: raise(ParserError.UnExpectedToken(currentToken))
         expectNextToken<Token.ParenOpen>().bind()
         nextToken().bind()
-        val params = parseExpressionList<Token.ParenClose>().bind()
+        val paramsTokens = mutableListOf<Token>()
+        val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
         params.any { it !is AstNode.Identifier }.let {
             if (it) raise(ParserError.UnExpectedToken(currentToken))
         }
@@ -305,8 +306,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         nextToken().bind()
         requireEndOfLine().bind()
         AstNode.FunctionStatement(
-            name.literal,
-            params.map { (it as AstNode.Identifier).value },
+            nameToken,
+            paramsTokens,
             block, start.range.first..end.range.last
         )
     }
@@ -427,7 +428,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.Function -> {
                 expectNextToken<Token.ParenOpen>().bind()
                 nextToken().bind()
-                val params = parseExpressionList<Token.ParenClose>().bind()
+                val paramsTokens = mutableListOf<Token>()
+                val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
                 params.any { it !is AstNode.Identifier }.let {
                     if (it) raise(ParserError.UnExpectedToken(currentToken))
                 }
@@ -435,7 +437,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 expectNextToken<Token.Colon>().bind()
                 val block = parseBlockStatement().bind()
                 val lit = AstNode.FunctionLiteral(
-                    params.map { (it as AstNode.Identifier).value }, block
+                    paramsTokens, block
                 )
                 expectNextToken<Token.Indent>().bind()
                 expectNextToken<Token.Define>().bind()
@@ -454,13 +456,14 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         }
     }
 
-    private inline fun <reified T : Token> parseExpressionList(): Either<DnclError, List<AstNode.Expression>> =
+    private inline fun <reified T : Token> parseExpressionList(paramsTokens: MutableList<Token>? = null): Either<DnclError, List<AstNode.Expression>> =
         either {
             if (currentToken is T) {
                 return emptyList<AstNode.Expression>().right()
             }
             val list =
                 mutableListOf(parseExpression(Precedence.LOWEST).bind())
+            paramsTokens?.add(currentToken)
             while (currentToken is Token.Indent || currentToken is Token.NewLine) nextToken().bind()
 
             while (nextToken is Token.Comma) {
@@ -470,6 +473,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
                 nextToken().bind()
+                paramsTokens?.add(currentToken)
                 while (currentToken is Token.Indent || currentToken is Token.NewLine) nextToken().bind()
 
 

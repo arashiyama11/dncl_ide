@@ -57,7 +57,7 @@ class Evaluator(
                     is AstNode.SystemLiteral -> onCallSystemCommand(SystemCommand.from(node))
                     is AstNode.FunctionLiteral -> DnclObject.Function(
                         null,
-                        node.parameters, node.body, env.createChildEnvironment(), node
+                        node.parameters.map { it.literal }, node.body, env.createChildEnvironment(), node
                     )
 
                     is AstNode.WhileExpression -> raise(InternalError("while式はサポートされていません"))
@@ -214,13 +214,13 @@ class Evaluator(
         env: Environment
     ): Either<DnclError, DnclObject> = either {
         val fn = DnclObject.Function(
-            functionStmt.name,
-            functionStmt.parameters,
+            functionStmt.name.literal,
+            functionStmt.parameters.map { it.literal },
             functionStmt.block,
             env.createChildEnvironment(), functionStmt
         )
-        env.set(functionStmt.name, fn).onLeft { return@either it }
-        fn.env.set(functionStmt.name, fn).onLeft { return@either it }
+        env.set(functionStmt.name.literal, fn).onLeft { return@either it }
+        fn.env.set(functionStmt.name.literal, fn).onLeft { return@either it }
         DnclObject.Nothing(functionStmt)
     }
 

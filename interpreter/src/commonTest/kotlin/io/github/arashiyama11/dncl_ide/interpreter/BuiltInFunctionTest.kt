@@ -192,6 +192,25 @@ class BuiltInFunctionTest {
         assertEquals("A", result.value)
     }
 
+    @Test
+    fun testGetStdoutHandleReturnsFile() {
+        val result = evalAndGetResult("標準出力ハンドル()")
+        assertTrue(result is DnclObject.File)
+        assertEquals("/dev/stdout", (result as DnclObject.File).handle.path)
+    }
+
+    @Test
+    fun testFileWriteAndRead() {
+        testEval(
+            """
+            handle = ファイルを開く("/virtual/test")
+            ファイルへ書く(handle, "abc")
+            表示する(ファイルを読む(handle))
+            """.trimIndent(),
+            "abc\n"
+        )
+    }
+
     // Tests for new built-in functions
     // Array operation functions
     @Test

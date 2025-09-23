@@ -1,11 +1,14 @@
 package io.github.arashiyama11.dncl_ide.interpreter.evaluator
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
+import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
+import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileSystem
+import io.github.arashiyama11.dncl_ide.interpreter.api.asVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.SystemCommand
-import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 
@@ -51,18 +54,40 @@ object EvaluatorFactory {
         else null
     }
 
-
     suspend fun createBuiltInFunctionEnvironment(
         stdout: Stdout,
         onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
+    ): Environment {
+        val virtualFileSystem = VirtualFileSystem().apply {
+            register(stdout.asVirtualFile(StandardVirtualFile.Stdout.path))
+            openOrCreate(StandardVirtualFile.Stderr.path)
+            openOrCreate(StandardVirtualFile.Stdin.path)
+        }
+        return createBuiltInFunctionEnvironment(virtualFileSystem, onImport)
+    }
+
+    suspend fun createBuiltInFunctionEnvironment(
+        virtualFileSystem: VirtualFileSystem,
+        onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
     ): Environment =
         Environment().apply {
+            val stdoutHandle =
+                virtualFileSystem.open(StandardVirtualFile.Stdout.path)
+                    ?: virtualFileSystem.openOrCreate(StandardVirtualFile.Stdout.path)
+            val stderrHandle = virtualFileSystem.open(StandardVirtualFile.Stderr.path)
+                ?: virtualFileSystem.openOrCreate(StandardVirtualFile.Stderr.path)
+            val stdinHandle = virtualFileSystem.open(StandardVirtualFile.Stdin.path)
+                ?: virtualFileSystem.openOrCreate(StandardVirtualFile.Stdin.path)
+            set("_stdout", DnclObject.File(stdoutHandle, AstNode.Program(emptyList())))
+            set("_stderr", DnclObject.File(stderrHandle, AstNode.Program(emptyList())))
+            set("_stdin", DnclObject.File(stdinHandle, AstNode.Program(emptyList())))
             AllBuiltInFunction.entries.forEach {
                 val func: suspend CallBuiltInFunctionScope.() -> DnclObject? = when (it) {
                     AllBuiltInFunction.PRINT -> {
                         {
-                            stdout.append(args.joinToString(" ", postfix = "\n") { it.toString() })
-                            stdout.flush()
+                            val text = args.joinToString(" ", postfix = "\n") { it.toString() }
+                            stdoutHandle.write(text)
+                            stdoutHandle.flush()
                             null
                         }
                     }
@@ -688,9 +713,32 @@ object EvaluatorFactory {
                     }
 
                     AllBuiltInFunction.CLEAR -> {
-                        {
-                            stdout.clear()
-                            DnclObject.Null(astNode)
+                        l@{
+                            when (args.size) {
+                                0 -> {
+                                    stdoutHandle.clear()
+                                    DnclObject.Null(astNode)
+                                }
+
+                                1 -> {
+                                    val file = args[0] as? DnclObject.File
+                                        ?: return@l DnclObject.TypeError(
+                                            "第一引数はファイルでなければなりません",
+                                            astNode
+                                        )
+                                    return@l try {
+                                        file.handle.clear()
+                                        DnclObject.Null(astNode)
+                                    } catch (e: UnsupportedOperationException) {
+                                        DnclObject.RuntimeError(
+                                            e.message ?: "このファイルは消去をサポートしません",
+                                            astNode
+                                        )
+                                    }
+                                }
+
+                                else -> DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
                         }
                     }
 
@@ -720,32 +768,271 @@ object EvaluatorFactory {
 
                     AllBuiltInFunction.APPEND -> {
                         l@{
-                            checkArgSize(1)?.let { return@l it }
-                            stdout.append(args[0].toString())
-                            DnclObject.Null(astNode)
+                            when (args.size) {
+                                0 -> return@l DnclObject.ArgumentSizeError(
+                                    "引数が少ないです",
+                                    astNode
+                                )
+
+                                1 -> {
+                                    stdoutHandle.write(args[0].toString())
+                                    DnclObject.Null(astNode)
+                                }
+
+                                2 -> {
+                                    val file = args[0] as? DnclObject.File
+                                        ?: return@l DnclObject.TypeError(
+                                            "第一引数はファイルでなければなりません",
+                                            astNode
+                                        )
+                                    file.handle.write(args[1].toString())
+                                    DnclObject.Null(astNode)
+                                }
+
+                                else -> DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
                         }
                     }
 
                     AllBuiltInFunction.FLUSH -> {
                         l@{
-                            checkArgSize(0)?.let { return@l it }
-                            stdout.flush()
-                            DnclObject.Null(astNode)
+                            when (args.size) {
+                                0 -> {
+                                    stdoutHandle.flush()
+                                    DnclObject.Null(astNode)
+                                }
+
+                                1 -> {
+                                    val file = args[0] as? DnclObject.File
+                                        ?: return@l DnclObject.TypeError(
+                                            "第一引数はファイルでなければなりません",
+                                            astNode
+                                        )
+                                    return@l try {
+                                        file.handle.flush()
+                                        DnclObject.Null(astNode)
+                                    } catch (e: UnsupportedOperationException) {
+                                        DnclObject.RuntimeError(
+                                            e.message
+                                                ?: "このファイルはフラッシュをサポートしません",
+                                            astNode
+                                        )
+                                    }
+                                }
+
+                                else -> DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
                         }
                     }
 
                     AllBuiltInFunction.COMMIT_FRAME -> {
                         l@{
-                            checkArgSize(0)?.let { return@l it }
-                            stdout.commitFrame()
-                            DnclObject.Null(astNode)
+                            when (args.size) {
+                                0 -> {
+                                    stdoutHandle.commitFrame()
+                                    DnclObject.Null(astNode)
+                                }
+
+                                1 -> {
+                                    val file = args[0] as? DnclObject.File
+                                        ?: return@l DnclObject.TypeError(
+                                            "第一引数はファイルでなければなりません",
+                                            astNode
+                                        )
+                                    return@l try {
+                                        file.handle.commitFrame()
+                                        DnclObject.Null(astNode)
+                                    } catch (e: UnsupportedOperationException) {
+                                        DnclObject.RuntimeError(
+                                            e.message
+                                                ?: "このファイルはcommitFrameをサポートしません",
+                                            astNode
+                                        )
+                                    }
+                                }
+
+                                else -> DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
                         }
                     }
 
                     AllBuiltInFunction.STDOUT_REPLACE -> {
                         l@{
+                            when (args.size) {
+                                0 -> return@l DnclObject.ArgumentSizeError(
+                                    "引数が少ないです",
+                                    astNode
+                                )
+
+                                1 -> {
+                                    stdoutHandle.replace(args[0].toString())
+                                    DnclObject.Null(astNode)
+                                }
+
+                                2 -> {
+                                    val file = args[0] as? DnclObject.File
+                                        ?: return@l DnclObject.TypeError(
+                                            "第一引数はファイルでなければなりません",
+                                            astNode
+                                        )
+                                    return@l try {
+                                        file.handle.replace(args[1].toString())
+                                        DnclObject.Null(astNode)
+                                    } catch (e: UnsupportedOperationException) {
+                                        DnclObject.RuntimeError(
+                                            e.message ?: "このファイルは置換をサポートしません",
+                                            astNode
+                                        )
+                                    }
+                                }
+
+                                else -> DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.GET_STDOUT -> {
+                        {
+                            DnclObject.File(
+                                virtualFileSystem.require(StandardVirtualFile.Stdout.path),
+                                astNode
+                            )
+                        }
+                    }
+
+                    AllBuiltInFunction.GET_STDERR -> {
+                        {
+                            DnclObject.File(
+                                virtualFileSystem.open(StandardVirtualFile.Stderr.path)
+                                    ?: virtualFileSystem.openOrCreate(StandardVirtualFile.Stderr.path),
+                                astNode
+                            )
+                        }
+                    }
+
+                    AllBuiltInFunction.GET_STDIN -> {
+                        {
+                            DnclObject.File(
+                                virtualFileSystem.open(StandardVirtualFile.Stdin.path)
+                                    ?: virtualFileSystem.openOrCreate(StandardVirtualFile.Stdin.path),
+                                astNode
+                            )
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_OPEN -> {
+                        l@{
                             checkArgSize(1)?.let { return@l it }
-                            stdout.replace(args[0].toString())
+                            val path = args[0] as? DnclObject.String
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数は文字列でなければなりません",
+                                    astNode
+                                )
+                            val handle = virtualFileSystem.openOrCreate(path.value)
+                            DnclObject.File(handle, astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_WRITE -> {
+                        l@{
+                            checkArgSize(2)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            val text = args[1].toString()
+                            file.handle.write(text)
+                            DnclObject.Null(astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_READ -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                DnclObject.String(file.handle.read(), astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルは読み込みに対応していません", astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_CLEAR -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                file.handle.clear()
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルは消去に対応していません", astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_FLUSH -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                file.handle.flush()
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルはフラッシュに対応していません",
+                                    astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_COMMIT -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                file.handle.commitFrame()
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルはcommitFrameに対応していません",
+                                    astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.FILE_CLOSE -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            file.handle.close()
                             DnclObject.Null(astNode)
                         }
                     }

@@ -23,8 +23,12 @@ enum class AllBuiltInFunction(val identifier: String) {
     // システム関数
     CLEAR("出力消去"), SLEEP("待機"),
 
-    // 標準出力関数
-    APPEND("stdout_append"), FLUSH("stdout_flash"), COMMIT_FRAME("stdout_commit"), STDOUT_REPLACE("stdout_replace");
+    // 標準出力・ファイル操作
+    APPEND("stdout_append"), FLUSH("stdout_flash"), COMMIT_FRAME("stdout_commit"), STDOUT_REPLACE("stdout_replace"),
+    GET_STDOUT("標準出力ハンドル"), GET_STDERR("標準エラーハンドル"), GET_STDIN("標準入力ハンドル"),
+    FILE_OPEN("ファイルを開く"), FILE_WRITE("ファイルへ書く"), FILE_READ("ファイルを読む"),
+    FILE_CLEAR("ファイルをクリア"), FILE_FLUSH("ファイルをフラッシュ"), FILE_COMMIT("ファイルをコミット"),
+    FILE_CLOSE("ファイルを閉じる");
 
     companion object {
         fun from(identifier: String): AllBuiltInFunction? =
