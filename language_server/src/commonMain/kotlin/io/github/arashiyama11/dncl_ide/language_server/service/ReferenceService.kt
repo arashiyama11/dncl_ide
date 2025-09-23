@@ -13,9 +13,10 @@ class ReferenceService(
         uri: String,
         code: String,
         offset: Int,
-        includeDeclaration: Boolean = true
+        includeDeclaration: Boolean = true,
+        cachedAstInfo: AstInfo? = null
     ): List<Location> {
-        val astInfo = astInfoService.parseAndAnalyze(code) ?: return emptyList()
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return emptyList()
 
         // カーソル位置のシンボルを取得
         val symbol = astInfoService.findSymbolAtOffset(astInfo, offset) ?: return emptyList()

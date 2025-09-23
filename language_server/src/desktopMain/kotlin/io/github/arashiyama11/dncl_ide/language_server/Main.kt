@@ -32,7 +32,8 @@ fun main() = runBlocking {
         RenameService(astInfoService),
         FormattingService(),
         CodeActionService(),
-        SemanticTokensService(astInfoService)
+        SemanticTokensService(astInfoService),
+        astInfoService
     )
 
     // 出力ループを起動

@@ -40,7 +40,8 @@ class DNCLLanguageServer(
     private val renameService: RenameService,
     private val formattingService: FormattingService,
     private val codeActionService: CodeActionService,
-    private val semanticTokensService: SemanticTokensService
+    private val semanticTokensService: SemanticTokensService,
+    private val astInfoService: AstInfoService
 ) {
     private val debug = false
     private val state = MutableStateFlow(LsState())
@@ -186,10 +187,20 @@ class DNCLLanguageServer(
     }
 
     private suspend fun publishDiagnostics(uri: String, text: String) {
-        val diagnostics = diagnosticService.getDiagnostics(uri, text)
+        val diagnosticResult = diagnosticService.analyze(uri, text)
+        val astInfo = diagnosticResult.program?.let { astInfoService.buildAstInfo(it) }
+
+        documentManager = documentManager.updateAnalysis(
+            uri,
+            DocumentAnalysis(
+                diagnostics = diagnosticResult.diagnostics,
+                astInfo = astInfo
+            )
+        )
+
         sendNotification(
             "textDocument/publishDiagnostics",
-            PublishDiagnosticsParams(uri, diagnostics)
+            PublishDiagnosticsParams(uri, diagnosticResult.diagnostics)
         )
     }
 
@@ -215,7 +226,7 @@ class DNCLLanguageServer(
     // 共���処理のヘルパ関数を追加
     private suspend inline fun <reified T, R> handleWithDocument(
         request: JsonRpcRequest,
-        crossinline handler: (code: String, offset: Int, params: T) -> R?
+        crossinline handler: (snapshot: DocumentSnapshot, offset: Int, params: T) -> R?
     ) {
         val params = request.params?.let { json.decodeFromJsonElement<T>(it) }
         params?.let {
@@ -237,9 +248,9 @@ class DNCLLanguageServer(
                 else -> null
             } ?: return
 
-            val code = documentManager.getDocument(textDocument.uri) ?: return
-            val offset = calculateOffset(code, position.line, position.character)
-            val result = handler(code, offset, it)
+            val snapshot = documentManager.getSnapshot(textDocument.uri) ?: return
+            val offset = calculateOffset(snapshot.text, position.line, position.character)
+            val result = handler(snapshot, offset, it)
 
             when (result) {
                 is CompletionList -> sendResponse(
@@ -283,38 +294,50 @@ class DNCLLanguageServer(
     }
 
     private suspend fun handleCompletion(request: JsonRpcRequest) {
-        handleWithDocument<CompletionParams, CompletionList>(request) { code, offset, _ ->
-            val completionItems = completionService.getCompletionItems(code, offset)
+        handleWithDocument<CompletionParams, CompletionList>(request) { snapshot, offset, _ ->
+            val completionItems = completionService.getCompletionItems(snapshot.text, offset)
             CompletionList(isIncomplete = false, items = completionItems)
         }
     }
 
     private suspend fun handleHover(request: JsonRpcRequest) {
-        handleWithDocument<HoverParams, Hover?>(request) { code, offset, _ ->
-            hoverService.getHover(code, offset)
+        handleWithDocument<HoverParams, Hover?>(request) { snapshot, offset, _ ->
+            hoverService.getHover(snapshot.text, offset, snapshot.astInfo)
         }
     }
 
     private suspend fun handleDefinition(request: JsonRpcRequest) {
-        handleWithDocument<DefinitionParams, Location?>(request) { code, offset, params ->
-            definitionService.getDefinitionLocation(params.textDocument.uri, code, offset)
+        handleWithDocument<DefinitionParams, Location?>(request) { snapshot, offset, params ->
+            definitionService.getDefinitionLocation(
+                params.textDocument.uri,
+                snapshot.text,
+                offset,
+                snapshot.astInfo
+            )
         }
     }
 
     private suspend fun handleReferences(request: JsonRpcRequest) {
-        handleWithDocument<ReferenceParams, List<Location>>(request) { code, offset, params ->
+        handleWithDocument<ReferenceParams, List<Location>>(request) { snapshot, offset, params ->
             referenceService.findReferences(
                 params.textDocument.uri,
-                code,
+                snapshot.text,
                 offset,
-                params.context.includeDeclaration
+                params.context.includeDeclaration,
+                cachedAstInfo = snapshot.astInfo
             )
         }
     }
 
     private suspend fun handleRename(request: JsonRpcRequest) {
-        handleWithDocument<RenameParams, WorkspaceEdit?>(request) { code, offset, params ->
-            renameService.rename(params.textDocument.uri, code, offset, params.newName)
+        handleWithDocument<RenameParams, WorkspaceEdit?>(request) { snapshot, offset, params ->
+            renameService.rename(
+                params.textDocument.uri,
+                snapshot.text,
+                offset,
+                params.newName,
+                cachedAstInfo = snapshot.astInfo
+            )
         }
     }
 
@@ -322,8 +345,8 @@ class DNCLLanguageServer(
         val params =
             request.params?.let { json.decodeFromJsonElement<DocumentFormattingParams>(it) }
         params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val edits = formattingService.formatDocument(code)
+            val snapshot = documentManager.getSnapshot(it.textDocument.uri) ?: return
+            val edits = formattingService.formatDocument(snapshot.text)
             sendResponse(
                 request.id,
                 json.encodeToJsonElement(ListSerializer(TextEdit.serializer()), edits)
@@ -346,8 +369,9 @@ class DNCLLanguageServer(
     private suspend fun handleSemanticTokensFull(request: JsonRpcRequest) {
         val params = request.params?.let { json.decodeFromJsonElement<SemanticTokensParams>(it) }
         params?.let {
-            val code = documentManager.getDocument(it.textDocument.uri) ?: return
-            val semanticTokens = semanticTokensService.getSemanticTokens(code)
+            val snapshot = documentManager.getSnapshot(it.textDocument.uri) ?: return
+            val semanticTokens =
+                semanticTokensService.getSemanticTokens(snapshot.text, snapshot.astInfo)
             sendResponse(
                 request.id,
                 json.encodeToJsonElement(SemanticTokens.serializer(), semanticTokens)
