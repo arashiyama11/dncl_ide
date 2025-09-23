@@ -198,7 +198,7 @@ class Lexer(private val input: String) : ILexer {
                 END_OF_FILE -> Token.EOF(position..position)
                 else -> when {
                     ch.isDigit() -> readNumber().bind()
-                    ch.isLetter() -> if (ch.isAlphaBet()) readIdentifier().bind() else readJapanese().bind()
+                    ch.isLetter() || ch == '_' -> if (ch.isAlphaBet()) readIdentifier().bind() else readJapanese().bind()
                     else -> raise(LexerError.UnExpectedCharacter(ch, position))
                 }
             }
@@ -258,6 +258,7 @@ class Lexer(private val input: String) : ILexer {
             "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo(pos until position).right()
             "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo(pos until position)
                 .right()
+
             "かつ" -> Token.And(pos until position).right()
             "または" -> Token.Or(pos until position).right()
             "関数" -> Token.Function(pos until position).right()

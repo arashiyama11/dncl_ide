@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileHandle
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 
 
@@ -31,6 +32,14 @@ sealed interface DnclObject {
         DnclObject {
         override fun toString() = value.toMutableList().joinToString(", ", "[", "]")
         override fun hash() = value.hashCode()
+    }
+
+    data class File(
+        val handle: VirtualFileHandle,
+        override val astNode: AstNode
+    ) : DnclObject {
+        override fun toString() = "<ファイル ${handle.path}>"
+        override fun hash() = handle.hashCode()
     }
 
     data class Function(

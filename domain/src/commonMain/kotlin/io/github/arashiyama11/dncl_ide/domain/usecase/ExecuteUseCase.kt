@@ -32,6 +32,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
+import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
+import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileSystem
+import io.github.arashiyama11.dncl_ide.interpreter.api.asVirtualFile
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.ensureActive
@@ -165,29 +168,37 @@ class ExecuteUseCase(
                 )
 
 
+                val stdout = object : Stdout {
+                    override suspend fun append(text: String) {
+                        send(DnclOutput.StdoutAppend(text))
+                    }
+
+                    override suspend fun flush() {
+                        send(DnclOutput.StdoutFlush)
+                    }
+
+                    override suspend fun clear() {
+                        send(DnclOutput.StdoutClear)
+                    }
+
+                    override suspend fun commitFrame() {
+                        send(DnclOutput.StdoutCommitFrame)
+                    }
+
+                    override suspend fun replace(text: String) {
+                        send(DnclOutput.StdoutReplace(text))
+                    }
+                }
+
+                val virtualFileSystem = VirtualFileSystem().apply {
+                    register(stdout.asVirtualFile(StandardVirtualFile.Stdout.path))
+                    openOrCreate(StandardVirtualFile.Stderr.path)
+                    openOrCreate(StandardVirtualFile.Stdin.path)
+                }
+
                 val globalEnv = Environment(
                     EvaluatorFactory.createBuiltInFunctionEnvironment(
-                        stdout = object : Stdout {
-                            override suspend fun append(text: String) {
-                                send(DnclOutput.StdoutAppend(text))
-                            }
-
-                            override suspend fun flush() {
-                                send(DnclOutput.StdoutFlush)
-                            }
-
-                            override suspend fun clear() {
-                                send(DnclOutput.StdoutClear)
-                            }
-
-                            override suspend fun commitFrame() {
-                                send(DnclOutput.StdoutCommitFrame)
-                            }
-
-                            override suspend fun replace(text: String) {
-                                send(DnclOutput.StdoutReplace(text))
-                            }
-                        },
+                        virtualFileSystem = virtualFileSystem,
                         onImport = { onImport(it) }
                     )
                 )

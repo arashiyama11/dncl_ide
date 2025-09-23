@@ -56,10 +56,6 @@ When you include code, format it neatly and add brief Japanese explanations.
 3. **Verify & Polish**
     - Ensure your code meets all requirements and any style guides.
     - Check for compilation errors using `compileKotlinDesktop`.
-    - Run `lintFix` and address any issues.
-
-4. **Commit**
-    - Commit with a clear message summarising the change (via `submit`).
 
 ---
 

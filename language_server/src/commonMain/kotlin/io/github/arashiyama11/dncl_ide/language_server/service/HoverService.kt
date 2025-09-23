@@ -503,6 +503,84 @@ class HoverService(
                     追加("Frame 2")
                     ```
             """.trimIndent()
+
+            AllBuiltInFunction.GET_STDOUT -> """
+                    `標準出力ハンドル()`  
+                    標準出力を表すファイルオブジェクトを取得します。  
+                    他のファイル操作系関数と組み合わせて使用できます。  
+                    使用例
+                    ```dncl
+                    stdout = 標準出力ハンドル()
+                    ファイルへ書く(stdout, "Hello")
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.GET_STDERR -> """
+                    `標準エラーハンドル()`  
+                    標準エラー出力を表すファイルオブジェクトを取得します。  
+                    使用例
+                    ```dncl
+                    stderr = 標準エラーハンドル()
+                    ファイルへ書く(stderr, "error!")
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.GET_STDIN -> """
+                    `標準入力ハンドル()`  
+                    標準入力を表すファイルオブジェクトを取得します。  
+                    使用例
+                    ```dncl
+                    stdin = 標準入力ハンドル()
+                    # 将来的に読み込みAPIと併用します
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_OPEN -> """
+                    `ファイルを開く(path)`  
+                    指定したパスの仮想ファイルを開き、ファイルオブジェクトを返します。存在しない場合は作成します。  
+                    使用例
+                    ```dncl
+                    log = ファイルを開く("/tmp/log")
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_WRITE -> """
+                    `ファイルへ書く(file, data)`  
+                    ファイルにデータを追記します。  
+                    使用例
+                    ```dncl
+                    ファイルへ書く(log, "start")
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_READ -> """
+                    `ファイルを読む(file)`  
+                    ファイル全体を文字列として読み出します。  
+                    使用例
+                    ```dncl
+                    content = ファイルを読む(log)
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_CLEAR -> """
+                    `ファイルをクリア(file)`  
+                    ファイルの内容を消去します。標準ストリームではサポートされない場合があります。  
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_FLUSH -> """
+                    `ファイルをフラッシュ(file)`  
+                    バッファを強制的にフラッシュします。  
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_COMMIT -> """
+                    `ファイルをコミット(file)`  
+                    フレーム境界など、ファイル固有のコミット操作を行います。  
+            """.trimIndent()
+
+            AllBuiltInFunction.FILE_CLOSE -> """
+                    `ファイルを閉じる(file)`  
+                    ファイルオブジェクトをクローズします。  
+            """.trimIndent()
         }
     }
 }
