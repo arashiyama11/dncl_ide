@@ -137,6 +137,7 @@ class MockFileRepository : FileRepository {
     }
 
     override suspend fun createFolder(path: EntryPath) {}
+    override suspend fun deleteEntry(path: EntryPath) {}
     override suspend fun selectFile(entryPath: EntryPath) {}
     override suspend fun getFileContent(programFile: ProgramFile) =
         io.github.arashiyama11.dncl_ide.domain.model.FileContent("")

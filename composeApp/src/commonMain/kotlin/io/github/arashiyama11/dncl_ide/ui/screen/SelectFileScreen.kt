@@ -21,13 +21,17 @@ import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -106,7 +110,8 @@ fun SelectFileScreen(
                             onFileClicked = {
                                 viewModel.onFileSelected(it)
                                 navigateToCodeScreen()
-                            }
+                            },
+                            onDelete = viewModel::onEntryDelete
                         )
                     }
 
@@ -118,7 +123,8 @@ fun SelectFileScreen(
                                 onClick = {
                                     viewModel.onFileSelected(it)
                                     navigateToCodeScreen()
-                                }
+                                },
+                                onDelete = viewModel::onEntryDelete
                             )
                         }
                     }
@@ -167,12 +173,40 @@ fun SelectFileScreen(
     }
 }
 
+
+
 @Composable
 fun FileItemCard(
     file: ProgramFile,
     depth: Int,
-    onClick: (EntryPath) -> Unit
+    onClick: (EntryPath) -> Unit,
+    onDelete: (EntryPath) -> Unit
 ) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("ファイルの削除") },
+            text = { Text("「${file.name.value}」を削除しますか？この操作は元に戻せません。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete(file.path)
+                        showDialog = false
+                    }
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -195,11 +229,16 @@ fun FileItemCard(
             Text(
                 text = file.name.value,
                 style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { showDialog = true }) {
+                Icon(Icons.Outlined.Delete, contentDescription = "Delete file")
+            }
         }
     }
 }
+
+
 
 context(viewModel: BaseSelectViewModel)
 @Composable
@@ -209,7 +248,8 @@ fun FolderItemCard(
     expandedFolders: Set<String>,
     onExpandToggle: (String, Boolean?) -> Unit,
     isNotebookMode: Boolean,
-    onFileClicked: (EntryPath) -> Unit = {}
+    onFileClicked: (EntryPath) -> Unit = {},
+    onDelete: (EntryPath) -> Unit
 ) {
     val isExpanded = expandedFolders.contains(folder.path.toString())
     val uiState = viewModel.uiState.collectAsState().value
@@ -217,6 +257,30 @@ fun FolderItemCard(
     val inputtingFileName = uiState.inputtingFileName
     val focusRequester = remember { FocusRequester() }
     val creatingType = uiState.creatingType
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("フォルダの削除") },
+            text = { Text("「${folder.name.value}」を削除しますか？この操作は元に戻せません。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete(folder.path)
+                        showDialog = false
+                    }
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
+    }
 
     Column {
         Card(
@@ -253,11 +317,15 @@ fun FolderItemCard(
                 Text(
                     text = folder.name.value,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
+                    modifier = Modifier.weight(1f)
                 )
 
+                IconButton(onClick = { showDialog = true }) {
+                    Icon(Icons.Outlined.Delete, contentDescription = "Delete folder")
+                }
+
                 Row(
-                    modifier = Modifier.weight(1f, fill = true),
+                    modifier = Modifier.wrapContentSize(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.clickable {
@@ -293,7 +361,8 @@ fun FolderItemCard(
                             depth = depth + 1,
                             expandedFolders = expandedFolders,
                             onExpandToggle = onExpandToggle,
-                            isNotebookMode = isNotebookMode
+                            isNotebookMode = isNotebookMode,
+                            onDelete = onDelete
                         )
 
                         is ProgramFile -> {
@@ -301,7 +370,8 @@ fun FolderItemCard(
                                 FileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = onFileClicked
+                                    onClick = onFileClicked,
+                                    onDelete = onDelete
                                 )
                             }
                         }
@@ -311,7 +381,8 @@ fun FolderItemCard(
                                 NotebookFileItemCard(
                                     file = entry,
                                     depth = depth + 1,
-                                    onClick = onFileClicked
+                                    onClick = onFileClicked,
+                                    onDelete = onDelete
                                 )
                             }
                         }
@@ -358,7 +429,8 @@ fun FolderItemCard(
 fun NotebookFileItemCard(
     file: Any, // Using Any because we're checking isNotebookFile() in the caller
     depth: Int,
-    onClick: (EntryPath) -> Unit
+    onClick: (EntryPath) -> Unit,
+    onDelete: (EntryPath) -> Unit
 ) {
     val entryPath = when (file) {
         is NotebookFile -> file.path
@@ -370,6 +442,31 @@ fun NotebookFileItemCard(
         is NotebookFile -> file.name.value
         is ProgramFile -> file.name.value
         else -> return
+    }
+
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("ノートブックの削除") },
+            text = { Text("「${fileName}」を削除しますか？この操作は元に戻せません。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete(entryPath)
+                        showDialog = false
+                    }
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
     }
 
     Card(
@@ -393,8 +490,11 @@ fun NotebookFileItemCard(
             Text(
                 text = fileName.removeSuffix(".dnclnb"),
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { showDialog = true }) {
+                Icon(Icons.Outlined.Delete, contentDescription = "Delete notebook")
+            }
         }
     }
 }

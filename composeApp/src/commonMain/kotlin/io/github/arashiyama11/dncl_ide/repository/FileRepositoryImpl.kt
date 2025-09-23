@@ -29,6 +29,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import kotlin.time.Duration.Companion.seconds
+import dncl_ide.composeapp.generated.resources.Res
 
 class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScope: AppScope) :
     FileRepository {
@@ -70,6 +71,17 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
 
             println("Root folder:")
             println(getRootFolder())
+
+            rootPath.plus(FileName("getting_start.dnclnb")).let {
+                if (getEntryByPath(it) == null) {
+                    val content = Res.readBytes("files/getting_start_template.dnclnb").decodeToString()
+                    saveFile(
+                        it,
+                        FileContent(content),
+                        CursorPosition(0)
+                    )
+                }
+            }
         }
     }
 
@@ -168,6 +180,13 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
 
     override suspend fun createFolder(path: EntryPath) = withContext(Dispatchers.IO) {
         SystemFileSystem.createDirectories(path.toPath()).also { updateRootFolder() }
+    }
+
+    override suspend fun deleteEntry(path: EntryPath) {
+        withContext(Dispatchers.IO) {
+            SystemFileSystem.delete(path.toPath(), false)
+            updateRootFolder()
+        }
     }
 
     override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {

@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.domain.usecase
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.model.*
 import io.github.arashiyama11.dncl_ide.domain.notebook.*
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -38,6 +39,7 @@ class NotebookFileUseCaseTest {
             throw NotImplementedError()
 
         override suspend fun createFolder(path: EntryPath) = throw NotImplementedError()
+        override suspend fun deleteEntry(path: EntryPath) = throw NotImplementedError()
         override suspend fun selectFile(entryPath: EntryPath) = throw NotImplementedError()
         override suspend fun getFileContent(programFile: ProgramFile): FileContent =
             throw NotImplementedError()
@@ -58,17 +60,17 @@ class NotebookFileUseCaseTest {
                 dnclVersion = "1.2.3",
                 kernelspec = KernelSpec(name = "k", language = "lang", version = null)
             ),
-            cells = listOf(
+            cells = persistentListOf(
                 Cell(
                     id = "1",
                     type = CellType.CODE,
-                    source = listOf("print('a')"),
+                    source = persistentListOf("print('a')"),
                     executionCount = 1,
-                    outputs = listOf(
+                    outputs = persistentListOf(
                         Output(
                             outputType = "stream",
                             name = "o",
-                            text = listOf("t"),
+                            text = persistentListOf("t"),
                             ename = null,
                             evalue = null,
                             traceback = null
@@ -78,7 +80,7 @@ class NotebookFileUseCaseTest {
                 Cell(
                     id = "2",
                     type = CellType.MARKDOWN,
-                    source = listOf("md"),
+                    source = persistentListOf("md"),
                     executionCount = null,
                     outputs = null
                 )
@@ -94,22 +96,22 @@ class NotebookFileUseCaseTest {
         val codeCell = useCase.createCell(
             id = "c",
             type = CellType.CODE,
-            source = listOf("s")
+            source = persistentListOf("s")
         )
         assertEquals("c", codeCell.id)
         assertEquals(CellType.CODE, codeCell.type)
-        assertEquals(listOf("s"), codeCell.source)
+        assertEquals(persistentListOf("s"), codeCell.source)
         assertEquals(0, codeCell.executionCount)
-        assertEquals(emptyList<Output>(), codeCell.outputs)
+        assertEquals(persistentListOf(), codeCell.outputs)
 
         val mdCell = useCase.createCell(
             id = "m",
             type = CellType.MARKDOWN,
-            source = listOf("m")
+            source = persistentListOf("m")
         )
         assertEquals("m", mdCell.id)
         assertEquals(CellType.MARKDOWN, mdCell.type)
-        assertEquals(listOf("m"), mdCell.source)
+        assertEquals(persistentListOf("m"), mdCell.source)
         assertNull(mdCell.executionCount)
         assertNull(mdCell.outputs)
     }
@@ -119,23 +121,23 @@ class NotebookFileUseCaseTest {
         val cell1 = useCase.createCell(
             id = "c1",
             type = CellType.CODE,
-            source = listOf("1")
+            source = persistentListOf("1")
         )
         val cell2 = useCase.createCell(
             id = "c2",
             type = CellType.CODE,
-            source = listOf("2")
+            source = persistentListOf("2")
         )
         val notebook = Notebook(
             metadata = Metadata(dnclVersion = "v"),
-            cells = listOf(cell1, cell2)
+            cells = persistentListOf(cell1, cell2)
         )
         val newCell2 = useCase.createCell(
             id = "c2",
             type = CellType.CODE,
-            source = listOf("updated"),
+            source = persistentListOf("updated"),
             executionCount = 5,
-            outputs = listOf(
+            outputs = persistentListOf(
                 Output(
                     outputType = "t",
                     name = null,

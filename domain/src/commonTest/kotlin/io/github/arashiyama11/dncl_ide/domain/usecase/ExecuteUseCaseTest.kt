@@ -52,8 +52,8 @@ class ExecuteUseCaseTest {
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("30", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -157,8 +157,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("30", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -174,8 +174,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("あなたは 25 歳です", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("あなたは 25 歳です", stdoutOutput.value.trim())
     }
 
     @Test
@@ -189,8 +189,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("10", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("10", stdoutOutput.value.trim())
     }
 
     @Test
@@ -204,8 +204,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 1).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("10", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("10", stdoutOutput.value.trim())
     }
 
     @Test
@@ -238,8 +238,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("30", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("30", stdoutOutput.value.trim())
     }
 
     @Test
@@ -299,8 +299,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // 出力の検証
-        val stdoutOutput = outputs.filterIsInstance<DnclOutput.Stdout>().first()
-        assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]", stdoutOutput.value)
+        val stdoutOutput = outputs.filterIsInstance<DnclOutput.StdoutAppend>().first()
+        assertEquals("[3, 7, 9, 18, 29, 33, 48, 52, 62, 65, 77, 89]", stdoutOutput.value.trim())
     }
 
     private class MockSettingsRepository : SettingsRepository {
@@ -370,6 +370,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         }
 
         override suspend fun createFolder(path: EntryPath) {}
+        override suspend fun deleteEntry(path: EntryPath) {}
         override suspend fun selectFile(entryPath: EntryPath) {}
         override suspend fun getFileContent(programFile: ProgramFile): FileContent =
             mockGetFileContent(programFile)

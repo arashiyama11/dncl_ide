@@ -89,7 +89,8 @@ fun SelectNotebookScreen(
                             onFileClicked = {
                                 viewModel.onFileSelected(it)
                                 navigateToCodeScreen()
-                            }
+                            },
+                            onDelete = viewModel::onEntryDelete
                         )
                     }
 
@@ -102,7 +103,8 @@ fun SelectNotebookScreen(
                                 onClick = {
                                     viewModel.onFileSelected(it)
                                     navigateToCodeScreen()
-                                }
+                                },
+                                onDelete = viewModel::onEntryDelete
                             )
                         }
                     }

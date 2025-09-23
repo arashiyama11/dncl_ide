@@ -10,7 +10,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 
-class FileUseCase(private val fileRepository: FileRepository) {
+open class FileUseCase(private val fileRepository: FileRepository) {
     suspend fun getEntryByPath(entryPath: EntryPath): Entry? {
         return fileRepository.getEntryByPath(entryPath)
     }
@@ -55,5 +55,9 @@ class FileUseCase(private val fileRepository: FileRepository) {
 
     suspend fun getFileContent(programFile: ProgramFile): FileContent {
         return fileRepository.getFileContent(programFile)
+    }
+
+    suspend fun deleteEntry(entryPath: EntryPath) {
+        fileRepository.deleteEntry(entryPath)
     }
 }

@@ -182,20 +182,6 @@ fun CodeEditor(
                 cursorBrush = SolidColor(if (isSystemInDarkTheme()) Color.White else Color.Black),
                 onTextLayout = { textLayoutResult ->
                     lineHeightDp = textLayoutResult.multiParagraph.getLineHeight(0).dp
-                    val cursorOffset = codeText.selection.start
-                    val cursorRect = textLayoutResult.getCursorRect(cursorOffset)
-                    val margin = 32f
-                    if (cursorRect.top < margin) {
-                        coroutineScope.launch {
-                            val delta = (margin - cursorRect.top).toInt()
-                            scrollState.animateScrollTo((scrollState.value - delta).coerceAtLeast(0))
-                        }
-                    } else if (cursorRect.bottom > textFieldHeightPx - margin) {
-                        coroutineScope.launch {
-                            val delta = (cursorRect.bottom - (textFieldHeightPx - margin)).toInt()
-                            scrollState.animateScrollTo(scrollState.value + delta)
-                        }
-                    }
                 },
                 decorationBox = { innerTextField ->
                     innerTextField()
@@ -211,32 +197,34 @@ fun CodeEditor(
         }
     }
 
-    var scrollJob: Job? by remember { mutableStateOf(null) }
+    if (verticalScroll) {
+        var scrollJob: Job? by remember { mutableStateOf(null) }
 
-    LaunchedEffect(codeText.selection, editorHeightPx, fontSize) {
-        scrollJob?.cancel()
-        scrollJob = launch {
-            val lines = codeText.text.split("\n")
-            var idx = 0
-            var cursorLine = 0
-            for ((i, line) in lines.withIndex()) {
-                if (idx + line.length < codeText.selection.start) {
-                    idx += line.length + 1
-                } else {
-                    cursorLine = i
-                    break
+        LaunchedEffect(codeText.selection, editorHeightPx, fontSize) {
+            scrollJob?.cancel()
+            scrollJob = launch {
+                val lines = codeText.text.split("\n")
+                var idx = 0
+                var cursorLine = 0
+                for ((i, line) in lines.withIndex()) {
+                    if (idx + line.length < codeText.selection.start) {
+                        idx += line.length + 1
+                    } else {
+                        cursorLine = i
+                        break
+                    }
                 }
-            }
-            val targetOffset = (cursorLine * lineHeightPx).toInt()
+                val targetOffset = (cursorLine * lineHeightPx).toInt()
 
-            // 表示領域からカーソルがはみ出している場合にスクロール調整
-            if (targetOffset - lineHeightPx.toInt() < scrollState.value) {
-                scrollState.animateScrollTo(targetOffset - lineHeightPx.toInt())
-            } else if (targetOffset + lineHeightPx.toInt() * 4 > scrollState.value + editorHeightPx) {
-                if (targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx > scrollState.maxValue)
-                    scrollState.animateScrollTo(scrollState.maxValue)
-                else
-                    scrollState.animateScrollTo(targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx)
+                // 表示領域からカーソルがはみ出している場合にスクロール調整
+                if (targetOffset - lineHeightPx.toInt() < scrollState.value) {
+                    scrollState.animateScrollTo(targetOffset - lineHeightPx.toInt())
+                } else if (targetOffset + lineHeightPx.toInt() * 4 > scrollState.value + editorHeightPx) {
+                    if (targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx > scrollState.maxValue)
+                        scrollState.animateScrollTo(scrollState.maxValue)
+                    else
+                        scrollState.animateScrollTo(targetOffset + lineHeightPx.toInt() * 4 - editorHeightPx)
+                }
             }
         }
     }

@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     alias(libs.plugins.kotlinxSerialization)
 }
@@ -13,7 +15,7 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
     }
-    
+
     jvmToolchain(17)
     androidLibrary {
         namespace = "io.github.arashiyama11.dncl_ide.domain"
@@ -73,6 +75,8 @@ kotlin {
                 implementation(libs.koin.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(project.dependencies.platform(libs.koin.bom))
+                implementation(libs.kotlinx.collections.immutable)
+                implementation(compose.runtime)
 
                 implementation(project(":interpreter"))
             }

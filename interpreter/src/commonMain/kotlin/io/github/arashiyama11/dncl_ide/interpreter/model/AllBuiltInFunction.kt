@@ -10,7 +10,7 @@ enum class AllBuiltInFunction(val identifier: String) {
     SLICE("部分配列"), JOIN("配列結合"), SORT("並べ替え"), REVERSE("逆順"), FIND("検索"),
 
     // 文字列操作関数
-    SUBSTRING("部分文字列"), SPLIT("分割"), TRIM("空白除去"), REPLACE("置換"),
+    SUBSTRING("部分文字列"), SPLIT("分割"), TRIM("空白除去"), STRING_REPLACE("置換"),
 
     // 数学関数
     ROUND("四捨五入"), FLOOR("切り捨て"), CEIL("切り上げ"), RANDOM("乱数"),
@@ -21,7 +21,10 @@ enum class AllBuiltInFunction(val identifier: String) {
     IS_ARRAY("配列判定"), IS_BOOLEAN("真偽値判定"),
 
     // システム関数
-    CLEAR("出力消去"), SLEEP("待機");
+    CLEAR("出力消去"), SLEEP("待機"),
+
+    // 標準出力関数
+    APPEND("stdout_append"), FLUSH("stdout_flash"), COMMIT_FRAME("stdout_commit"), STDOUT_REPLACE("stdout_replace");
 
     companion object {
         fun from(identifier: String): AllBuiltInFunction? =

@@ -146,6 +146,17 @@ class FileUseCaseTest {
     }
 
 
+    @Test
+    fun `deleteEntryはリポジトリのdeleteEntryを正しく呼び出すこと`() = runTest {
+        val entryPath = EntryPath(listOf(FolderName("root"), FileName("test.txt")))
+        var calledWithPath: EntryPath? = null
+        fileRepository.mockDeleteEntry = { path ->
+            calledWithPath = path
+        }
+        fileUseCase.deleteEntry(entryPath)
+        assertEquals(entryPath, calledWithPath)
+    }
+
     private class MockFileRepository : FileRepository {
         override val rootFolder: StateFlow<Folder?>
             get() = MutableStateFlow(null)
@@ -159,6 +170,7 @@ class FileUseCaseTest {
             { null }
         var mockSaveFile: (ProgramFile, FileContent, CursorPosition) -> Job = { _, _, _ -> Job() }
         var mockCreateFolder: (EntryPath) -> Unit = { }
+        var mockDeleteEntry: (EntryPath) -> Unit = { }
         var mockSelectFile: (EntryPath) -> Unit = { selectedEntryPathFlow.value = it }
         var mockGetFileContent: (ProgramFile) -> FileContent = { FileContent("") }
         var mockGetCursorPosition: (ProgramFile) -> CursorPosition = { CursorPosition(0) }
@@ -184,6 +196,7 @@ class FileUseCaseTest {
         }
 
         override suspend fun createFolder(path: EntryPath) = mockCreateFolder(path)
+        override suspend fun deleteEntry(path: EntryPath) = mockDeleteEntry(path)
         override suspend fun selectFile(entryPath: EntryPath) = mockSelectFile(entryPath)
         override suspend fun getFileContent(programFile: ProgramFile): FileContent =
             mockGetFileContent(programFile)

@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.runBlocking
@@ -67,12 +68,13 @@ suspend fun CoroutineScope.executeSourceCode(sourceCode: String) {
     )
 
     val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
-        onStdout = { output ->
-            println(output)
-        },
+        stdout = StdoutImpl,
         onImport = { path ->
             System.err.println("REPLモードではimportはサポートされていません: $path")
-            DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
+            DnclObject.RuntimeError(
+                "REPLモードではimportはサポートされていません: $path",
+                AstNode.Program(emptyList())
+            )
         }
     )
 
@@ -107,12 +109,13 @@ suspend fun CoroutineScope.runRepl() {
     val inputChannel = Channel<String>()
 
     val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
-        onStdout = { output ->
-            println(output)
-        },
+        stdout = StdoutImpl,
         onImport = { path ->
             System.err.println("REPLモードではimportはサポートされていません: $path")
-            DnclObject.RuntimeError("REPLモードではimportはサポートされていません: $path", AstNode.Program(emptyList()))
+            DnclObject.RuntimeError(
+                "REPLモードではimportはサポートされていません: $path",
+                AstNode.Program(emptyList())
+            )
         }
     )
 
@@ -160,7 +163,10 @@ suspend fun CoroutineScope.runRepl() {
                     { error ->
                         // parseProgram()が失敗した場合
                         val errorMessage = error.explain(currentInput)
-                        if (isBlankLine || !(errorMessage.contains("EOF") || errorMessage.contains("expected") || errorMessage.contains("unclosed"))) {
+                        if (isBlankLine || !(errorMessage.contains("EOF") || errorMessage.contains("expected") || errorMessage.contains(
+                                "unclosed"
+                            ))
+                        ) {
                             // 空行で確定された場合、または復元不可能なエラーの場合、エラーを出力してリセット
                             System.err.println("構文解析エラー: $errorMessage")
                             currentInput = ""
@@ -177,22 +183,31 @@ suspend fun CoroutineScope.runRepl() {
                         if (!isBlankLine) { // 空行でない場合にのみ継続の可能性をチェック
                             val lines = currentInput.lines().filter { it.trim().isNotEmpty() }
                             val lastNonEmptyLine = lines.lastOrNull()
-                            val secondLastNonEmptyLine = if (lines.size >= 2) lines[lines.size - 2] else null
+                            val secondLastNonEmptyLine =
+                                if (lines.size >= 2) lines[lines.size - 2] else null
 
                             if (lastNonEmptyLine != null) {
-                                val blockKeywords = listOf("もし", "関数", "繰り返し") // DNCLのキーワードに合わせて調整
+                                val blockKeywords =
+                                    listOf("もし", "関数", "繰り返し") // DNCLのキーワードに合わせて調整
 
                                 // Case 1: The current line is a block-starting keyword ending with a colon
                                 val isCurrentLineBlockStart = blockKeywords.any { keyword ->
-                                    lastNonEmptyLine.trimStart().startsWith(keyword) && lastNonEmptyLine.trimEnd().endsWith(":")
+                                    lastNonEmptyLine.trimStart()
+                                        .startsWith(keyword) && lastNonEmptyLine.trimEnd()
+                                        .endsWith(":")
                                 }
                                 if (isCurrentLineBlockStart) {
                                     shouldContinue = true
                                 } else if (secondLastNonEmptyLine != null) {
                                     // Case 2: The current line is indented and the previous line was a block-starting keyword ending with a colon
-                                    val isLastLineIndented = lastNonEmptyLine.startsWith(" ") || lastNonEmptyLine.startsWith("\t")
+                                    val isLastLineIndented =
+                                        lastNonEmptyLine.startsWith(" ") || lastNonEmptyLine.startsWith(
+                                            "\t"
+                                        )
                                     val isPrevLineBlockStart = blockKeywords.any { keyword ->
-                                        secondLastNonEmptyLine.trimStart().startsWith(keyword) && secondLastNonEmptyLine.trimEnd().endsWith(":")
+                                        secondLastNonEmptyLine.trimStart()
+                                            .startsWith(keyword) && secondLastNonEmptyLine.trimEnd()
+                                            .endsWith(":")
                                     }
                                     shouldContinue = isLastLineIndented && isPrevLineBlockStart
                                 }
@@ -234,4 +249,26 @@ suspend fun CoroutineScope.runRepl() {
     }
     inputChannel.close()
     exitProcess(0)
+}
+
+object StdoutImpl : Stdout {
+    override suspend fun append(text: String) {
+        print(text)
+    }
+
+    override suspend fun flush() {
+        System.out.flush()
+    }
+
+    override suspend fun clear() {
+
+    }
+
+    override suspend fun commitFrame() {
+
+    }
+
+    override suspend fun replace(text: String) {
+        print(text)
+    }
 }

@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
@@ -22,17 +23,8 @@ class BuiltInFunctionTest {
     private var clearCalled = false
     private lateinit var evaluator: Evaluator
 
-    private val builtInEnv = runBlocking {
-        EvaluatorFactory.createBuiltInFunctionEnvironment(
-            onStdout = {
-                stdout += "$it\n"
-            },
-            onClear = {
-                clearCalled = true
-            },
-            onImport = { DnclObject.Null(astNode) },
-        )
-    }
+    private lateinit var builtInEnv: Environment
+
 
     @BeforeTest
     fun setUp() {
@@ -40,20 +32,41 @@ class BuiltInFunctionTest {
         clearCalled = false
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("")
-        evaluator =
-            EvaluatorFactory.create(
-                inputChannel = inputChannel,
-                arrayOrigin = 0,
-            ) { astNode, _ ->
-                DnclObject.Null(astNode)
-            }
+        evaluator = EvaluatorFactory.create(
+            inputChannel = inputChannel,
+            arrayOrigin = 0
+        )
+        
+        builtInEnv = runBlocking {
+            EvaluatorFactory.createBuiltInFunctionEnvironment(
+                stdout = object : Stdout {
+                    override suspend fun append(text: String) {
+                        stdout += text
+                    }
+
+                    override suspend fun flush() {
+                    }
+
+                    override suspend fun clear() {
+                        clearCalled = true
+                    }
+
+                    override suspend fun commitFrame() {
+                    }
+
+                    override suspend fun replace(text: String) {
+                    }
+                },
+                onImport = { _ -> DnclObject.Null(io.github.arashiyama11.dncl_ide.interpreter.model.AstNode.Program(emptyList())) }
+            )
+        }
     }
 
     private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!
 
     private fun testEval(program: String, expected: String) {
         runBlocking {
-            evaluator.evalProgram(program.toProgram(), Environment(builtInEnv)).leftOrNull()
+            evaluator.evalProgram(program.toProgram(), builtInEnv).leftOrNull()
                 ?.let { fail(it.toString()) }
         }
         assertEquals(expected, stdout)
@@ -61,7 +74,7 @@ class BuiltInFunctionTest {
 
     private fun evalAndGetResult(program: String): DnclObject {
         return runBlocking {
-            val result = evaluator.evalProgram(program.toProgram(), Environment(builtInEnv))
+            val result = evaluator.evalProgram(program.toProgram(), builtInEnv)
             result.leftOrNull()?.let { fail(it.toString()) }
             result.getOrNull() ?: fail("Evaluation failed")
         }

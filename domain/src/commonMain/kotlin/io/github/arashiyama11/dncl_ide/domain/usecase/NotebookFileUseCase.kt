@@ -6,43 +6,48 @@ import io.github.arashiyama11.dncl_ide.domain.model.DnclOutput
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.FileName
+import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
+import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Metadata
 import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
+import io.github.arashiyama11.dncl_ide.domain.notebook.SerializableNotebook
+import io.github.arashiyama11.dncl_ide.domain.notebook.toDomain
+import io.github.arashiyama11.dncl_ide.domain.notebook.toSerializable
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
+import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
-import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
-import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import kotlinx.coroutines.channels.Channel
-import kotlinx.serialization.json.Json
-import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
-import kotlinx.coroutines.withTimeoutOrNull
-import io.github.arashiyama11.dncl_ide.domain.model.FolderName
-import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlin.collections.plus
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 
-class NotebookFileUseCase(private val fileRepository: FileRepository) {
+open class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
 
-    fun FileContent.toNotebook(): Notebook = Json.decodeFromString(value)
+    fun FileContent.toNotebook(): Notebook = json.decodeFromString<SerializableNotebook>(value).toDomain()
 
-    fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this))
+    fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this.toSerializable()))
 
-    suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
+    open suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
         withContext(
             Dispatchers.Default
         ) {
@@ -85,25 +90,25 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                         }
 
                         else -> {
-                            DnclOutput.Stdout(it.toString())
+                            DnclOutput.StdoutAppend(it.toString())
                         }
                     }
                 }
             }
 
             when (output) {
-                is DnclOutput.Stdout -> {
+                is DnclOutput.StdoutAppend -> {
                     Output(
                         outputType = "stream",
                         name = "stdout",
-                        text = listOf(output.value)
+                        text = persistentListOf(output.value)
                     )
                 }
 
                 is DnclOutput.Error -> {
                     Output(
                         outputType = "error",
-                        text = listOf(output.value),
+                        text = persistentListOf(output.value),
                         evalue = output.value,
                         ename = output::class.simpleName,
                     )
@@ -112,7 +117,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 is DnclOutput.RuntimeError -> {
                     Output(
                         outputType = "error",
-                        text = listOf(output.value.explain(code)),
+                        text = persistentListOf(output.value.explain(code)),
                         evalue = output.value.explain(code),
                         ename = "RuntimeError",
                     )
@@ -121,7 +126,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 else -> Output(
                     outputType = "stream",
                     name = "stdout",
-                    text = listOf()
+                    text = persistentListOf()
                 )
             }
         }
@@ -132,20 +137,20 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     ) {
         val notebook = Notebook(
             metadata = Metadata(dnclVersion = "0.0.0"),
-            cells = listOf(
+            cells = persistentListOf(
                 Cell(
                     id = "cell-1",
                     type = CellType.CODE,
-                    source = listOf(""""表示する("Hello, world!")"""),
+                    source = persistentListOf("""表示する("Hello, world!")"""),
                     executionCount = 0,
-                    outputs = emptyList()
+                    outputs = persistentListOf()
                 ),
                 Cell(
                     id = "cell-2",
                     type = CellType.MARKDOWN,
-                    source = listOf("# タイトル", "これはマークダウンセルです。"),
+                    source = persistentListOf("# タイトル", "これはマークダウンセルです。"),
                     executionCount = null,
-                    outputs = emptyList()
+                    outputs = persistentListOf()
                 )
             )
         )
@@ -161,7 +166,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         return fileRepository.saveFile(notebookFile.path, fileContent, cursorPosition)
     }
 
-    suspend fun getNotebook(notebookFile: NotebookFile): Notebook {
+    open suspend fun getNotebook(notebookFile: NotebookFile): Notebook {
         return fileRepository.getNotebookFileContent(notebookFile).toNotebook()
     }
 
@@ -173,7 +178,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         val updatedCells = notebook.cells.map { cell ->
             if (cell.id == cellId) newCell else cell
         }
-        return notebook.copy(cells = updatedCells)
+        return notebook.copy(cells = updatedCells.toImmutableList())
     }
 
     fun modifyNotebookCell(
@@ -184,13 +189,13 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         val updatedCells = notebook.cells.map { cell ->
             if (cell.id == cellId) transform(cell) else cell
         }
-        return notebook.copy(cells = updatedCells)
+        return notebook.copy(cells = updatedCells.toImmutableList())
     }
 
-    fun modifyNotebookOutput(
+    open fun modifyNotebookOutput(
         notebook: Notebook,
         cellId: String,
-        newOutputs: List<Output>
+        newOutputs: ImmutableList<Output>
     ): Notebook {
         val updatedCells = notebook.cells.map { cell ->
             if (cell.id == cellId) {
@@ -199,7 +204,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 cell
             }
         }
-        return notebook.copy(cells = updatedCells)
+        return notebook.copy(cells = updatedCells.toImmutableList())
     }
 
     /**
@@ -215,9 +220,9 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     fun createCell(
         id: String,
         type: CellType,
-        source: List<String>,
+        source: ImmutableList<String>,
         executionCount: Int? = if (type == CellType.CODE) 0 else null,
-        outputs: List<Output>? = if (type == CellType.CODE) emptyList() else null
+        outputs: ImmutableList<Output>? = if (type == CellType.CODE) persistentListOf() else null
     ): Cell {
         return Cell(
             id = id,
@@ -276,7 +281,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         } else {
             cells.add(newCell)
         }
-        val updatedNotebook = notebook.copy(cells = cells)
+        val updatedNotebook = notebook.copy(cells = cells.toImmutableList())
         saveNotebookFile(
             notebookFile,
             updatedNotebook.toFileContent(),
@@ -294,7 +299,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
         cellId: String
     ): Notebook {
         val updatedCells = notebook.cells.filterNot { it.id == cellId }
-        val updatedNotebook = notebook.copy(cells = updatedCells)
+        val updatedNotebook = notebook.copy(cells = updatedCells.toImmutableList())
         saveNotebookFile(
             notebookFile,
             updatedNotebook.toFileContent(),
@@ -319,7 +324,7 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
             type = newType,
             source = cell.source,
             executionCount = if (newType == CellType.CODE) 0 else null,
-            outputs = if (newType == CellType.CODE) emptyList() else null
+            outputs = if (newType == CellType.CODE) persistentListOf() else null
         )
         val updatedNotebook = modifyNotebookCell(notebook, cellId, updatedCell)
         saveNotebookFile(
@@ -340,12 +345,12 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     ): Notebook {
         val updatedCells = notebook.cells.map { cell ->
             if (cell.id == cellId) {
-                cell.copy(outputs = emptyList(), executionCount = 0)
+                cell.copy(outputs = persistentListOf(), executionCount = 0)
             } else {
                 cell
             }
         }
-        val updatedNotebook = notebook.copy(cells = updatedCells)
+        val updatedNotebook = notebook.copy(cells = updatedCells.toImmutableList())
         return updatedNotebook
     }
 
@@ -358,16 +363,20 @@ class NotebookFileUseCase(private val fileRepository: FileRepository) {
     ): Notebook {
         val oldCell = notebook.cells.firstOrNull { it.id == cellId }
             ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
-        val prevOutputs = oldCell.outputs ?: emptyList()
-        val mergedOutputs =
-            if (prevOutputs.isNotEmpty() && prevOutputs.last().outputType == newOutput.outputType) {
-                val last = prevOutputs.last()
-                val mergedText = (last.text ?: emptyList()) + (newOutput.text ?: emptyList())
-                val mergedOutput = last.copy(text = mergedText)
-                prevOutputs.dropLast(1) + mergedOutput
-            } else {
-                prevOutputs + newOutput
-            }
+        val prevOutputs = oldCell.outputs ?: persistentListOf()
+
+        val mergedOutputs = if (prevOutputs.isNotEmpty() && prevOutputs.last().outputType == newOutput.outputType) {
+            val last = prevOutputs.last()
+            val mergedText = (last.text ?: persistentListOf()) + (newOutput.text ?: persistentListOf())
+            val mergedOutput = last.copy(text = mergedText.toImmutableList())
+
+            val mutableOutputs = prevOutputs.toMutableList()
+            mutableOutputs[mutableOutputs.lastIndex] = mergedOutput
+            mutableOutputs.toImmutableList()
+        } else {
+            prevOutputs.toMutableList().apply { add(newOutput) }.toImmutableList()
+        }
+
         val updatedCell = oldCell.copy(
             outputs = mergedOutputs,
             executionCount = (oldCell.executionCount ?: 0) + 1

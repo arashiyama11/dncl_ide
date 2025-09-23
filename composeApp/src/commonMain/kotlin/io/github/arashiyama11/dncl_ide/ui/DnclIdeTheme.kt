@@ -9,8 +9,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownTypography
+import com.mikepenz.markdown.model.MarkdownColors
+import com.mikepenz.markdown.model.MarkdownTypography
 import org.jetbrains.compose.resources.Font
 import dncl_ide.composeapp.generated.resources.NOTONOTO_Black
 import dncl_ide.composeapp.generated.resources.NOTONOTO_Bold
@@ -83,14 +89,63 @@ fun DnclIdeTheme(content: @Composable () -> Unit) {
     )
 
 
-    CompositionLocalProvider(LocalCodeTypography provides codeTypography) {
-        MaterialTheme(
-            colorScheme = if (isDark) darkColorScheme else lightColorScheme,
-        ) { content() }
+    MaterialTheme(
+        colorScheme = if (isDark) darkColorScheme else lightColorScheme,
+    ) {
+        CompositionLocalProvider(
+            LocalCodeTypography provides codeTypography,
+            LocalMarkdownColors provides rememberMarkdownColors(),
+            LocalMarkdownTypography provides rememberMarkdownTypography()
+        ) {
+            content()
+        }
     }
 }
 
 
 val LocalCodeTypography = compositionLocalOf<Typography> {
     error("No typography provided")
+}
+
+
+@Composable
+fun rememberMarkdownColors(): MarkdownColors {
+    return object : MarkdownColors {
+        override val text: Color = MaterialTheme.colorScheme.onBackground
+        override val codeText: Color = MaterialTheme.colorScheme.onSurface
+        override val inlineCodeText: Color = MaterialTheme.colorScheme.onSurfaceVariant
+        override val linkText: Color = MaterialTheme.colorScheme.primary
+        override val codeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
+        override val inlineCodeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
+        override val dividerColor: Color = MaterialTheme.colorScheme.outline
+        override val tableText: Color = MaterialTheme.colorScheme.onSurface
+        override val tableBackground: Color = MaterialTheme.colorScheme.surface
+    }
+}
+
+@Composable
+fun rememberMarkdownTypography(): MarkdownTypography {
+    return object : MarkdownTypography {
+        override val text: TextStyle = MaterialTheme.typography.bodyLarge
+        override val code: TextStyle =
+            MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
+        override val inlineCode: TextStyle =
+            MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+        override val h1: TextStyle = MaterialTheme.typography.headlineLarge
+        override val h2: TextStyle = MaterialTheme.typography.headlineMedium
+        override val h3: TextStyle = MaterialTheme.typography.headlineSmall
+        override val h4: TextStyle = MaterialTheme.typography.titleLarge
+        override val h5: TextStyle = MaterialTheme.typography.titleMedium
+        override val h6: TextStyle = MaterialTheme.typography.titleSmall
+        override val quote: TextStyle =
+            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary)
+        override val paragraph: TextStyle = MaterialTheme.typography.bodyLarge
+        override val ordered: TextStyle = MaterialTheme.typography.bodyLarge
+        override val bullet: TextStyle = MaterialTheme.typography.bodyLarge
+        override val list: TextStyle = MaterialTheme.typography.bodyLarge
+        override val link: TextStyle =
+            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
+        override val textLink: TextLinkStyles = TextLinkStyles()
+        override val table: TextStyle = MaterialTheme.typography.bodyMedium
+    }
 }

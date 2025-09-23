@@ -333,7 +333,7 @@ class HoverService(
                     ```
                 """.trimIndent()
 
-            AllBuiltInFunction.REPLACE -> """
+            AllBuiltInFunction.STDOUT_REPLACE -> """
                     `置換(string, target, replacement)`  
                     文字列中の指定部分を別の文字列に置換して返す関数です。  
                     使用例
@@ -463,6 +463,46 @@ class HoverService(
                     待機(1000)  # 1秒停止
                     ```
                 """.trimIndent()
+
+            AllBuiltInFunction.STRING_REPLACE -> """
+                    `置換(string, target, replacement)`  
+                    文字列中の指定部分を別の文字列に置換して返す関数です。  
+                    使用例
+                    ```dncl
+                    r = 置換("abcabc", "b", "x")  # "axcaxc"
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.APPEND -> """
+                    `追加(text)`  
+                    出力にテキストを追加する関数です。  
+                    使用例
+                    ```dncl
+                    追加("Hello, ")
+                    追加("world!")
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.FLUSH -> """
+                    `フラッシュ()`  
+                    出力をフラッシュ（強制表示）する関数です。  
+                    使用例
+                    ```dncl
+                    追加("Loading...")
+                    フラッシュ()
+                    ```
+            """.trimIndent()
+
+            AllBuiltInFunction.COMMIT_FRAME -> """
+                    `フレーム確定()`  
+                    現在の出力フレームを確定し、新しいフレームを開始する関数です。  
+                    使用例
+                    ```dncl
+                    追加("Frame 1")
+                    フレーム確定()
+                    追加("Frame 2")
+                    ```
+            """.trimIndent()
         }
     }
 }

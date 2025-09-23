@@ -1,5 +1,4 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.compose.reload.ComposeHotRun
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -67,6 +66,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.navigation.compose)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.kotlinx.collections.immutable)
 
             implementation(libs.arrow.core)
             implementation(libs.arrow.fx.coroutines)
@@ -91,6 +91,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+        }
+
+        val desktopTest by getting {
+            dependencies {
+            }
         }
     }
 }
@@ -141,8 +146,4 @@ compose.desktop {
 
 composeCompiler {
     featureFlags.add(ComposeFeatureFlag.OptimizeNonSkippingGroups)
-}
-
-tasks.withType<ComposeHotRun>().configureEach {
-    mainClass.set("io.github.arashiyama11.dncl_ide.MainKt")
 }

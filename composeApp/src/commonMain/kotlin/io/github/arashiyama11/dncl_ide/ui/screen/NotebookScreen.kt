@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -29,42 +30,39 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
-import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
+import com.mikepenz.markdown.compose.Markdown
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
+import io.github.arashiyama11.dncl_ide.adapter.NotebookUiState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
-import io.github.arashiyama11.dncl_ide.domain.model.Definition
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
-import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
-import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.model.MarkdownColors
-import com.mikepenz.markdown.model.MarkdownTypography
-import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
+import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -74,64 +72,73 @@ fun NotebookScreen(
     notebookViewModel: NotebookViewModel = koinViewModel(),
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
+    val onAction = remember(notebookViewModel) { notebookViewModel::handleAction }
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
         if (uiState.notebook == null || uiState.loading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
-            CompositionLocalProvider(
-                LocalMarkdownColors provides rememberMarkdownColors(),
-                LocalMarkdownTypography provides rememberMarkdownTypography()
-            ) {
-                NotebookContent(
-                    notebookViewModel = notebookViewModel,
-                )
-            }
+            NotebookContent(
+                uiState = uiState,
+                onAction = onAction,
+                onSave = notebookViewModel::saveNotebook
+            )
         }
     }
 }
 
 @Composable
 fun NotebookContent(
-    notebookViewModel: NotebookViewModel = koinViewModel(),
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
+    Column(modifier = modifier.fillMaxSize()) {
+        NotebookToolbarComponent(uiState, onAction, onSave)
+        CellListComponent(uiState, onAction, Modifier.weight(1f))
+    }
+}
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Notebook toolbar with cancel capability
-        NotebookToolbar(
-            selectedEntryPath = uiState.selectedEntryPath,
-            onExecuteAllCells = { notebookViewModel.handleAction(NotebookAction.ExecuteAllCells) },
-            onCancelExecution = { notebookViewModel.handleAction(NotebookAction.CancelExecution) },
-            unsavedChanges = uiState.unsavedChanges,
-            onSave = { notebookViewModel.saveNotebook() },
-            running = uiState.running // Pass running state
-        )
+@Composable
+fun NotebookToolbarComponent(
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    onSave: () -> Unit
+) {
+    NotebookToolbar(
+        selectedEntryPath = uiState.selectedEntryPath,
+        onExecuteAllCells = { onAction(NotebookAction.ExecuteAllCells) },
+        onCancelExecution = { onAction(NotebookAction.CancelExecution) },
+        unsavedChanges = uiState.unsavedChanges,
+        onSave = onSave,
+        running = uiState.running
+    )
+}
 
-        // Cells
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            items(uiState.notebook!!.cells) { cell ->
+@Composable
+fun CellListComponent(
+    uiState: NotebookUiState,
+    onAction: (NotebookAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        for (cellId in uiState.cellIds) {
+            key(cellId) {
                 CellComponent(
-                    cell = cell,
-                    isSelected = cell.id == uiState.selectedCellId,
-                    onAction = notebookViewModel::handleAction,
-                    codeCellStateMap = uiState.codeCellStateMap,
-                    suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList(),
-                    fontSize = uiState.fontSize
+                    uiState = uiState,
+                    cellId = cellId,
+                    onAction = onAction
                 )
-                Spacer(modifier = Modifier.height(8.dp))
             }
-
-            item {
-                with(LocalDensity.current) {
-                    Spacer(Modifier.height(LocalWindowInfo.current.containerSize.height.toDp() / 3))
-                }
-            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -143,7 +150,7 @@ fun NotebookToolbar(
     onCancelExecution: () -> Unit,
     unsavedChanges: Boolean,
     onSave: () -> Unit,
-    running: Boolean // Add running as a parameter
+    running: Boolean
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -176,13 +183,15 @@ fun NotebookToolbar(
 
 @Composable
 fun CellComponent(
-    cell: Cell,
-    isSelected: Boolean,
+    uiState: NotebookUiState,
+    cellId: String,
     onAction: (NotebookAction) -> Unit,
-    codeCellStateMap: Map<String, CodeCellState>,
-    suggestions: List<Definition> = emptyList(),
-    fontSize: Int
 ) {
+    val cell = uiState.notebook?.cells?.find { it.id == cellId } ?: return
+    val isSelected = uiState.selectedCellId == cellId
+    val codeCellState = uiState.codeCellStateMap[cellId]
+    val fontSize = uiState.fontSize
+
     val borderColor = if (isSelected)
         MaterialTheme.colorScheme.primary
     else
@@ -191,12 +200,11 @@ fun CellComponent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 96.dp)
             .clip(RoundedCornerShape(4.dp))
             .border(1.dp, borderColor, RoundedCornerShape(4.dp))
-            .clickable { onAction(NotebookAction.SelectCell(cell.id)) }
             .padding(8.dp)
     ) {
-        // Cell header with type indicator and controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -212,24 +220,22 @@ fun CellComponent(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Cell controls
             if (cell.type == CellType.CODE) {
-                IconButton(onClick = { onAction(NotebookAction.ExecuteCell(cell.id)) }) {
+                IconButton(onClick = { onAction(NotebookAction.ExecuteCell(cellId)) }) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Execute Cell")
                 }
             }
 
-            IconButton(onClick = { onAction(NotebookAction.DeleteCell(cell.id)) }) {
+            IconButton(onClick = { onAction(NotebookAction.DeleteCell(cellId)) }) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete Cell")
-            }
+                }
 
-            // Toggle cell type button
             TextButton(onClick = {
                 val newType = when (cell.type) {
                     CellType.CODE -> CellType.MARKDOWN
                     CellType.MARKDOWN -> CellType.CODE
                 }
-                onAction(NotebookAction.ChangeCellType(cell.id, newType))
+                onAction(NotebookAction.ChangeCellType(cellId, newType))
             }) {
                 Text(
                     text = when (cell.type) {
@@ -242,59 +248,54 @@ fun CellComponent(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-        // Cell content
         when (cell.type) {
-            CellType.CODE -> CodeCellContent(
-                cell,
-                onAction,
-                codeCellStateMap[cell.id] ?: CodeCellState(),
-                suggestions,
-                fontSize
-            )
+            CellType.CODE -> if (codeCellState != null) {
+                CodeCellContent(
+                    uiState = uiState,
+                    cell = cell,
+                    onAction = onAction,
+                    codeCellState = codeCellState,
+                    fontSize = fontSize,
+                )
+            }
 
             CellType.MARKDOWN -> MarkdownCellContent(
-                cell,
-                isSelected,
-                onAction,
-                fontSize
-            ) // Pass fontSize
+                cell = cell,
+                isSelected = isSelected,
+                onAction = onAction,
+                fontSize = fontSize,
+            )
         }
     }
 }
 
 @Composable
 fun CodeCellContent(
-    cell: Cell,
+    uiState: NotebookUiState,
+    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
     onAction: (NotebookAction) -> Unit,
-    codeCellState: CodeCellState,
-    suggestions: List<Definition> = emptyList(),
-    fontSize: Int
+    codeCellState: io.github.arashiyama11.dncl_ide.adapter.CodeCellState,
+    fontSize: Int,
 ) {
-    var localTfv by remember(cell.id) {
+    val suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList()
+
+    var localTfv by remember(cell.id, codeCellState.textFieldValue) {
         mutableStateOf(codeCellState.textFieldValue)
     }
 
-    LaunchedEffect(codeCellState.textFieldValue, cell.id) {
-        if (localTfv != codeCellState.textFieldValue) {
-            localTfv = codeCellState.textFieldValue
-        }
-    }
-
-    LaunchedEffect(localTfv, cell.id) {
+    LaunchedEffect(localTfv) {
         if (codeCellState.textFieldValue != localTfv) {
             onAction(NotebookAction.UpdateCodeCell(cell.id, localTfv))
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().clickable {
-        onAction(NotebookAction.SelectCell(cell.id))
-    }) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         CodeEditor(
             codeText = localTfv,
             codeCellState.annotatedString,
-            Modifier.clickable {
-                onAction(NotebookAction.SelectCell(cell.id))
-            },
+            Modifier,
             fontSize,
             { newTextFieldValue ->
                 localTfv = newTextFieldValue
@@ -337,29 +338,57 @@ fun CodeCellContent(
             }
         }
 
-        cell.outputs?.forEach { output ->
-            OutputDisplay(output, fontSize)
+        val density = LocalDensity.current
+        var minHeight by remember(cell.id) { mutableStateOf(0.dp) }
+
+        Column(
+            modifier = Modifier.onGloballyPositioned {
+                val heightInDp = with(density) { it.size.height.toDp() }
+                if (heightInDp > minHeight) {
+                    minHeight = heightInDp
+                }
+            }.heightIn(min = minHeight)
+        ) {
+            cell.outputs?.forEachIndexed { i, output ->
+                key(i) {
+                    OutputDisplay(output, fontSize)
+                }
+            }
         }
     }
 }
 
 @Composable
 fun MarkdownCellContent(
-    cell: Cell,
+    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
-    fontSize: Int = 16
+    fontSize: Int = 16,
 ) {
     var text by remember(cell.id) {
         mutableStateOf(TextFieldValue(cell.source.joinToString("\n")))
     }
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(text.text) {
-        onAction(NotebookAction.UpdateMarkdownCell(cell.id, text.text.lines()))
+        if (cell.source.joinToString("\n") != text.text) {
+            onAction(NotebookAction.UpdateMarkdownCell(cell.id, text.text.lines()))
+        }
+    }
+
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            coroutineScope.launch {
+                focusRequester.requestFocus()
+            }
+        }
     }
 
     Box(
-        modifier = Modifier.clickable { onAction(NotebookAction.SelectCell(cell.id)) }
+        modifier = Modifier.clickable(enabled = !isSelected) {
+            onAction(NotebookAction.SelectCell(cell.id))
+        }
     ) {
         if (isSelected) {
             OutlinedTextField(
@@ -367,41 +396,52 @@ fun MarkdownCellContent(
                 onValueChange = { newValue -> text = newValue },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .focusRequester(focusRequester),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = fontSize.sp,
                     lineHeight = fontSize.sp
-                ), // Use fontSize
-                singleLine = false,
-                maxLines = Int.MAX_VALUE
+                ),
+                singleLine = false
             )
         } else {
-
             Markdown(
-                content = cell.source.joinToString("\n"),
+                content = text.text,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 100.dp)
                     .padding(8.dp),
-                colors = LocalMarkdownColors.current,// rememberMarkdownColors(),
-                typography = LocalMarkdownTypography.current//rememberMarkdownTypography()
+                colors = LocalMarkdownColors.current,
+                typography = LocalMarkdownTypography.current
             )
         }
     }
-
-
 }
 
 @Composable
 fun OutputDisplay(output: Output, fontSize: Int) {
+    var minHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
             .border(1.dp, Color.LightGray, RoundedCornerShape(4.dp))
             .padding(8.dp)
+            .onGloballyPositioned {
+                val heightInDp = with(density) { it.size.height.toDp() }
+                if (heightInDp > minHeight) {
+                    minHeight = heightInDp
+                }
+            }.heightIn(min = minHeight)
+        //.heightIn(min = 500.dp)
     ) {
         when (output.outputType) {
             "stream" -> {
+                // stdout/stderr を name で判定
+                val isStderr = output.name == "stderr"
+                val textColor = if (isStderr) MaterialTheme.colorScheme.error else Color.Unspecified
+
                 output.text?.let { textLines ->
                     Text(
                         text = textLines.joinToString("\n"),
@@ -409,6 +449,7 @@ fun OutputDisplay(output: Output, fontSize: Int) {
                             fontSize = fontSize.sp,
                             lineHeight = (fontSize + 2).sp
                         ),
+                        color = textColor
                     )
                 }
             }
@@ -443,48 +484,5 @@ fun OutputDisplay(output: Output, fontSize: Int) {
                 )
             }
         }
-    }
-}
-
-
-@Composable
-fun rememberMarkdownColors(): MarkdownColors {
-    return object : MarkdownColors {
-        override val text: Color = MaterialTheme.colorScheme.onBackground
-        override val codeText: Color = MaterialTheme.colorScheme.onSurface
-        override val inlineCodeText: Color = MaterialTheme.colorScheme.onSurfaceVariant
-        override val linkText: Color = MaterialTheme.colorScheme.primary
-        override val codeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val inlineCodeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val dividerColor: Color = MaterialTheme.colorScheme.outline
-        override val tableText: Color = MaterialTheme.colorScheme.onSurface
-        override val tableBackground: Color = MaterialTheme.colorScheme.surface
-    }
-}
-
-@Composable
-fun rememberMarkdownTypography(): MarkdownTypography {
-    return object : MarkdownTypography {
-        override val text: TextStyle = MaterialTheme.typography.bodyLarge
-        override val code: TextStyle =
-            MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-        override val inlineCode: TextStyle =
-            MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-        override val h1: TextStyle = MaterialTheme.typography.headlineLarge
-        override val h2: TextStyle = MaterialTheme.typography.headlineMedium
-        override val h3: TextStyle = MaterialTheme.typography.headlineSmall
-        override val h4: TextStyle = MaterialTheme.typography.titleLarge
-        override val h5: TextStyle = MaterialTheme.typography.titleMedium
-        override val h6: TextStyle = MaterialTheme.typography.titleSmall
-        override val quote: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary)
-        override val paragraph: TextStyle = MaterialTheme.typography.bodyLarge
-        override val ordered: TextStyle = MaterialTheme.typography.bodyLarge
-        override val bullet: TextStyle = MaterialTheme.typography.bodyLarge
-        override val list: TextStyle = MaterialTheme.typography.bodyLarge
-        override val link: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
-        override val textLink: TextLinkStyles = TextLinkStyles()
-        override val table: TextStyle = MaterialTheme.typography.bodyMedium
     }
 }

@@ -6,6 +6,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
+import io.github.arashiyama11.dncl_ide.util.OutputEvent
+import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -23,15 +25,13 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
+import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -44,13 +44,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 
 data class IdeUiState(
@@ -144,9 +140,8 @@ class IdeViewModel(
     private var executeJob: Job? = null
     private var inputChannel: Channel<String>? = null
     val errorChannel = Channel<String>(Channel.BUFFERED)
-    private var stdoutChannel = Channel<String>(capacity = 1024)
-    private val pendingOutputCount = atomic(0)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
+    private lateinit var outputHandler: OutputHandler
 
 
     fun onPause() {
@@ -156,6 +151,14 @@ class IdeViewModel(
     }
 
     fun onStart(isDarkTheme: StateFlow<Boolean>) {
+        outputHandler = OutputHandler(viewModelScope) { outputs ->
+            viewModelScope.launch(Dispatchers.Main) {
+                _localState.update {
+                    it.copy(output = outputs[null] ?: "")
+                }
+            }
+        }
+
         viewModelScope.launch {
             isDarkTheme.collect {
                 _localState.update { state ->
@@ -175,8 +178,10 @@ class IdeViewModel(
                     when (programFile) {
                         is ProgramFile -> {
                             if (prePath != null) saveFile(prePath)
-                            _localState.updateOnMain {
-                                it.copy(output = "")
+                            viewModelScope.launch(Dispatchers.Main) {
+                                _localState.update {
+                                    it.copy(output = "")
+                                }
                             }
                             onTextChanged(
                                 TextFieldValue(
@@ -205,97 +210,16 @@ class IdeViewModel(
                 prePath = entryPath
             }
         }
-        executeScope.launch {
-            watchStdoutChannel()
-        }
-    }
-
-    @OptIn(DelicateCoroutinesApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private suspend fun watchStdoutChannel() {
-        try {
-            println("starting watchStdoutChannel stdout for IdeViewModel")
-            val channel = stdoutChannel
-            var isBusy = false
-            val stdoutBuilder = StringBuilder() // Changed from mutableListOf<String>()
-
-            suspend fun updateOutputView(text: String) {
-                withContext(Dispatchers.Main.immediate) {
-                    _localState.update {
-                        it.copy(
-                            output = text
-                        )
-                    }
-                }
-            }
-
-            for (outputStr in channel) {
-                if (channel.isClosedForReceive || !coroutineContext.isActive || !executeScope.coroutineContext.isActive || executeScope.coroutineContext.job.isCancelled) {
-                    println("stdout channel closed or coroutine context is not active, exiting watchStdoutChannel for IdeViewModel")
-                    return
-                }
-
-                if (channel.isClosedForReceive) {
-                    println("stdout channel closed, exiting watchStdoutChannel for IdeViewModel")
-                    return
-                }
-
-                pendingOutputCount.decrementAndGet()
-                if (stdoutChannel.isEmpty || pendingOutputCount.value < 0) {
-                    pendingOutputCount.update { 0 }
-                }
-
-                val x = 4L - pendingOutputCount.value.toLong()
-                val t = x * x * x + x * 10L
-                if (t > 0) {
-                    delay(t)
-                }
-
-                if (stdoutChannel.isEmpty && isBusy) {
-                    println("end busy for IdeViewModel")
-                    isBusy = false
-                    withContext(Dispatchers.Main.immediate) {
-                        updateOutputView(stdoutBuilder.toString()) // Changed from stdoutLines.joinToString("\\n")
-                    }
-                    pendingOutputCount.update { 0 }
-                }
-
-                if (!stdoutChannel.isEmpty && !isBusy) {
-                    println("start busy for IdeViewModel")
-                    isBusy = true
-                }
-
-                if (outputStr == "\\u0000") {
-                    stdoutBuilder.clear() // Changed from stdoutLines.clear()
-                    if (!isBusy) withContext(Dispatchers.Main) {
-                        updateOutputView("")
-                    }
-                    continue
-                }
-                stdoutBuilder.append(outputStr + "\n") // Changed from stdoutLines.add(outputStr)
-
-                val text = stdoutBuilder.toString() // Changed from stdoutLines.joinToString("\\n")
-                if (isBusy) {
-                    if (pendingOutputCount.value < 20)
-                        executeScope.launch(Dispatchers.Main) {
-                            updateOutputView(text)
-                        }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        updateOutputView(text)
-                    }
-                }
-            }
-        } finally {
-            println("watchStdoutChannel finished for IdeViewModel, closing stdoutChannel")
-        }
     }
 
     fun onTextChanged(text: TextFieldValue) {
         val indentedText = autoIndent(uiState.value.codeTextFieldValue, text)
 
         viewModelScope.launch(Dispatchers.Default) {
-            _localState.updateOnMain {
-                it.copy(codeTextFieldValue = indentedText)
+            viewModelScope.launch(Dispatchers.Main) {
+                _localState.update {
+                    it.copy(codeTextFieldValue = indentedText)
+                }
             }
 
             val tokens = Lexer(indentedText.text).toList()
@@ -323,14 +247,16 @@ class IdeViewModel(
             )
 
             val finalError = error ?: highlightError
-            _localState.updateOnMain {
-                it.copy(
-                    dnclError = finalError,
-                    output = finalError?.explain(uiState.value.codeTextFieldValue.text)
-                        ?: if (it.dnclError == null) it.output else "",
-                    errorRange = finalError?.errorRange
-                        ?: if (it.dnclError == null) it.errorRange else null,
-                )
+            viewModelScope.launch(Dispatchers.Main) {
+                _localState.update {
+                    it.copy(
+                        dnclError = finalError,
+                        output = finalError?.explain(uiState.value.codeTextFieldValue.text)
+                            ?: if (it.dnclError == null) it.output else "",
+                        errorRange = finalError?.errorRange
+                            ?: if (it.dnclError == null) it.errorRange else null,
+                    )
+                }
             }
 
             // Use the shared results for text suggestions
@@ -345,11 +271,13 @@ class IdeViewModel(
                 emptyList()
             }
 
-            _localState.updateOnMain {
-                it.copy(
-                    annotatedString = annotatedString,
-                    textSuggestions = suggestions
-                )
+            viewModelScope.launch(Dispatchers.Main) {
+                _localState.update {
+                    it.copy(
+                        annotatedString = annotatedString,
+                        textSuggestions = suggestions
+                    )
+                }
             }
         }
     }
@@ -361,16 +289,14 @@ class IdeViewModel(
         }
 
         appStateStore.dispatch(Action.SetRunning(true))
+        viewModelScope.launch {
+            outputHandler.stdout.clear()
+        }
 
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
         executeScope.coroutineContext.job.cancel().also {
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            stdoutChannel.close()
-            stdoutChannel = Channel(capacity = 1024)
-            executeScope.launch {
-                watchStdoutChannel()
-            }
         }
 
         inputChannel?.close()
@@ -396,64 +322,84 @@ class IdeViewModel(
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
-                        _localState.updateOnMain {
-                            it.copy(
-                                // output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
-                                isError = true,
-                                errorRange = output.value.astNode.range
-                            )
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update {
+                                it.copy(
+                                    // output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
+                                    isError = true,
+                                    errorRange = output.value.astNode.range
+                                )
+                            }
                         }
                         appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
                     is DnclOutput.Error -> {
-                        _localState.updateOnMain {
-                            it.copy(
-                                // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
-                                isError = true
-                            )
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update {
+                                it.copy(
+                                    // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
+                                    isError = true
+                                )
+                            }
                         }
                         appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
-                    is DnclOutput.Stdout -> {
-                        if (!stdoutChannel.isClosedForSend)
-                            stdoutChannel.send(output.value)
-                        pendingOutputCount.incrementAndGet()
+                    is DnclOutput.StdoutAppend -> {
+                        outputHandler.stdout.append(text = output.value)
                     }
 
-                    is DnclOutput.Clear -> {
-                        if (!stdoutChannel.isClosedForSend)
-                            stdoutChannel.send("\\u0000")
-                        pendingOutputCount.incrementAndGet()
-                        // This is now handled by the onClear callback in executeUseCase
+                    is DnclOutput.StdoutClear -> {
+                        outputHandler.stdout.clear()
+                    }
+
+                    is DnclOutput.StdoutFlush -> {
+                        outputHandler.stdout.flush()
+                    }
+
+                    is DnclOutput.StdoutCommitFrame -> {
+                        outputHandler.stdout.commitFrame()
+                    }
+
+                    is DnclOutput.StdoutReplace -> {
+                        outputHandler.stdout.replace(text = output.value)
                     }
 
                     is DnclOutput.LineEvaluation -> {
-                        _localState.updateOnMain {
-                            it.copy(
-                                currentEvaluatingLine = output.value
-                            )
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update {
+                                it.copy(
+                                    currentEvaluatingLine = output.value
+                                )
+                            }
                         }
                     }
 
                     is DnclOutput.EnvironmentUpdate -> {
-                        _localState.updateOnMain {
-                            it.copy(
-                                currentEnvironment = output.environment
-                            )
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update {
+                                it.copy(
+                                    currentEnvironment = output.environment
+                                )
+                            }
                         }
                     }
 
                     is DnclOutput.WaitingForInput -> {
-                        _localState.updateOnMain {
-                            it.copy(isWaitingForInput = output.isWaiting)
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update {
+                                it.copy(isWaitingForInput = output.isWaiting)
+                            }
                         }
                     }
                 }
             }
+            outputHandler.stdout.flush()
             delay(50)
-            _localState.updateOnMain { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) } // isExecuting controlled by AppState
+            viewModelScope.launch(Dispatchers.Main) {
+                _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) }
+            } // isExecuting controlled by AppState
             appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
             onTextChanged(uiState.value.codeTextFieldValue)
         }
@@ -463,11 +409,6 @@ class IdeViewModel(
         executeJob?.cancel()
         executeScope.coroutineContext.job.cancel().also {
             executeScope = CoroutineScope(Dispatchers.Default + Job())
-            stdoutChannel.close()
-            stdoutChannel = Channel(capacity = 1024)
-            executeScope.launch {
-                watchStdoutChannel()
-            }
         }
         _localState.update { it.copy(currentEvaluatingLine = null) }
         appStateStore.dispatch(Action.SetRunning(false))
@@ -627,10 +568,4 @@ class IdeViewModel(
         val textSuggestions: List<Definition>,
         val isFocused: Boolean
     )
-
-    private suspend fun MutableStateFlow<LocalIdeState>.updateOnMain(block: (LocalIdeState) -> LocalIdeState) {
-        withContext(Dispatchers.Main) {
-            this@updateOnMain.update(block)
-        }
-    }
 }
