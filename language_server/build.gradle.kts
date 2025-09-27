@@ -9,6 +9,7 @@ plugins {
 }
 
 kotlin {
+    jvmToolchain(17)
 
     // Target declarations - add or remove as needed below. These define
     // which platforms this KMP module supports.
@@ -79,6 +80,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
     }

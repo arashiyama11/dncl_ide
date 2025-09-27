@@ -6,7 +6,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
-import io.github.arashiyama11.dncl_ide.util.OutputEvent
 import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
@@ -24,14 +23,18 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
-import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.language.LanguageService
+import io.github.arashiyama11.dncl_ide.language.LanguageServerDocument
+import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +72,7 @@ data class IdeUiState(
     val isDarkTheme: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
     val isFocused: Boolean = false,
+    val languageDiagnostics: List<Diagnostic> = emptyList(),
     val selectedEntryPath: EntryPath? = null,
     val running: Boolean = false
 )
@@ -81,9 +85,9 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
-    private val settingsUseCase: SettingsUseCase,
     private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore<StatePermission.Write>
+    private val appStateStore: AppStateStore<StatePermission.Write>,
+    private val languageService: LanguageService
 ) : ViewModel() {
     private val appState by appStateStore
 
@@ -104,7 +108,8 @@ class IdeViewModel(
             isWaitingForInput = false,
             isDarkTheme = false,
             textSuggestions = emptyList(),
-            isFocused = false
+            isFocused = false,
+            languageDiagnostics = emptyList()
         )
     )
 
@@ -132,6 +137,7 @@ class IdeViewModel(
             isDarkTheme = localState.isDarkTheme,
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
+            languageDiagnostics = localState.languageDiagnostics,
             selectedEntryPath = appState.selectedEntryPath,
             running = appState.running
         )
@@ -142,6 +148,8 @@ class IdeViewModel(
     val errorChannel = Channel<String>(Channel.BUFFERED)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
+    private var diagnosticsJob: Job? = null
+    private var currentDocumentUri: String? = null
 
 
     fun onPause() {
@@ -183,12 +191,40 @@ class IdeViewModel(
                                     it.copy(output = "")
                                 }
                             }
-                            onTextChanged(
-                                TextFieldValue(
-                                    fileUseCase.getFileContent(programFile).value,
-                                    TextRange(fileUseCase.getCursorPosition(programFile).value)
-                                )
+                            val content = fileUseCase.getFileContent(programFile)
+                            val textValue = TextFieldValue(
+                                content.value,
+                                TextRange(fileUseCase.getCursorPosition(programFile).value)
                             )
+                            val uri = programFile.path.toFileUri()
+
+                            diagnosticsJob?.cancel()
+                            diagnosticsJob = viewModelScope.launch {
+                                languageService.diagnostics(uri).collect { diagnostics ->
+                                    withContext(Dispatchers.Main) {
+                                        _localState.update { state ->
+                                            state.copy(languageDiagnostics = diagnostics)
+                                        }
+                                    }
+                                }
+                            }
+
+                            currentDocumentUri?.let { previousUri ->
+                                viewModelScope.launch { languageService.closeDocument(previousUri) }
+                            }
+                            currentDocumentUri = uri
+
+                            viewModelScope.launch {
+                                languageService.openDocument(
+                                    LanguageServerDocument(
+                                        uri = uri,
+                                        languageId = "dncl",
+                                        text = content.value
+                                    )
+                                )
+                            }
+
+                            onTextChanged(textValue)
                         }
 
                         is NotebookFile -> {
@@ -277,6 +313,28 @@ class IdeViewModel(
                         annotatedString = annotatedString,
                         textSuggestions = suggestions
                     )
+                }
+            }
+
+            currentDocumentUri?.let { uri ->
+                viewModelScope.launch {
+                    languageService.applyChanges(uri, indentedText.text)
+                    val position = calculatePosition(indentedText.text, indentedText.selection.end)
+                    val completion = languageService.requestCompletion(uri, position)
+                    if (completion.items.isNotEmpty()) {
+                        val lspSuggestions = completion.items.map { item ->
+                            Definition(
+                                literal = item.label,
+                                position = null,
+                                isFunction = item.kind == 2
+                            )
+                        }
+                        withContext(Dispatchers.Main) {
+                            _localState.update { state ->
+                                state.copy(textSuggestions = lspSuggestions)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -566,6 +624,7 @@ class IdeViewModel(
         val isWaitingForInput: Boolean,
         val isDarkTheme: Boolean,
         val textSuggestions: List<Definition>,
-        val isFocused: Boolean
+        val isFocused: Boolean,
+        val languageDiagnostics: List<Diagnostic>
     )
 }
