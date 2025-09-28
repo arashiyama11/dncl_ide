@@ -63,7 +63,7 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        
+
 
         Column(
             modifier = Modifier.wrapContentHeight()
@@ -175,7 +175,7 @@ fun SettingsScreen(
             val uriHandler = LocalUriHandler.current
             TextButton(
                 onClick = {
-                    uriHandler.openUri("https://github.com/arashiyama11/DNCL-IDE/issues/new/choose")
+                    uriHandler.openUri("https://github.com/arashiyama11/dncl_ide/issues")
                 },
                 modifier = Modifier
                     .fillMaxWidth()

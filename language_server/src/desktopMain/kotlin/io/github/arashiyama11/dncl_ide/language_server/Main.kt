@@ -32,7 +32,8 @@ fun main() = runBlocking {
         RenameService(astInfoService),
         FormattingService(),
         CodeActionService(),
-        SemanticTokensService(astInfoService)
+        SemanticTokensService(astInfoService),
+        astInfoService
     )
 
     // 出力ループを起動
@@ -56,9 +57,16 @@ fun CoroutineScope.launchOutputLoop(server: DNCLLanguageServer) = launch(Dispatc
     }
 }
 
+val logFile by lazy {
+    if (System.getenv("DNCL_LS_LOG_FILE")?.isNotEmpty() == true) {
+        File(System.getenv("DNCL_LS_LOG_FILE"))
+    } else {
+        File("server.log")
+    }
+}
 
 fun logging(message: String) {
-    File("server.log").appendText("$message\n")
+    logFile.appendText("$message\n")
 }
 
 fun CoroutineScope.launchInputLoop(

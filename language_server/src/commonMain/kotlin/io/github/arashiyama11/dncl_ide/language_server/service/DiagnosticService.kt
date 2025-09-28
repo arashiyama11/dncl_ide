@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.language_server.service
 
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
+import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
@@ -9,21 +10,37 @@ import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.Range
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
+data class DiagnosticResult(
+    val diagnostics: List<Diagnostic>,
+    val program: AstNode.Program?
+)
+
 class DiagnosticService {
 
-    fun getDiagnostics(uri: String, text: String): List<Diagnostic> {
+    @Suppress("UNUSED_PARAMETER")
+    fun analyze(uri: String, text: String): DiagnosticResult {
         val lexer = Lexer(text)
         val parser: Parser = when (val parserResult = Parser(lexer)) {
             is Either.Left -> {
-                return listOf(parserResult.value.toDiagnostic(text))
+                return DiagnosticResult(
+                    diagnostics = listOf(parserResult.value.toDiagnostic(text)),
+                    program = null
+                )
             }
 
             is Either.Right -> parserResult.value
         }
 
         return when (val programResult = parser.parseProgram()) {
-            is Either.Left -> listOf(programResult.value.toDiagnostic(text))
-            is Either.Right -> emptyList()
+            is Either.Left -> DiagnosticResult(
+                diagnostics = listOf(programResult.value.toDiagnostic(text)),
+                program = null
+            )
+
+            is Either.Right -> DiagnosticResult(
+                diagnostics = emptyList(),
+                program = programResult.value
+            )
         }
     }
 

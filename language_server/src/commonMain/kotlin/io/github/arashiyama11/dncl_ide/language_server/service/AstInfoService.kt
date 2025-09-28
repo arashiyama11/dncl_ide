@@ -30,13 +30,16 @@ class AstInfoService {
                 is Either.Right -> programResult.value
             }
 
-            val visitor = AstVisitor()
-            val symbolTable = visitor.visit(program)
-
-            AstInfo(program, symbolTable)
+            buildAstInfo(program)
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun buildAstInfo(program: AstNode.Program): AstInfo {
+        val visitor = AstVisitor()
+        val symbolTable = visitor.visit(program)
+        return AstInfo(program, symbolTable)
     }
 
     fun findNodeAtOffset(astInfo: AstInfo, offset: Int): AstNode? {

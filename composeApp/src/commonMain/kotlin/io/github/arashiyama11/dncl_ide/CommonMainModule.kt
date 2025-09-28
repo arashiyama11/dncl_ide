@@ -8,11 +8,16 @@ import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
 import io.github.arashiyama11.dncl_ide.common.AppScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
+import io.github.arashiyama11.dncl_ide.language.DefaultLanguageService
+import io.github.arashiyama11.dncl_ide.language.LanguageServerClient
+import io.github.arashiyama11.dncl_ide.language.LanguageServerSession
+import io.github.arashiyama11.dncl_ide.language.LanguageService
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
+import kotlinx.coroutines.CoroutineScope
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
@@ -29,9 +34,11 @@ val commonMainModule = module {
         AppStateStore(get(), get(), get())
     }.bind<AppStateStore<StatePermission.Read>>()
 
-    singleOf(::AppScope)
+    singleOf(::AppScope) { binds(listOf(CoroutineScope::class)) }
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
+    single<LanguageServerClient> { LanguageServerSession(get()) }
+    singleOf(::DefaultLanguageService) { binds(listOf(LanguageService::class)) }
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
 }

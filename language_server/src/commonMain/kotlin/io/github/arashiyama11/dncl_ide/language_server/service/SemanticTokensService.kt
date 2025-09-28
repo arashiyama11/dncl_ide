@@ -11,12 +11,12 @@ import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 class SemanticTokensService(
     private val astInfoService: AstInfoService
 ) {
-    fun getSemanticTokens(code: String): SemanticTokens {
+    fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
         val lexer = Lexer(code)
         val tokens = lexer.toList().mapNotNull { it.getOrNull() }
 
         // ASTとシンボルテーブルを取得
-        val astInfo = astInfoService.parseAndAnalyze(code)
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code)
 
         val data = mutableListOf<Int>()
         var lastLine = 0
