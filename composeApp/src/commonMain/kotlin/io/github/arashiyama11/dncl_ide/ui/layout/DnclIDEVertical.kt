@@ -33,7 +33,10 @@ import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorConfig
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorEvent
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorStyle
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import org.koin.compose.viewmodel.koinViewModel
@@ -61,15 +64,21 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
 
         HorizontalDivider()
         CodeEditor(
-            codeText = uiState.codeTextFieldValue,
-            annotatedCodeText = uiState.annotatedString,
-            onCodeChange = { viewModel.onTextChanged(it) },
-            modifier = Modifier
-                .weight(2f),
-            fontSize = uiState.fontSize,
-            currentEvaluatingLine = uiState.currentEvaluatingLine,
-            onFocused = { viewModel.onCodeEditorFocused(it) },
-            verticalScroll = true
+            config = CodeEditorConfig(
+                text = uiState.codeTextFieldValue,
+                annotatedText = uiState.annotatedString,
+                fontSize = uiState.fontSize,
+                evaluatingLine = uiState.currentEvaluatingLine,
+                verticalScrollEnabled = true
+            ),
+            modifier = Modifier.weight(2f),
+            style = CodeEditorStyle(textStyle = LocalCodeTypography.current.bodyMedium),
+            onEvent = { event ->
+                when (event) {
+                    is CodeEditorEvent.ContentChange -> viewModel.onTextChanged(event.value)
+                    is CodeEditorEvent.FocusChanged -> viewModel.onCodeEditorFocused(event.isFocused)
+                }
+            }
         )
 
         // Conditionally display Input Row when isWaitingForInput is true

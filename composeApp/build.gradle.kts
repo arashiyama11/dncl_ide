@@ -87,6 +87,7 @@ kotlin {
             implementation(project(":domain"))
             implementation(project(":interpreter"))
             implementation(project(":language_server"))
+            implementation(project(":editor"))
         }
 
         commonTest.dependencies {

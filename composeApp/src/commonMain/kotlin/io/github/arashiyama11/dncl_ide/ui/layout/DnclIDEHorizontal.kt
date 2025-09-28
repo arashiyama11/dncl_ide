@@ -32,7 +32,10 @@ import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorConfig
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorEvent
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorStyle
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
@@ -64,14 +67,21 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
 
             HorizontalDivider()
             CodeEditor(
-                codeText = uiState.codeTextFieldValue,
-                annotatedCodeText = uiState.annotatedString,
-                onCodeChange = { viewModel.onTextChanged(it) },
+                config = CodeEditorConfig(
+                    text = uiState.codeTextFieldValue,
+                    annotatedText = uiState.annotatedString,
+                    fontSize = uiState.fontSize,
+                    evaluatingLine = uiState.currentEvaluatingLine,
+                    verticalScrollEnabled = true
+                ),
                 modifier = Modifier.weight(1f),
-                fontSize = uiState.fontSize,
-                currentEvaluatingLine = uiState.currentEvaluatingLine,
-                onFocused = { viewModel.onCodeEditorFocused(it) },
-                verticalScroll = true
+                style = CodeEditorStyle(textStyle = LocalCodeTypography.current.bodyMedium),
+                onEvent = { event ->
+                    when (event) {
+                        is CodeEditorEvent.ContentChange -> viewModel.onTextChanged(event.value)
+                        is CodeEditorEvent.FocusChanged -> viewModel.onCodeEditorFocused(event.isFocused)
+                    }
+                }
             )
 
             if (uiState.isWaitingForInput) {
@@ -152,4 +162,3 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
         }
     }
 }
-

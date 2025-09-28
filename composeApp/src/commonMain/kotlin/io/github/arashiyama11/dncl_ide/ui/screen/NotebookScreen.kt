@@ -60,7 +60,10 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorConfig
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorEvent
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorStyle
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
@@ -293,16 +296,20 @@ fun CodeCellContent(
         modifier = Modifier.fillMaxWidth()
     ) {
         CodeEditor(
-            codeText = localTfv,
-            codeCellState.annotatedString,
-            Modifier,
-            fontSize,
-            { newTextFieldValue ->
-                localTfv = newTextFieldValue
-            },
-            verticalScroll = false,
-            onFocused = {
-                onAction(NotebookAction.SelectCell(cell.id))
+            config = CodeEditorConfig(
+                text = localTfv,
+                annotatedText = codeCellState.annotatedString,
+                fontSize = fontSize,
+                verticalScrollEnabled = false
+            ),
+            style = CodeEditorStyle(textStyle = LocalCodeTypography.current.bodyMedium),
+            onEvent = { event ->
+                when (event) {
+                    is CodeEditorEvent.ContentChange -> localTfv = event.value
+                    is CodeEditorEvent.FocusChanged -> if (event.isFocused) {
+                        onAction(NotebookAction.SelectCell(cell.id))
+                    }
+                }
             }
         )
 

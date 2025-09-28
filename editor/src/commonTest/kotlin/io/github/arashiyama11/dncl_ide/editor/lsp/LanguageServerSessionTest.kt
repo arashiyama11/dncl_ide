@@ -1,5 +1,7 @@
-package io.github.arashiyama11.dncl_ide.language
+package io.github.arashiyama11.dncl_ide.editor.lsp
 
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerDocument
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerSession
 import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import kotlin.test.AfterTest

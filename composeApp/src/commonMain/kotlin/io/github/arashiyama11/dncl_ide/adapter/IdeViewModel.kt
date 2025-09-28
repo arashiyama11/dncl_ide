@@ -24,9 +24,15 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
-import io.github.arashiyama11.dncl_ide.language.LanguageService
-import io.github.arashiyama11.dncl_ide.language.LanguageServerDocument
+import io.github.arashiyama11.dncl_ide.editor.compose.toEditorContentUpdate
+import io.github.arashiyama11.dncl_ide.editor.core.DefaultEditorSession
+import io.github.arashiyama11.dncl_ide.editor.core.EditorDocument
+import io.github.arashiyama11.dncl_ide.editor.core.EditorIntent
+import io.github.arashiyama11.dncl_ide.editor.core.EditorState
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.editor.compose.toTextFieldValue
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
@@ -87,8 +93,10 @@ class IdeViewModel(
     private val fileUseCase: FileUseCase,
     private val suggestionUseCase: SuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>,
-    private val languageService: LanguageService
+    private val languageFeatureProvider: LanguageFeatureProvider
 ) : ViewModel() {
+    private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
+    private val editorStateFlow = editorSession.state
     private val appState by appStateStore
 
     private val _localState = MutableStateFlow(
@@ -113,6 +121,27 @@ class IdeViewModel(
         )
     )
 
+
+    init {
+        viewModelScope.launch {
+            editorStateFlow.collect { editorState ->
+                val lspSuggestions = editorState.completions.takeIf { it.isNotEmpty() }?.map { item ->
+                    Definition(
+                        literal = item.label,
+                        position = null,
+                        isFunction = item.kind == 2
+                    )
+                } ?: emptyList()
+                _localState.update { state ->
+                    state.copy(
+                        codeTextFieldValue = editorState.toTextFieldValue(),
+                        languageDiagnostics = editorState.diagnostics,
+                        textSuggestions = if (lspSuggestions.isNotEmpty()) lspSuggestions else state.textSuggestions
+                    )
+                }
+            }
+        }
+    }
     val uiState = combine(
         _localState,
         appStateStore.state
@@ -148,9 +177,6 @@ class IdeViewModel(
     val errorChannel = Channel<String>(Channel.BUFFERED)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
-    private var diagnosticsJob: Job? = null
-    private var currentDocumentUri: String? = null
-
 
     fun onPause() {
         viewModelScope.launch {
@@ -198,31 +224,12 @@ class IdeViewModel(
                             )
                             val uri = programFile.path.toFileUri()
 
-                            diagnosticsJob?.cancel()
-                            diagnosticsJob = viewModelScope.launch {
-                                languageService.diagnostics(uri).collect { diagnostics ->
-                                    withContext(Dispatchers.Main) {
-                                        _localState.update { state ->
-                                            state.copy(languageDiagnostics = diagnostics)
-                                        }
-                                    }
-                                }
-                            }
-
-                            currentDocumentUri?.let { previousUri ->
-                                viewModelScope.launch { languageService.closeDocument(previousUri) }
-                            }
-                            currentDocumentUri = uri
-
-                            viewModelScope.launch {
-                                languageService.openDocument(
-                                    LanguageServerDocument(
-                                        uri = uri,
-                                        languageId = "dncl",
-                                        text = content.value
-                                    )
-                                )
-                            }
+                            val document = EditorDocument(
+                                uri = uri,
+                                languageId = "dncl",
+                                initialText = content.value
+                            )
+                            editorSession.dispatch(EditorIntent.Initialize(document))
 
                             onTextChanged(textValue)
                         }
@@ -250,6 +257,14 @@ class IdeViewModel(
 
     fun onTextChanged(text: TextFieldValue) {
         val indentedText = autoIndent(uiState.value.codeTextFieldValue, text)
+        val currentEditorState: EditorState = editorStateFlow.value
+        if (currentEditorState.document != null) {
+            editorSession.dispatch(
+                EditorIntent.UpdateContent(
+                    indentedText.toEditorContentUpdate(currentEditorState.content.revision)
+                )
+            )
+        }
 
         viewModelScope.launch(Dispatchers.Default) {
             viewModelScope.launch(Dispatchers.Main) {
@@ -295,7 +310,6 @@ class IdeViewModel(
                 }
             }
 
-            // Use the shared results for text suggestions
             val suggestions = if (parsedProgram?.isRight() == true) {
                 suggestionUseCase.suggestWithParsedData(
                     indentedText.text,
@@ -316,26 +330,9 @@ class IdeViewModel(
                 }
             }
 
-            currentDocumentUri?.let { uri ->
-                viewModelScope.launch {
-                    languageService.applyChanges(uri, indentedText.text)
-                    val position = calculatePosition(indentedText.text, indentedText.selection.end)
-                    val completion = languageService.requestCompletion(uri, position)
-                    if (completion.items.isNotEmpty()) {
-                        val lspSuggestions = completion.items.map { item ->
-                            Definition(
-                                literal = item.label,
-                                position = null,
-                                isFunction = item.kind == 2
-                            )
-                        }
-                        withContext(Dispatchers.Main) {
-                            _localState.update { state ->
-                                state.copy(textSuggestions = lspSuggestions)
-                            }
-                        }
-                    }
-                }
+            editorStateFlow.value.document?.let {
+                val position: Position = calculatePosition(indentedText.text, indentedText.selection.end)
+                editorSession.dispatch(EditorIntent.TriggerCompletion(position))
             }
         }
     }
@@ -580,6 +577,13 @@ class IdeViewModel(
                 isFocused = isFocused
             )
         }
+    }
+
+    override fun onCleared() {
+        viewModelScope.launch {
+            editorSession.close()
+        }
+        super.onCleared()
     }
 
     private suspend fun saveFile(entryPath: EntryPath? = null) {

@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.language
+package io.github.arashiyama11.dncl_ide.editor.lsp
 
 import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
@@ -241,9 +241,3 @@ class LanguageServerSession(
         return nextVersion
     }
 }
-
-data class LanguageServerDocument(
-    val uri: String,
-    val languageId: String,
-    val text: String
-)

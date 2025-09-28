@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.language
+package io.github.arashiyama11.dncl_ide.editor.lsp
 
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
 import io.github.arashiyama11.dncl_ide.language_server.Position
@@ -10,10 +10,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
 
-class DefaultLanguageService(
+class DefaultLanguageFeatureProvider(
     private val rootPathProvider: RootPathProvider,
     private val client: LanguageServerClient
-) : LanguageService {
+) : LanguageFeatureProvider {
     private val initializeMutex = Mutex()
 
     @Volatile
