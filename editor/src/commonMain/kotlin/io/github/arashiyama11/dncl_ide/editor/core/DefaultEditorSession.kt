@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.editor.core
 
+import androidx.compose.ui.text.input.TextFieldValue
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerDocument
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
@@ -46,8 +47,7 @@ class DefaultEditorSession(
                 it.copy(
                     document = document,
                     content = it.content.copy(
-                        text = document.initialText,
-                        selection = EditorSelection(0, 0),
+                        text = TextFieldValue(document.initialText),
                         revision = 0
                     ),
                     isDirty = false,
@@ -68,8 +68,7 @@ class DefaultEditorSession(
             it.copy(
                 document = document,
                 content = EditorContent(
-                    text = document.initialText,
-                    selection = EditorSelection(0, 0),
+                    text = TextFieldValue(document.initialText),
                     revision = 0
                 ),
                 diagnostics = emptyList(),
@@ -126,7 +125,7 @@ class DefaultEditorSession(
 
         scope.launch {
             runCatching {
-                languageFeatureProvider.applyChanges(document.uri, nextContent.text)
+                languageFeatureProvider.applyChanges(document.uri, nextContent.text.text)
             }.onFailure { error ->
                 mutableState.update { state ->
                     state.copy(lastError = EditorError.LanguageFeature(error.message, error))
@@ -146,7 +145,8 @@ class DefaultEditorSession(
                 state.copy(
                     isBusy = false,
                     completions = result.getOrElse { emptyList<CompletionItem>() },
-                    lastError = result.exceptionOrNull()?.let { EditorError.LanguageFeature(it.message, it) }
+                    lastError = result.exceptionOrNull()
+                        ?.let { EditorError.LanguageFeature(it.message, it) }
                 )
             }
         }
@@ -163,7 +163,8 @@ class DefaultEditorSession(
                 state.copy(
                     isBusy = false,
                     semanticTokens = result.getOrNull(),
-                    lastError = result.exceptionOrNull()?.let { EditorError.LanguageFeature(it.message, it) }
+                    lastError = result.exceptionOrNull()
+                        ?.let { EditorError.LanguageFeature(it.message, it) }
                 )
             }
         }

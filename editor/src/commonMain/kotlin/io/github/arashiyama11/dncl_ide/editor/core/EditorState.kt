@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.editor.core
 
+import androidx.compose.ui.text.input.TextFieldValue
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
@@ -9,7 +10,7 @@ import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
  */
 data class EditorState(
     val document: EditorDocument? = null,
-    val content: EditorContent = EditorContent(text = "", selection = EditorSelection(start = 0, end = 0)),
+    val content: EditorContent = EditorContent(text = TextFieldValue()),
     val diagnostics: List<Diagnostic> = emptyList(),
     val completions: List<CompletionItem> = emptyList(),
     val semanticTokens: SemanticTokens? = null,
@@ -22,6 +23,9 @@ data class EditorState(
 sealed interface EditorError {
     val message: String?
 
-    data class Initialization(override val message: String?, val cause: Throwable? = null) : EditorError
-    data class LanguageFeature(override val message: String?, val cause: Throwable? = null) : EditorError
+    data class Initialization(override val message: String?, val cause: Throwable? = null) :
+        EditorError
+
+    data class LanguageFeature(override val message: String?, val cause: Throwable? = null) :
+        EditorError
 }

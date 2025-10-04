@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -31,15 +32,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
-import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
-import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
-import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorConfig
-import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorEvent
-import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorStyle
-import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorOptions
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.BindCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
+import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
+import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,22 +69,80 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
         }
 
         HorizontalDivider()
-        CodeEditor(
-            config = CodeEditorConfig(
-                text = uiState.codeTextFieldValue,
-                annotatedText = uiState.annotatedString,
-                fontSize = uiState.fontSize,
-                evaluatingLine = uiState.currentEvaluatingLine,
-                verticalScrollEnabled = true
-            ),
-            modifier = Modifier.weight(2f),
-            style = CodeEditorStyle(textStyle = LocalCodeTypography.current.bodyMedium),
-            onEvent = { event ->
-                when (event) {
-                    is CodeEditorEvent.ContentChange -> viewModel.onTextChanged(event.value)
-                    is CodeEditorEvent.FocusChanged -> viewModel.onCodeEditorFocused(event.isFocused)
-                }
+
+        val editorController: CodeEditorController = rememberCodeEditorController()
+        val editorContent = EditorContent(text = uiState.codeTextFieldValue)
+        val editorState: CodeEditorState = rememberCodeEditorState(
+            content = editorContent,
+            annotatedText = uiState.annotatedString,
+            evaluatingLine = uiState.currentEvaluatingLine,
+            verticalScrollEnabled = true,
+        )
+
+        BindCodeEditorState(
+            state = editorState,
+            content = editorContent,
+            annotatedText = uiState.annotatedString,
+            highlightRevision = uiState.highlightRevision,
+            evaluatingLine = uiState.currentEvaluatingLine,
+            verticalScrollEnabled = true,
+        )
+
+        LaunchedEffect(
+            uiState.annotatedString,
+            uiState.codeTextFieldValue.text,
+            uiState.highlightRevision
+        ) {
+            viewModel.onTextChanged(uiState.codeTextFieldValue)
+        }
+
+        LaunchedEffect(uiState.codeTextFieldValue) {
+            val currentContent = editorState.content
+            val nextRevision = if (
+                currentContent.text == uiState.codeTextFieldValue
+            ) {
+                currentContent.revision
+            } else {
+                currentContent.revision + 1
             }
+            editorState.updateContent(
+                content = EditorContent(
+                    text = uiState.codeTextFieldValue,
+                    revision = nextRevision
+                ),
+            )
+        }
+
+        LaunchedEffect(uiState.currentEvaluatingLine) {
+            editorState.updateEvaluatingLine(uiState.currentEvaluatingLine)
+        }
+
+        LaunchedEffect(editorController) {
+            editorController.events.contentChanges.collectLatest { event ->
+                val content = event.update.content
+                viewModel.onTextChanged(
+                    text = content.text,
+                )
+            }
+        }
+
+        LaunchedEffect(editorController) {
+            editorController.events.focusChanges.collectLatest { event ->
+                viewModel.onCodeEditorFocused(event.isFocused)
+            }
+        }
+
+        val editorOptions = CodeEditorOptions(
+            fontSize = uiState.fontSize,
+            textStyle = LocalCodeTypography.current.bodyMedium,
+            verticalScrollEnabled = true
+        )
+
+        CodeEditor(
+            state = editorState,
+            modifier = Modifier.weight(2f),
+            options = editorOptions,
+            controller = editorController
         )
 
         // Conditionally display Input Row when isWaitingForInput is true
@@ -88,7 +152,7 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(

@@ -84,7 +84,8 @@ data class CodeCellState(
         text = "",
         selection = TextRange(0)
     ),
-    val annotatedString: AnnotatedString = AnnotatedString("")
+    val annotatedString: AnnotatedString = AnnotatedString(""),
+    val highlightRevision: Long = 0L
 )
 
 
@@ -292,7 +293,8 @@ class NotebookViewModel(
                                     )
                                     cell.id to CodeCellState(
                                         textFieldValue = TextFieldValue(text),
-                                        annotatedString = annotatedString
+                                        annotatedString = annotatedString,
+                                        highlightRevision = 1L
                                     )
                                 }.toImmutableMap()
 
@@ -461,7 +463,8 @@ class NotebookViewModel(
                             )
                             CodeCellState(
                                 textFieldValue = TextFieldValue(text),
-                                annotatedString = annotatedString
+                                annotatedString = annotatedString,
+                                highlightRevision = 1L
                             )
                         } else null
 
@@ -504,7 +507,8 @@ class NotebookViewModel(
                             )
                             val newCodeCellState = CodeCellState(
                                 textFieldValue = TextFieldValue(text),
-                                annotatedString = annotatedString
+                                annotatedString = annotatedString,
+                                highlightRevision = 1L
                             )
                             currentState.copy(
                                 domainNotebook = updatedNotebook,
@@ -568,10 +572,12 @@ class NotebookViewModel(
                             oldCell.copy(source = newText.split('\n').toImmutableList())
                         }
 
+                        val previousRevision = currentState.codeCellStateMap[action.cellId]?.highlightRevision ?: 0L
                         val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
                             this[action.cellId] = CodeCellState(
                                 textFieldValue = newTextFieldValue,
-                                annotatedString = annotatedStr
+                                annotatedString = annotatedStr,
+                                highlightRevision = previousRevision + 1
                             )
                         }.toImmutableMap()
                         val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {

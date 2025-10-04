@@ -30,7 +30,6 @@ import io.github.arashiyama11.dncl_ide.editor.core.EditorDocument
 import io.github.arashiyama11.dncl_ide.editor.core.EditorIntent
 import io.github.arashiyama11.dncl_ide.editor.core.EditorState
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
-import io.github.arashiyama11.dncl_ide.editor.compose.toTextFieldValue
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
@@ -62,6 +61,7 @@ data class IdeUiState(
     val codeTextFieldValue: TextFieldValue = TextFieldValue(""),
     val dnclError: DnclError? = null,
     val annotatedString: AnnotatedString? = null,
+    val highlightRevision: Long = 0L,
     val output: String = "",
     val currentInput: String = "",
     val isError: Boolean = false,
@@ -104,6 +104,7 @@ class IdeViewModel(
             codeTextFieldValue = TextFieldValue(""),
             dnclError = null,
             annotatedString = null,
+            highlightRevision = 0L,
             output = "",
             currentInput = "",
             isError = false,
@@ -125,16 +126,17 @@ class IdeViewModel(
     init {
         viewModelScope.launch {
             editorStateFlow.collect { editorState ->
-                val lspSuggestions = editorState.completions.takeIf { it.isNotEmpty() }?.map { item ->
-                    Definition(
-                        literal = item.label,
-                        position = null,
-                        isFunction = item.kind == 2
-                    )
-                } ?: emptyList()
+                val lspSuggestions =
+                    editorState.completions.takeIf { it.isNotEmpty() }?.map { item ->
+                        Definition(
+                            literal = item.label,
+                            position = null,
+                            isFunction = item.kind == 2
+                        )
+                    } ?: emptyList()
                 _localState.update { state ->
                     state.copy(
-                        codeTextFieldValue = editorState.toTextFieldValue(),
+                        codeTextFieldValue = editorState.content.text,
                         languageDiagnostics = editorState.diagnostics,
                         textSuggestions = if (lspSuggestions.isNotEmpty()) lspSuggestions else state.textSuggestions
                     )
@@ -142,6 +144,7 @@ class IdeViewModel(
             }
         }
     }
+
     val uiState = combine(
         _localState,
         appStateStore.state
@@ -150,6 +153,7 @@ class IdeViewModel(
             codeTextFieldValue = localState.codeTextFieldValue,
             dnclError = localState.dnclError,
             annotatedString = localState.annotatedString,
+            highlightRevision = localState.highlightRevision,
             output = localState.output,
             currentInput = localState.currentInput,
             isError = localState.isError,
@@ -325,13 +329,15 @@ class IdeViewModel(
                 _localState.update {
                     it.copy(
                         annotatedString = annotatedString,
+                        highlightRevision = it.highlightRevision + 1,
                         textSuggestions = suggestions
                     )
                 }
             }
 
             editorStateFlow.value.document?.let {
-                val position: Position = calculatePosition(indentedText.text, indentedText.selection.end)
+                val position: Position =
+                    calculatePosition(indentedText.text, indentedText.selection.end)
                 editorSession.dispatch(EditorIntent.TriggerCompletion(position))
             }
         }
@@ -433,9 +439,10 @@ class IdeViewModel(
 
                     is DnclOutput.EnvironmentUpdate -> {
                         viewModelScope.launch(Dispatchers.Main) {
+                            println("EnvironmentUpdate: ${output.environment}")
                             _localState.update {
                                 it.copy(
-                                    currentEnvironment = output.environment
+                                    currentEnvironment = output.environment.copy()
                                 )
                             }
                         }
@@ -616,6 +623,7 @@ class IdeViewModel(
         val codeTextFieldValue: TextFieldValue,
         val dnclError: DnclError?,
         val annotatedString: AnnotatedString?,
+        val highlightRevision: Long,
         val output: String,
         val currentInput: String,
         val isError: Boolean,

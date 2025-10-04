@@ -1,5 +1,7 @@
 package io.github.arashiyama11.dncl_ide.editor.core
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerDocument
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
@@ -42,7 +44,7 @@ class DefaultEditorSessionTest {
         assertTrue(state.isInitialized)
         assertFalse(state.isBusy)
         assertEquals(sampleDocument, state.document)
-        assertEquals(sampleDocument.initialText, state.content.text)
+        assertEquals(sampleDocument.initialText, state.content.text.text)
         assertEquals(0L, state.content.revision)
         assertNull(state.lastError)
         assertEquals(emptyList(), state.diagnostics)
@@ -95,8 +97,10 @@ class DefaultEditorSessionTest {
 
         val update = EditorContentUpdate(
             content = EditorContent(
-                text = "print 2",
-                selection = EditorSelection(start = 2, end = 2)
+                text = TextFieldValue(
+                    text = "print 2",
+                    selection = TextRange(2)
+                )
             )
         )
         session.dispatch(EditorIntent.UpdateContent(update))
@@ -104,7 +108,7 @@ class DefaultEditorSessionTest {
 
         val state = session.state.value
         assertTrue(state.isDirty)
-        assertEquals("print 2", state.content.text)
+        assertEquals("print 2", state.content.text.text)
         assertEquals(1L, state.content.revision)
         val error = state.lastError
         assertTrue(error is EditorError.LanguageFeature)
