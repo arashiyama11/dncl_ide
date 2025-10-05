@@ -29,8 +29,9 @@ class SettingsScreenViewModel(
             onEvalDelay = appState.onEvalDelay,
             debugModeEnabled = appState.debugModeEnabled,
             debugRunningMode = appState.debugRunningMode,
+            list1IndexSwitchEnabled = appState.arrayOriginIndex == 1
         )
-    }.stateIn(viewModelScope, SharingStarted.Lazily, SettingsUiState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 
     fun onList1IndexSwitchClicked(enabled: Boolean) {
         settingsUseCase.setListFirstIndex(if (enabled) 1 else 0)

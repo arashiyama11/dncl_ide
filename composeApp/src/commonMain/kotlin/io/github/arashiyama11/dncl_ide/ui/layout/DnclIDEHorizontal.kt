@@ -24,19 +24,31 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.BindCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorOptions
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
+import io.github.arashiyama11.dncl_ide.editor.core.EditorSelection
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,15 +75,84 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
             }
 
             HorizontalDivider()
-            CodeEditor(
-                codeText = uiState.codeTextFieldValue,
-                annotatedCodeText = uiState.annotatedString,
-                onCodeChange = { viewModel.onTextChanged(it) },
-                modifier = Modifier.weight(1f),
+
+            val editorController: CodeEditorController = rememberCodeEditorController()
+            val editorContent = EditorContent(text = uiState.codeTextFieldValue)
+            val editorState: CodeEditorState = rememberCodeEditorState(
+                content = editorContent,
+                annotatedText = uiState.annotatedString,
+                evaluatingLine = uiState.currentEvaluatingLine,
+                verticalScrollEnabled = true,
+            )
+
+            BindCodeEditorState(
+                state = editorState,
+                content = editorContent,
+                annotatedText = uiState.annotatedString,
+                highlightRevision = uiState.highlightRevision,
+                evaluatingLine = uiState.currentEvaluatingLine,
+                verticalScrollEnabled = true,
+            )
+
+            LaunchedEffect(
+                uiState.annotatedString,
+                uiState.codeTextFieldValue.text,
+                uiState.highlightRevision
+            ) {
+                if (
+                    uiState.highlightRevision == 0L &&
+                    uiState.annotatedString == null &&
+                    uiState.codeTextFieldValue.text.isNotEmpty()
+                ) {
+                    viewModel.onTextChanged(uiState.codeTextFieldValue)
+                }
+            }
+
+            LaunchedEffect(uiState.codeTextFieldValue) {
+                val currentContent = editorState.content
+                val nextRevision = if (
+                    currentContent.text == uiState.codeTextFieldValue
+                ) {
+                    currentContent.revision
+                } else {
+                    currentContent.revision + 1
+                }
+                editorState.updateContent(
+                    content = EditorContent(
+                        text = uiState.codeTextFieldValue,
+                        revision = nextRevision
+                    ),
+                )
+            }
+
+            LaunchedEffect(uiState.currentEvaluatingLine) {
+                editorState.updateEvaluatingLine(uiState.currentEvaluatingLine)
+            }
+
+            LaunchedEffect(editorController) {
+                editorController.events.contentChanges.collectLatest { event ->
+                    val content = event.update.content
+                    viewModel.onTextChanged(content.text)
+                }
+            }
+
+            LaunchedEffect(editorController) {
+                editorController.events.focusChanges.collectLatest { event ->
+                    viewModel.onCodeEditorFocused(event.isFocused)
+                }
+            }
+
+            val editorOptions = CodeEditorOptions(
                 fontSize = uiState.fontSize,
-                currentEvaluatingLine = uiState.currentEvaluatingLine,
-                onFocused = { viewModel.onCodeEditorFocused(it) },
-                verticalScroll = true
+                textStyle = LocalCodeTypography.current.bodyMedium,
+                verticalScrollEnabled = true
+            )
+
+            CodeEditor(
+                state = editorState,
+                modifier = Modifier.weight(1f),
+                options = editorOptions,
+                controller = editorController
             )
 
             if (uiState.isWaitingForInput) {
@@ -152,4 +233,3 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
         }
     }
 }
-

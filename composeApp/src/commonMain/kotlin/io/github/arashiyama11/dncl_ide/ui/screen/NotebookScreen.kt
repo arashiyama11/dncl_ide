@@ -36,6 +36,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,16 +54,27 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.Markdown
+import io.github.arashiyama11.dncl_ide.adapter.CodeCellState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookAction
 import io.github.arashiyama11.dncl_ide.adapter.NotebookUiState
 import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
+import io.github.arashiyama11.dncl_ide.domain.notebook.Cell
 import io.github.arashiyama11.dncl_ide.domain.notebook.CellType
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
+import io.github.arashiyama11.dncl_ide.editor.compose.BindCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorOptions
+import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorController
+import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
+import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
+import io.github.arashiyama11.dncl_ide.editor.core.EditorContentUpdate
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.CodeEditor
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -228,7 +240,7 @@ fun CellComponent(
 
             IconButton(onClick = { onAction(NotebookAction.DeleteCell(cellId)) }) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete Cell")
-                }
+            }
 
             TextButton(onClick = {
                 val newType = when (cell.type) {
@@ -272,38 +284,61 @@ fun CellComponent(
 @Composable
 fun CodeCellContent(
     uiState: NotebookUiState,
-    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
+    cell: Cell,
     onAction: (NotebookAction) -> Unit,
-    codeCellState: io.github.arashiyama11.dncl_ide.adapter.CodeCellState,
+    codeCellState: CodeCellState,
     fontSize: Int,
 ) {
     val suggestions = uiState.cellSuggestionsMap[cell.id] ?: emptyList()
 
-    var localTfv by remember(cell.id, codeCellState.textFieldValue) {
-        mutableStateOf(codeCellState.textFieldValue)
-    }
-
-    LaunchedEffect(localTfv) {
-        if (codeCellState.textFieldValue != localTfv) {
-            onAction(NotebookAction.UpdateCodeCell(cell.id, localTfv))
-        }
-    }
-
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        CodeEditor(
-            codeText = localTfv,
-            codeCellState.annotatedString,
-            Modifier,
-            fontSize,
-            { newTextFieldValue ->
-                localTfv = newTextFieldValue
-            },
-            verticalScroll = false,
-            onFocused = {
-                onAction(NotebookAction.SelectCell(cell.id))
+        val editorController: CodeEditorController = rememberCodeEditorController()
+        val editorState: CodeEditorState = rememberCodeEditorState(
+            content = EditorContent(text = codeCellState.textFieldValue),
+            annotatedText = codeCellState.annotatedString,
+            evaluatingLine = null,
+            verticalScrollEnabled = false,
+        )
+
+        val syncedContent = remember(codeCellState.textFieldValue) {
+            EditorContent(text = codeCellState.textFieldValue)
+        }
+        BindCodeEditorState(
+            state = editorState,
+            content = syncedContent,
+            annotatedText = codeCellState.annotatedString,
+            highlightRevision = codeCellState.highlightRevision,
+            verticalScrollEnabled = false,
+        )
+
+        val latestOnAction by rememberUpdatedState(onAction)
+
+        LaunchedEffect(editorController) {
+            editorController.events.contentChanges.collectLatest { event ->
+                latestOnAction(NotebookAction.UpdateCodeCell(cell.id, event.update.content.text))
             }
+        }
+
+        LaunchedEffect(editorController) {
+            editorController.events.focusChanges.collectLatest { event ->
+                if (event.isFocused) {
+                    latestOnAction(NotebookAction.SelectCell(cell.id))
+                }
+            }
+        }
+
+        val editorOptions = CodeEditorOptions(
+            fontSize = fontSize,
+            textStyle = LocalCodeTypography.current.bodyMedium,
+            verticalScrollEnabled = false
+        )
+
+        CodeEditor(
+            state = editorState,
+            options = editorOptions,
+            controller = editorController
         )
 
         if (suggestions.isNotEmpty()) {
@@ -311,8 +346,9 @@ fun CodeCellContent(
                 SuggestionListView(
                     textSuggestions = suggestions,
                     onConfirmTextSuggestion = { suggestion ->
-                        val currentText = localTfv.text
-                        val cursorPos = localTfv.selection.end
+                        val currentValue = editorState.textFieldValue
+                        val currentText = currentValue.text
+                        val cursorPos = currentValue.selection.end
 
                         var startPos = cursorPos
                         while (startPos > 0) {
@@ -329,9 +365,19 @@ fun CodeCellContent(
                         val newText = beforeCursor + suggestion + afterCursor
                         val newCursorPos = startPos + suggestion.length
 
-                        localTfv = TextFieldValue(
+                        val newValue = TextFieldValue(
                             text = newText,
                             selection = TextRange(newCursorPos)
+                        )
+                        val update = editorState.consumeTextFieldValue(
+                            value = newValue,
+                            cause = EditorContentUpdate.UpdateCause.Programmatic
+                        )
+                        latestOnAction(
+                            NotebookAction.UpdateCodeCell(
+                                cell.id,
+                                update.content.text
+                            )
                         )
                     }
                 )
@@ -360,7 +406,7 @@ fun CodeCellContent(
 
 @Composable
 fun MarkdownCellContent(
-    cell: io.github.arashiyama11.dncl_ide.domain.notebook.Cell,
+    cell: Cell,
     isSelected: Boolean,
     onAction: (NotebookAction) -> Unit,
     fontSize: Int = 16,

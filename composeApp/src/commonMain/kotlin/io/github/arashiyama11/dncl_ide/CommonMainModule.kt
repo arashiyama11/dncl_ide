@@ -8,10 +8,10 @@ import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
 import io.github.arashiyama11.dncl_ide.common.AppScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
-import io.github.arashiyama11.dncl_ide.language.DefaultLanguageService
-import io.github.arashiyama11.dncl_ide.language.LanguageServerClient
-import io.github.arashiyama11.dncl_ide.language.LanguageServerSession
-import io.github.arashiyama11.dncl_ide.language.LanguageService
+import io.github.arashiyama11.dncl_ide.editor.lsp.DefaultLanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerClient
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerSession
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
@@ -38,7 +38,7 @@ val commonMainModule = module {
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
     single<LanguageServerClient> { LanguageServerSession(get()) }
-    singleOf(::DefaultLanguageService) { binds(listOf(LanguageService::class)) }
+    singleOf(::DefaultLanguageFeatureProvider) { binds(listOf(LanguageFeatureProvider::class)) }
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
 }

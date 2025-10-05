@@ -1,6 +1,9 @@
-package io.github.arashiyama11.dncl_ide.language
+package io.github.arashiyama11.dncl_ide.editor.lsp
 
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
+import io.github.arashiyama11.dncl_ide.editor.lsp.DefaultLanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerClient
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerDocument
 import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
@@ -17,12 +20,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class DefaultLanguageServiceTest {
+class DefaultLanguageFeatureProviderTest {
 
     @Test
     fun `openDocument initializes session once and forwards call`() = runTest {
         val fakeClient = FakeLanguageServerClient()
-        val service = DefaultLanguageService(
+        val service = DefaultLanguageFeatureProvider(
             rootPathProvider = object : RootPathProvider {
                 override fun invoke(): EntryPath = EntryPath.fromString("/workspace/project")
             },
@@ -41,7 +44,7 @@ class DefaultLanguageServiceTest {
     @Test
     fun `diagnostics stream reflects client emissions`() = runTest {
         val fakeClient = FakeLanguageServerClient()
-        val service = DefaultLanguageService(
+        val service = DefaultLanguageFeatureProvider(
             rootPathProvider = object : RootPathProvider {
                 override fun invoke(): EntryPath = EntryPath.fromString("/workspace/project")
             },
