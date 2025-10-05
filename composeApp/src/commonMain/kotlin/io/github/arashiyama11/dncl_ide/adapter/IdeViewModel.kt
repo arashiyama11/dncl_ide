@@ -439,7 +439,6 @@ class IdeViewModel(
 
                     is DnclOutput.EnvironmentUpdate -> {
                         viewModelScope.launch(Dispatchers.Main) {
-                            println("EnvironmentUpdate: ${output.environment}")
                             _localState.update {
                                 it.copy(
                                     currentEnvironment = output.environment.copy()
