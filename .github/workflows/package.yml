@@ -8,7 +8,7 @@ jobs:
   package-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: ./github/actions/setup-java
+      - uses: ./.github/actions/setup-java
 
       - uses: actions/checkout@v5
       - uses: gradle/actions/setup-gradle@v5
@@ -37,7 +37,7 @@ jobs:
   package-macos:
     runs-on: macos-latest
     steps:
-      - uses: ./github/actions/setup-java
+      - uses: ./.github/actions/setup-java
 
       - uses: actions/checkout@v5
       - uses: gradle/actions/setup-gradle@v5
@@ -52,7 +52,7 @@ jobs:
   package-windows:
     runs-on: windows-latest
     steps:
-      - uses: ./github/actions/setup-java
+      - uses: ./.github/actions/setup-java
 
       - uses: actions/checkout@v5
       - uses: gradle/actions/setup-gradle@v5
