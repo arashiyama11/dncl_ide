@@ -36,7 +36,7 @@ jobs:
       APK_PATH: composeApp/build/outputs/apk/release/composeApp-release.apk
       JAR_PATH: interpreter/build/libs/interpreter-all.jar
       LINUX_NATIVE_PATH: interpreter/build/bin/linuxArm64/releaseExecutable/interpreter.kexe
-      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/composeApp-${{ github.ref_name }}.tar.gz
+      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/io.github.arashiyama11.dncl_ide-*
       KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
     steps:
       - name: Checkout
@@ -66,16 +66,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          ./gradlew assembleDebug assembleRelease -q --console=plain || true
+          ./gradlew assembleDebug assembleRelease -q --console=plain
 
       - name: Package CLI Jar
-        run: ./gradlew interpreter:fatJar -q --console=plain || true
+        run: ./gradlew interpreter:fatJar -q --console=plain
 
       - name: Package Native CLI (linux)
-        run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain || true
+        run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain
 
       - name: Package Desktop App
-        run: ./gradlew composeApp:packageDeb -q --console=plain || true
+        run: ./gradlew composeApp:packageDeb -q --console=plain
 
       - name: Upload APK to release
         if: ${{ needs.create_release.outputs.upload_url }}
@@ -124,16 +124,16 @@ jobs:
       - name: Final ls of build tree for debugging
         run: |
           echo "-- build/ tree --"
-          ls -la build || true
+          ls -la build
           echo "-- interpreter build --"
-          ls -la interpreter/build || true
+          ls -la interpreter/build
 
   package-macos:
     needs: create_release
     runs-on: macos-latest
     env:
       MAC_NATIVE_PATH: interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe
-      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/composeApp-${{ github.ref_name }}.dmg
+      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-*.dmg
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -143,11 +143,11 @@ jobs:
 
       - name: Package Native Cli (macos)
         run: |
-          ./gradlew interpreter:macosArm64Binaries -q --console=plain || true
+          ./gradlew interpreter:macosArm64Binaries -q --console=plain
 
       - name: Package Desktop App (dmg)
         run: |
-          ./gradlew packageDmg -q --console=plain || true
+          ./gradlew packageDmg -q --console=plain
 
       - name: Upload mac artifact to release
         if: ${{ needs.create_release.outputs.upload_url }}
@@ -165,6 +165,7 @@ jobs:
     runs-on: windows-latest
     env:
       WIN_NATIVE_PATH: interpreter\\build\\bin\\mingwX64\\releaseExecutable\\interpreter.exe
+      WIN_DESKTOP_MSI: composeApp\\build\\compose\\binaries\\main\\msi\\io.github.arashiyama11.dncl_ide-*.msi
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -175,11 +176,12 @@ jobs:
       - name: Package Native Cli (windows)
         shell: pwsh
         run: |
-          try {
-            .\gradlew interpreter:mingwX64Binaries -q --console=plain
-          } catch {
-            Write-Host "gradle step failed (ignored)"; exit 0
-          }
+          .\gradlew interpreter:mingwX64Binaries -q --console=plain
+
+      - name: Package Desktop App (msi)
+        shell: pwsh
+        run: |
+          .\gradlew composeApp:packageMsi -q --console=plain
 
       - name: Upload windows artifact to release
         if: ${{ needs.create_release.outputs.upload_url }}
