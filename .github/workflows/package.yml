@@ -75,7 +75,9 @@ jobs:
         run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain
 
       - name: Package Desktop App
-        run: ./gradlew composeApp:packageDeb -q --console=plain
+        run: |
+          ./gradlew composeApp:packageDeb -q --console=plain
+          ls -l composeApp/build/compose/binaries/main/deb/
 
       - name: Upload APK to release
         if: ${{ needs.create_release.outputs.upload_url }}
@@ -105,7 +107,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.LINUX_NATIVE_PATH }}
-          asset_name: interpreter-${{ github.ref_name }}-linux.kexe
+          asset_name: linux-dncl-cli-${{ github.ref_name }}.kexe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -148,6 +150,7 @@ jobs:
       - name: Package Desktop App (dmg)
         run: |
           ./gradlew packageDmg -q --console=plain
+          ls -la composeApp/build/compose/binaries/main/dmg/
 
       - name: Upload mac native to release
         if: ${{ needs.create_release.outputs.upload_url }}
@@ -155,7 +158,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.MAC_NATIVE_PATH }}
-          asset_name: interpreter-${{ github.ref_name }}-macos.kexe
+          asset_name: macos-dncl-cli-${{ github.ref_name }}.kexe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -200,7 +203,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.WIN_NATIVE_PATH }}
-          asset_name: windows-package-${{ github.ref_name }}.exe
+          asset_name: windows-dncl-cli-${{ github.ref_name }}.exe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
