@@ -356,7 +356,5 @@ jobs:
         uses: eregon/publish-release@v1
         with:
           release_id: ${{ needs.create_release.outputs.release_id }}
-          tag_name: ${{ github.ref_name }}
-          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
