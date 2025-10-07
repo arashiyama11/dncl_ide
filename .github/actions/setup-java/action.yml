@@ -1,0 +1,43 @@
+name: "Setup JDK"
+description: "setup JDK and gradle caching"
+
+inputs:
+  java-version:
+    description: "Java version. Just for DRY inside of this file."
+    default: "17"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate Gradle Wrapper
+      uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
+    - name: Copy CI gradle.properties
+      shell: bash
+      run: |
+        mkdir -p ~/.gradle
+        cp .github/ci-gradle.properties ~/.gradle/gradle.properties
+
+    - name: Set up JDK ${{ inputs.java-version }}
+      uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+
+    # Better than caching and/or extensions of actions/setup-java
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      with:
+        gradle-version: wrapper
+
+    - name: set konan cache key
+      id: konan-cache-key
+      shell: bash
+      run: echo "KOTLIN_VERSION=$(grep -oE 'kotlin\s*=\s*"[0-9.]*"' gradle/libs.versions.toml | grep -oE '[0-9.]+')" >> $GITHUB_OUTPUT
+
+    - name: cache Konan
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: |
+          ~/.konan
+        key: v1-konan-${{ runner.os }}-${{ hashFiles('.xcode-version') }}-${{ steps.konan-cache-key.outputs.KOTLIN_VERSION }}

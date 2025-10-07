@@ -1,0 +1,61 @@
+name: Package
+
+on:
+  release:
+    types: [ released, prereleased ]
+
+jobs:
+  package-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-java
+
+      - uses: actions/checkout@v5
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Restore keystore from secret
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > "${KEYSTORE_PATH}"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Package APK
+        run: ./gradlew assembleDebug assembleRelease -q --console=plain # composeApp/build/outputs/apk/debug/composeApp-debug.apk and composeApp/build/outputs/apk/release/composeApp-release.apk
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Package Cli Jar
+        run: ./gradlew interpreter:fatJar -q --console=plain # interpreter/build/libs/interpreter-all.jar
+
+      - name: Package Native Cli
+        run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain
+
+      - name: Package Desktop App
+        run: ./gradlew desktop:packageApp -q --console=plain
+
+  package-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: ./.github/actions/setup-java
+
+      - uses: actions/checkout@v5
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Package Native Cli
+        run: ./gradlew interpreter:macosArm64Binaries -q --console=plain # interpreter/build/bin/macosArm64/debugExecutable/interpreter.kexe
+
+      - name: Package Desktop App
+        run: ./gradlew packageDmg -q --console=plain  # composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-x.x.x.dmg
+
+
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: ./.github/actions/setup-java
+
+      - uses: actions/checkout@v5
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Package Native Cli
+        run: .\gradlew interpreter:mingwX64Binaries -q --console=plain
