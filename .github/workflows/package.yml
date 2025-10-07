@@ -14,10 +14,8 @@ jobs:
   package-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: ./.github/actions/setup-java
-
       - uses: actions/checkout@v5
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: ./.github/actions/setup-java
       - name: Restore keystore from secret
         run: echo "$KEYSTORE_BASE64" | base64 --decode > "${KEYSTORE_PATH}"
         env:
@@ -43,10 +41,8 @@ jobs:
   package-macos:
     runs-on: macos-latest
     steps:
-      - uses: ./.github/actions/setup-java
-
       - uses: actions/checkout@v5
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: ./.github/actions/setup-java
 
       - name: Package Native Cli
         run: ./gradlew interpreter:macosArm64Binaries -q --console=plain # interpreter/build/bin/macosArm64/debugExecutable/interpreter.kexe
@@ -58,10 +54,8 @@ jobs:
   package-windows:
     runs-on: windows-latest
     steps:
-      - uses: ./.github/actions/setup-java
-
       - uses: actions/checkout@v5
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: ./.github/actions/setup-java
 
       - name: Package Native Cli
         run: .\gradlew interpreter:mingwX64Binaries -q --console=plain
