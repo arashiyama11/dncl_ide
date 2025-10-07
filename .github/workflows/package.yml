@@ -33,7 +33,7 @@ jobs:
           release_name: ${{ github.ref_name }}
           body: |
             Automated release created by workflow for tag ${{ github.ref_name }}.
-          draft: false
+          draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -86,7 +86,6 @@ jobs:
       - name: Package Desktop App
         run: |
           ./gradlew composeApp:packageDeb -q --console=plain
-          ls -l composeApp/build/compose/binaries/main/deb/
 
       - name: Upload APK to release
         if: ${{ needs.create_release.outputs.upload_url }}
@@ -132,13 +131,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Final ls of build tree for debugging
-        run: |
-          echo "-- build/ tree --"
-          ls -la build
-          echo "-- interpreter build --"
-          ls -la interpreter/build
-
   package-macos:
     needs: create_release
     runs-on: macos-latest
@@ -159,7 +151,6 @@ jobs:
       - name: Package Desktop App (dmg)
         run: |
           ./gradlew packageDmg -q --console=plain
-          ls -la composeApp/build/compose/binaries/main/dmg/
 
       - name: Upload mac native to release
         if: ${{ needs.create_release.outputs.upload_url }}

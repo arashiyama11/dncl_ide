@@ -13,7 +13,7 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-val version = "1.0.19"
+val version = "1.0.20"
 
 kotlin {
     jvmToolchain(17)
