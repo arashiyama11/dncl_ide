@@ -36,7 +36,7 @@ jobs:
       APK_PATH: composeApp/build/outputs/apk/release/composeApp-release.apk
       JAR_PATH: interpreter/build/libs/interpreter-all.jar
       LINUX_NATIVE_PATH: interpreter/build/bin/linuxArm64/releaseExecutable/interpreter.kexe
-      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/io.github.arashiyama11.dncl_ide-*
+      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/io.github.arashiyama11.dncl_ide-${{ replace(github.ref_name, 'v', '') }}-1_amd64.deb
       KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
     steps:
       - name: Checkout
@@ -135,7 +135,7 @@ jobs:
     runs-on: macos-latest
     env:
       MAC_NATIVE_PATH: interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe
-      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-*.dmg
+      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-${{ replace(github.ref_name, 'v', '') }}.dmg
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -168,7 +168,7 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-*.dmg
+          asset_path: ${{ env.MAC_DESKTOP_DMG }}
           asset_name: dncl-ide-${{ github.ref_name }}.dmg
           asset_content_type: application/octet-stream
         env:
@@ -179,7 +179,7 @@ jobs:
     runs-on: windows-latest
     env:
       WIN_NATIVE_PATH: interpreter\\build\\bin\\mingwX64\\releaseExecutable\\interpreter.exe
-      WIN_DESKTOP_MSI: composeApp\\build\\compose\\binaries\\main\\msi\\io.github.arashiyama11.dncl_ide-*.msi
+      WIN_DESKTOP_MSI: composeApp\\build\\compose\\binaries\\main\\msi\\io.github.arashiyama11.dncl_ide-${{ replace(github.ref_name, 'v', '') }}.msi
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -204,6 +204,17 @@ jobs:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.WIN_NATIVE_PATH }}
           asset_name: windows-dncl-cli-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload windows msi to release
+        if: ${{ needs.create_release.outputs.upload_url }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ env.WIN_DESKTOP_MSI }}
+          asset_name: dncl-ide-${{ github.ref_name }}.msi
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
