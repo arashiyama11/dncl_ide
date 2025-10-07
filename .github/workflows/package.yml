@@ -144,7 +144,7 @@ jobs:
     runs-on: macos-latest
     env:
       MAC_NATIVE_PATH: interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe
-      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-${{ needs.create_release.outputs.version }}.dmg
+      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide_${{ needs.create_release.outputs.version }}.dmg
     steps:
       - name: Checkout
         uses: actions/checkout@v5
