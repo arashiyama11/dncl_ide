@@ -42,8 +42,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup JDK & Gradle (local composite)
-        uses: ./github/actions/setup-java
+      - name: Setup JDK & Gradle
+        uses: ./.github/actions/setup-java
         with:
           java-version: "17"
 
@@ -241,7 +241,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup JDK & Gradle (local composite)
+      - name: Setup JDK & Gradle
         uses: ./.github/actions/setup-java
 
       - name: Package Native Cli (macos)
@@ -300,7 +300,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup JDK & Gradle (local composite)
+      - name: Setup JDK & Gradle
         uses: ./.github/actions/setup-java
 
       - name: Package Native Cli (windows)
