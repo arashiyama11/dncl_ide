@@ -10,13 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - uses: ./github/actions/setup-java
 
       - uses: actions/checkout@v5
       - uses: gradle/actions/setup-gradle@v5
 
       - name: Unit Test
         run: ./gradlew clean desktopTest --stacktrace --no-daemon
+

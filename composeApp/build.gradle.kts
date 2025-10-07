@@ -13,6 +13,8 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
+val version = "1.0.0"
+
 kotlin {
     jvmToolchain(17)
     androidTarget {
@@ -111,16 +113,31 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "1.0"
+        versionName = version
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    signingConfigs {
+        create("release") {
+            providers.environmentVariable("KEYSTORE_PATH").orNull?.let {
+                storeFile = file(it)
+            }
+
+            storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
+            keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
+            keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
+        }
+    }
+
+
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
         }
     }
     compileOptions {
@@ -141,7 +158,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "io.github.arashiyama11.dncl_ide"
-            packageVersion = "1.0.0"
+            packageVersion = version
         }
     }
 }

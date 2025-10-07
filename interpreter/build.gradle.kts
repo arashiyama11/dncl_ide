@@ -1,4 +1,6 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,6 +10,25 @@ plugins {
 
 kotlin {
     jvmToolchain(17)
+
+    wasmJs {
+        browser {
+            binaries.executable()
+        }
+    }
+
+    listOf(
+        macosArm64(),
+        linuxArm64(),
+        mingwX64()
+    ).forEach {
+        it.binaries {
+            executable {
+                entryPoint("io.github.arashiyama11.dncl_ide.interpreter.main")
+            }
+        }
+    }
+
 
 // Target declarations - add or remove as needed below. These define
 // which platforms this KMP module supports.
@@ -129,7 +150,7 @@ tasks.register<JavaExec>("runInterpreter") {
 
 tasks.register<Jar>("fatJar") {
     group = "build"
-    description = "Assemble a fat (über) JAR containing all runtime dependencies"
+    description = "Assemble a fat JAR containing all runtime dependencies"
 
     // 出力 JAR 名のサフィックス
     archiveClassifier.set("all")
