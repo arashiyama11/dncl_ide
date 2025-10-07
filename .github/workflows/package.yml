@@ -105,7 +105,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.LINUX_NATIVE_PATH }}
-          asset_name: interpreter-${{ github.ref_name }}-linux-kexe
+          asset_name: interpreter-${{ github.ref_name }}-linux.kexe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -149,13 +149,24 @@ jobs:
         run: |
           ./gradlew packageDmg -q --console=plain
 
+      - name: Upload mac native to release
+        if: ${{ needs.create_release.outputs.upload_url }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ env.MAC_NATIVE_PATH }}
+          asset_name: interpreter-${{ github.ref_name }}-macos.kexe
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload mac artifact to release
         if: ${{ needs.create_release.outputs.upload_url }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ${{ env.MAC_DESKTOP_DMG }}
-          asset_name: mac-package-${{ github.ref_name }}
+          asset_path: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-*.dmg
+          asset_name: dncl-ide-${{ github.ref_name }}.dmg
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
