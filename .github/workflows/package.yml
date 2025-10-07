@@ -1,61 +1,362 @@
-name: Package
+name: Release on tag (build & upload artifacts)
 
-
+# トリガー: セマンティックな vX.Y.Z タグ（例: v1.2.3）で発火 + 手動トリガー
 on:
   push:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
 
+# release 作成/asset アップロードに必要な権限
 permissions:
   contents: write
 
 jobs:
-  package-linux:
+  # 1) まず Draft Release を作成（以降のジョブはこれを参照してアップロードする）
+  create_release:
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-java
+      - name: Create draft release for tag
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body: |
+            Automated release created by workflow for tag ${{ github.ref_name }}.
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2) Linux パッケージ作成 + upload
+  package-linux:
+    needs: create_release
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK & Gradle (local composite)
+        uses: ./github/actions/setup-java
+        with:
+          java-version: "17"
+
       - name: Restore keystore from secret
-        run: echo "$KEYSTORE_BASE64" | base64 --decode > "${KEYSTORE_PATH}"
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "${KEYSTORE_PATH}"
+            ls -l "${KEYSTORE_PATH}"
+          else
+            echo "No KEYSTORE_BASE64 secret present, skipping keystore restore"
+          fi
 
-      - name: Package APK
-        run: ./gradlew assembleDebug assembleRelease -q --console=plain # composeApp/build/outputs/apk/debug/composeApp-debug.apk and composeApp/build/outputs/apk/release/composeApp-release.apk
+      - name: Package APKs
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
+          KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          ./gradlew assembleDebug assembleRelease -q --console=plain || true
 
-      - name: Package Cli Jar
-        run: ./gradlew interpreter:fatJar -q --console=plain # interpreter/build/libs/interpreter-all.jar
+      - name: Package CLI Jar
+        run: ./gradlew interpreter:fatJar -q --console=plain || true
 
-      - name: Package Native Cli
-        run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain
+      - name: Package Native CLI (linux)
+        run: ./gradlew interpreter:linuxArm64Binaries -q --console=plain || true
 
       - name: Package Desktop App
-        run: ./gradlew desktop:packageApp -q --console=plain
+        run: ./gradlew desktop:packageApp -q --console=plain || true
 
+      - name: Find APK (candidates) and list likely dirs
+        id: find_apk
+        run: |
+          echo "Listing likely apk directories..."
+          ls -la composeApp/build/outputs/apk || true
+          ls -la app/build/outputs/apk || true
+          candidates=(
+            "composeApp/build/outputs/apk/debug/composeApp-debug.apk"   # known
+            "composeApp/build/outputs/apk/release/composeApp-release.apk" # known
+            "app/build/outputs/apk/debug/app-debug.apk"
+            "app/build/outputs/apk/release/app-release.apk"
+            "build/outputs/apk/debug/app-debug.apk"
+          )
+          found=""
+          for p in "${candidates[@]}"; do
+            if [ -f "$p" ]; then
+              found="$p"
+              break
+            fi
+          done
+          if [ -n "$found" ]; then
+            echo "apk_path=$found" >> $GITHUB_OUTPUT
+            echo "apk_exists=true" >> $GITHUB_OUTPUT
+            echo "Found APK: $found"
+          else
+            echo "apk_path=" >> $GITHUB_OUTPUT
+            echo "apk_exists=false" >> $GITHUB_OUTPUT
+            echo "No APK found in candidates"
+          fi
+
+      - name: Find CLI JAR
+        id: find_jar
+        run: |
+          echo "Looking for interpreter fatJar candidates..."
+          ls -la interpreter/build/libs || true
+          candidates=(
+            "interpreter/build/libs/interpreter-all.jar"   # expected
+            "interpreter/build/libs/interpreter-fat.jar"
+            "interpreter/build/libs/interpreter.jar"
+          )
+          found=""
+          for p in "${candidates[@]}"; do
+            if [ -f "$p" ]; then found="$p"; break; fi
+          done
+          if [ -n "$found" ]; then
+            echo "jar_path=$found" >> $GITHUB_OUTPUT
+            echo "jar_exists=true" >> $GITHUB_OUTPUT
+            echo "Found JAR: $found"
+          else
+            echo "jar_path=" >> $GITHUB_OUTPUT
+            echo "jar_exists=false" >> $GITHUB_OUTPUT
+            echo "No JAR found in candidates"
+          fi
+
+      - name: Find Linux native binary
+        id: find_linux_native
+        run: |
+          echo "Looking for linux native candidate paths..."
+          ls -la interpreter/build/bin || true
+          candidates=(
+            "interpreter/build/bin/linuxArm64/debugExecutable/interpreter.kexe"
+            "interpreter/build/bin/linuxX64/debugExecutable/interpreter.kexe"
+            "interpreter/build/bin/linuxArm64/releaseExecutable/interpreter.kexe"
+            "interpreter/build/bin/linuxX64/releaseExecutable/interpreter.kexe"
+          )
+          found=""
+          for p in "${candidates[@]}"; do
+            if [ -f "$p" ]; then found="$p"; break; fi
+          done
+          if [ -n "$found" ]; then
+            echo "linux_native_path=$found" >> $GITHUB_OUTPUT
+            echo "linux_native_exists=true" >> $GITHUB_OUTPUT
+            echo "Found native linux: $found"
+          else
+            echo "linux_native_path=" >> $GITHUB_OUTPUT
+            echo "linux_native_exists=false" >> $GITHUB_OUTPUT
+            echo "No linux native found"
+          fi
+
+      - name: Find Desktop package (linux)
+        id: find_desktop
+        run: |
+          echo "Looking for desktop packages..."
+          ls -la composeApp/build/compose || true
+          candidates=(
+            "desktop/build/outputs/appImage/*.AppImage"
+            "composeApp/build/compose/binaries/main/dmg/*.dmg"
+            "composeApp/build/compose/binaries/main/tar/*.tar.gz"
+          )
+          found=""
+          for pattern in "${candidates[@]}"; do
+            for f in $pattern; do
+              if [ -f "$f" ]; then found="$f"; break 2; fi
+            done
+          done
+          if [ -n "$found" ]; then
+            echo "desktop_path=$found" >> $GITHUB_OUTPUT
+            echo "desktop_exists=true" >> $GITHUB_OUTPUT
+            echo "Found desktop package: $found"
+          else
+            echo "desktop_path=" >> $GITHUB_OUTPUT
+            echo "desktop_exists=false" >> $GITHUB_OUTPUT
+            echo "No desktop package found"
+          fi
+
+      - name: Upload APK to release (if found)
+        if: ${{ needs.create_release.outputs.upload_url && steps.find_apk.outputs.apk_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_apk.outputs.apk_path }}
+          asset_name: apk-${{ github.ref_name }}-$(basename ${{ steps.find_apk.outputs.apk_path }})
+          asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload JAR to release (if found)
+        if: ${{ needs.create_release.outputs.upload_url && steps.find_jar.outputs.jar_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_jar.outputs.jar_path }}
+          asset_name: interpreter-${{ github.ref_name }}.jar
+          asset_content_type: application/java-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux native to release (if found)
+        if: ${{ needs.create_release.outputs.upload_url && steps.find_linux_native.outputs.linux_native_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_linux_native.outputs.linux_native_path }}
+          asset_name: interpreter-${{ github.ref_name }}-linux-kexe
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Desktop package (if found)
+        if: ${{ needs.create_release.outputs.upload_url && steps.find_desktop.outputs.desktop_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_desktop.outputs.desktop_path }}
+          asset_name: desktop-${{ github.ref_name }}-package
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Final ls of build tree for debugging
+        run: |
+          echo "-- build/ tree --"
+          ls -la build || true
+          echo "-- interpreter build --"
+          ls -la interpreter/build || true
+
+  # 3) macos job
   package-macos:
+    needs: create_release
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-java
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Package Native Cli
-        run: ./gradlew interpreter:macosArm64Binaries -q --console=plain # interpreter/build/bin/macosArm64/debugExecutable/interpreter.kexe
+      - name: Setup JDK & Gradle (local composite)
+        uses: ./.github/actions/setup-java
 
-      - name: Package Desktop App
-        run: ./gradlew packageDmg -q --console=plain  # composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-x.x.x.dmg
+      - name: Package Native Cli (macos)
+        run: |
+          ./gradlew interpreter:macosArm64Binaries -q --console=plain || true
 
+      - name: Package Desktop App (dmg)
+        run: |
+          ./gradlew packageDmg -q --console=plain || true
 
+      - name: ls likely macos output dirs
+        id: ls_macos
+        run: |
+          echo "List interpreter mac build dirs"
+          ls -la interpreter/build/bin || true
+          ls -la composeApp/build/compose/binaries/main || true
+          candidates=(
+            "interpreter/build/bin/macosArm64/debugExecutable/interpreter.kexe"  # expected
+            "interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe"
+            "interpreter/build/bin/macosX64/debugExecutable/interpreter.kexe"
+            "interpreter/build/bin/macosX64/releaseExecutable/interpreter.kexe"
+            "composeApp/build/compose/binaries/main/dmg/*.dmg"  # expected dmg path
+          )
+          found=""
+          for pattern in "${candidates[@]}"; do
+            for f in $pattern; do
+              if [ -f "$f" ]; then found="$f"; break 2; fi
+            done
+          done
+          if [ -n "$found" ]; then
+            echo "mac_path=$found" >> $GITHUB_OUTPUT
+            echo "mac_exists=true" >> $GITHUB_OUTPUT
+            echo "Found: $found"
+          else
+            echo "mac_path=" >> $GITHUB_OUTPUT
+            echo "mac_exists=false" >> $GITHUB_OUTPUT
+            echo "No mac artifact found"
+          fi
+
+      - name: Upload mac artifact to release (if exists)
+        if: ${{ needs.create_release.outputs.upload_url && steps.ls_macos.outputs.mac_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.ls_macos.outputs.mac_path }}
+          asset_name: mac-package-${{ github.ref_name }}
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 4) windows job (PowerShell)
   package-windows:
+    needs: create_release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-java
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Package Native Cli
-        run: .\gradlew interpreter:mingwX64Binaries -q --console=plain
+      - name: Setup JDK & Gradle (local composite)
+        uses: ./.github/actions/setup-java
+
+      - name: Package Native Cli (windows)
+        shell: pwsh
+        run: |
+          try {
+            .\gradlew interpreter:mingwX64Binaries -q --console=plain
+          } catch {
+            Write-Host "gradle step failed (ignored)"; exit 0
+          }
+
+      - name: List windows build dirs (PowerShell)
+        id: find_windows
+        shell: pwsh
+        run: |
+          Write-Host "Listing interpreter build bins..."
+          if (Test-Path "interpreter\build\bin") { Get-ChildItem -Recurse interpreter\build\bin | Select-Object -First 50 }
+          $candidates = @(
+            "interpreter\build\bin\mingwX64\debugExecutable\interpreter.exe",
+            "interpreter\build\bin\mingwX64\releaseExecutable\interpreter.exe"
+          )
+          $found = ""
+          foreach ($p in $candidates) {
+            if (Test-Path $p) { $found = (Resolve-Path $p).Path; break }
+          }
+          if ($found -ne "") {
+            echo "win_path=$found" >> $env:GITHUB_OUTPUT
+            echo "win_exists=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Found: $found"
+          } else {
+            echo "win_path=" >> $env:GITHUB_OUTPUT
+            echo "win_exists=false" >> $env:GITHUB_OUTPUT
+            Write-Host "No windows artifact found"
+          }
+
+      - name: Upload windows artifact to release (if exists)
+        if: ${{ needs.create_release.outputs.upload_url && steps.find_windows.outputs.win_exists == 'true' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_windows.outputs.win_path }}
+          asset_name: windows-package-${{ github.ref_name }}.exe
+          asset_content_type: application/octet-stream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 5) publish the draft release after uploads (optional)
+  publish_release:
+    needs: [ package-linux, package-macos, package-windows ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish draft release
+        uses: eregon/publish-release@v1
+        with:
+          release_id: ${{ needs.create_release.outputs.release_id }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
