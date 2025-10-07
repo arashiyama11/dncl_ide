@@ -45,7 +45,7 @@ jobs:
       APK_PATH: composeApp/build/outputs/apk/release/composeApp-release.apk
       JAR_PATH: interpreter/build/libs/interpreter-all.jar
       LINUX_NATIVE_PATH: interpreter/build/bin/linuxArm64/releaseExecutable/interpreter.kexe
-      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/io.github.arashiyama11.dncl_ide-${{ needs.create_release.outputs.version }}-1_amd64.deb
+      DESKTOP_PATH: composeApp/build/compose/binaries/main/tar/io.github.arashiyama11.dncl_ide_${{ needs.create_release.outputs.version }}-1_amd64.deb
       KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
     steps:
       - name: Checkout
@@ -144,7 +144,7 @@ jobs:
     runs-on: macos-latest
     env:
       MAC_NATIVE_PATH: interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe
-      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide_${{ needs.create_release.outputs.version }}.dmg
+      MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-${{ needs.create_release.outputs.version }}.dmg
     steps:
       - name: Checkout
         uses: actions/checkout@v5
