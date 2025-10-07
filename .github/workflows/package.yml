@@ -42,23 +42,11 @@ jobs:
     needs: create_release
     runs-on: ubuntu-latest
     env:
-      # build artifact paths (existing)
       APK_PATH: composeApp/build/outputs/apk/release/composeApp-release.apk
       JAR_PATH: interpreter/build/libs/interpreter-all.jar
       LINUX_NATIVE_PATH: interpreter/build/bin/linuxArm64/releaseExecutable/interpreter.kexe
       DESKTOP_PATH: composeApp/build/compose/binaries/main/deb/io.github.arashiyama11.dncl-ide_${{ needs.create_release.outputs.version }}-1_amd64.deb
-
-      # naming components
-      PROJECT: dncl
-      BUILD: release
-      VERSION: ${{ needs.create_release.outputs.version }}
-
-      # per-artifact arch hints (adjust if your build targets change)
-      ARCH_NATIVE: arm64
-      ARCH_DESKTOP: amd64
-      PLATFORM_ANDROID: android
-      PLATFORM_DESKTOP: linux
-      PLATFORM_CLI: linux
+      KEYSTORE_PATH: ${{ github.workspace }}/release-keystore.jks
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -100,43 +88,13 @@ jobs:
           ./gradlew composeApp:packageDeb -q --console=plain
           ls -l composeApp/build/compose/binaries/main/deb/
 
-      - name: Compute asset names (linux)
-        id: compute_asset_names_linux
-        run: |
-          PROJECT="${PROJECT}"
-          VERSION="${VERSION}"
-          BUILD="${BUILD}"
-
-          # APK (Android universal)
-          ASSET_NAME_APK="${PROJECT}-ide-${PLATFORM_ANDROID}-universal-${VERSION}-${BUILD}.apk"
-          echo "ASSET_NAME_APK=${ASSET_NAME_APK}" >> $GITHUB_ENV
-
-          # JAR (interpreter fat jar)
-          ASSET_NAME_JAR="${PROJECT}-interpreter-${VERSION}-all.jar"
-          echo "ASSET_NAME_JAR=${ASSET_NAME_JAR}" >> $GITHUB_ENV
-
-          # Native CLI (linux arm64)
-          ASSET_NAME_NATIVE="${PROJECT}-cli-${PLATFORM_CLI}-${ARCH_NATIVE}-${VERSION}.kexe"
-          echo "ASSET_NAME_NATIVE=${ASSET_NAME_NATIVE}" >> $GITHUB_ENV
-
-          # Desktop package .deb (linux amd64)
-          ASSET_NAME_DESKTOP="${PROJECT}-ide-${PLATFORM_DESKTOP}-${ARCH_DESKTOP}-${VERSION}.deb"
-          echo "ASSET_NAME_DESKTOP=${ASSET_NAME_DESKTOP}" >> $GITHUB_ENV
-
-          # Debug output
-          echo "Computed names:"
-          echo "  APK    = ${ASSET_NAME_APK}"
-          echo "  JAR    = ${ASSET_NAME_JAR}"
-          echo "  NATIVE = ${ASSET_NAME_NATIVE}"
-          echo "  DESK   = ${ASSET_NAME_DESKTOP}"
-
       - name: Upload APK to release
         if: ${{ needs.create_release.outputs.upload_url }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.APK_PATH }}
-          asset_name: ${{ env.ASSET_NAME_APK }}
+          asset_name: dncl-ide-android-universal-${{ needs.create_release.outputs.version }}-release.apk
           asset_content_type: application/vnd.android.package-archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -147,7 +105,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.JAR_PATH }}
-          asset_name: ${{ env.ASSET_NAME_JAR }}
+          asset_name: interpreter-${{ needs.create_release.outputs.version }}-all.jar
           asset_content_type: application/java-archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -158,7 +116,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.LINUX_NATIVE_PATH }}
-          asset_name: ${{ env.ASSET_NAME_NATIVE }}
+          asset_name: dncl-cli-linux-amd64-${{ needs.create_release.outputs.version }}.kexe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,7 +127,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.DESKTOP_PATH }}
-          asset_name: ${{ env.ASSET_NAME_DESKTOP }}
+          asset_name: dncl-ide-linux-amd64-${{ needs.create_release.outputs.version }}.deb
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -187,15 +145,6 @@ jobs:
     env:
       MAC_NATIVE_PATH: interpreter/build/bin/macosArm64/releaseExecutable/interpreter.kexe
       MAC_DESKTOP_DMG: composeApp/build/compose/binaries/main/dmg/io.github.arashiyama11.dncl_ide-${{ needs.create_release.outputs.version }}.dmg
-
-      PROJECT: dncl
-      VERSION: ${{ needs.create_release.outputs.version }}
-      BUILD: release
-
-      PLATFORM_CLI: macos
-      PLATFORM_DESKTOP: macos
-      ARCH_NATIVE: arm64
-      ARCH_DESKTOP: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -212,30 +161,13 @@ jobs:
           ./gradlew packageDmg -q --console=plain
           ls -la composeApp/build/compose/binaries/main/dmg/
 
-      - name: Compute asset names (macos)
-        id: compute_asset_names_macos
-        run: |
-          PROJECT="${PROJECT}"
-          VERSION="${VERSION}"
-          BUILD="${BUILD}"
-
-          ASSET_NAME_MAC_NATIVE="${PROJECT}-cli-${PLATFORM_CLI}-${ARCH_NATIVE}-${VERSION}.kexe"
-          echo "ASSET_NAME_MAC_NATIVE=${ASSET_NAME_MAC_NATIVE}" >> $GITHUB_ENV
-
-          ASSET_NAME_DMG="${PROJECT}-ide-${PLATFORM_DESKTOP}-${ARCH_DESKTOP}-${VERSION}.dmg"
-          echo "ASSET_NAME_DMG=${ASSET_NAME_DMG}" >> $GITHUB_ENV
-
-          echo "Computed mac asset names:"
-          echo "  MAC_NATIVE = ${ASSET_NAME_MAC_NATIVE}"
-          echo "  DMG        = ${ASSET_NAME_DMG}"
-
       - name: Upload mac native to release
         if: ${{ needs.create_release.outputs.upload_url }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.MAC_NATIVE_PATH }}
-          asset_name: ${{ env.ASSET_NAME_MAC_NATIVE }}
+          asset_name: dncl-cli-macos-arm64-${{ needs.create_release.outputs.version }}.kexe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -246,7 +178,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.MAC_DESKTOP_DMG }}
-          asset_name: ${{ env.ASSET_NAME_DMG }}
+          asset_name: dncl-ide-macos-arm64-${{ needs.create_release.outputs.version }}.dmg
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -257,15 +189,6 @@ jobs:
     env:
       WIN_NATIVE_PATH: interpreter\\build\\bin\\mingwX64\\releaseExecutable\\interpreter.exe
       WIN_DESKTOP_MSI: composeApp\\build\\compose\\binaries\\main\\msi\\io.github.arashiyama11.dncl_ide-${{ needs.create_release.outputs.version }}.msi
-
-      PROJECT: dncl
-      VERSION: ${{ needs.create_release.outputs.version }}
-      BUILD: release
-
-      PLATFORM_CLI: windows
-      PLATFORM_DESKTOP: windows
-      ARCH_NATIVE: x86_64
-      ARCH_DESKTOP: x86_64
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -283,30 +206,13 @@ jobs:
         run: |
           .\gradlew composeApp:packageMsi -q --console=plain
 
-      - name: Compute asset names (windows)
-        id: compute_asset_names_windows
-        run: |
-          PROJECT="${PROJECT}"
-          VERSION="${VERSION}"
-          BUILD="${BUILD}"
-
-          ASSET_NAME_WIN_NATIVE="${PROJECT}-cli-${PLATFORM_CLI}-${ARCH_NATIVE}-${VERSION}.exe"
-          echo "ASSET_NAME_WIN_NATIVE=${ASSET_NAME_WIN_NATIVE}" >> $GITHUB_ENV
-
-          ASSET_NAME_WIN_MSI="${PROJECT}-ide-${PLATFORM_DESKTOP}-${ARCH_DESKTOP}-${VERSION}.msi"
-          echo "ASSET_NAME_WIN_MSI=${ASSET_NAME_WIN_MSI}" >> $GITHUB_ENV
-
-          echo "Computed windows asset names:"
-          echo "  EXE = ${ASSET_NAME_WIN_NATIVE}"
-          echo "  MSI = ${ASSET_NAME_WIN_MSI}"
-
       - name: Upload windows artifact to release
         if: ${{ needs.create_release.outputs.upload_url }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.WIN_NATIVE_PATH }}
-          asset_name: ${{ env.ASSET_NAME_WIN_NATIVE }}
+          asset_name: dncl-cli-windows-x86_64-${{ needs.create_release.outputs.version }}.exe
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -317,7 +223,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.WIN_DESKTOP_MSI }}
-          asset_name: ${{ env.ASSET_NAME_WIN_MSI }}
+          asset_name: dncl-ide-windows-x86_64-${{ needs.create_release.outputs.version }}.msi
           asset_content_type: application/octet-stream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
