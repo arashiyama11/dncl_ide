@@ -19,6 +19,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -26,6 +27,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ExecuteUseCaseTest {
+
+    private val testDispatcher = StandardTestDispatcher()
     private lateinit var fileRepository: MockFileRepository
     private lateinit var settingsRepository: MockSettingsRepository
     private lateinit var executeUseCase: ExecuteUseCase
@@ -35,12 +38,12 @@ class ExecuteUseCaseTest {
     fun setup() {
         fileRepository = MockFileRepository()
         settingsRepository = MockSettingsRepository()
-        executeUseCase = ExecuteUseCase(fileRepository, settingsRepository)
+        executeUseCase = ExecuteUseCase(fileRepository, settingsRepository, testDispatcher)
         inputChannel = Channel(Channel.BUFFERED)
     }
 
     @Test
-    fun testBasicExecution() = runTest {
+    fun testBasicExecution() = runTest(testDispatcher) {
         // 基本的な変数代入と表示
         val program = """
             x = 10
@@ -57,7 +60,7 @@ class ExecuteUseCaseTest {
     }
 
     @Test
-    fun testLexerError() = runTest {
+    fun testLexerError() = runTest(testDispatcher) {
         // 不正な文字を含むプログラム
         val program = "x = @"
 
@@ -70,7 +73,7 @@ class ExecuteUseCaseTest {
     }
 
     @Test
-    fun testParserError() = runTest {
+    fun testParserError() = runTest(testDispatcher) {
         // 構文エラーを含むプログラム
         val program = """
             もし x > 10 ならば:
@@ -87,7 +90,7 @@ class ExecuteUseCaseTest {
     }
 
     @Test
-    fun testRuntimeError() = runTest {
+    fun testRuntimeError() = runTest(testDispatcher) {
         // 実行時エラーを含むプログラム
         val program = """
             x = 10
@@ -109,7 +112,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testDebugModeNonBlocking() = runTest {
+    fun testDebugModeNonBlocking() = runTest(testDispatcher) {
         // デバッグモードを有効化
         settingsRepository.setDebugMode(true)
         settingsRepository.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
@@ -138,7 +141,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testDebugModeButton() = runTest {
+    fun testDebugModeButton() = runTest(testDispatcher) {
         // デバッグモードを有効化（ボタンモード）
         settingsRepository.setDebugMode(true)
         settingsRepository.setDebugRunningMode(DebugRunningMode.BUTTON)
@@ -162,7 +165,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testInputHandling() = runTest {
+    fun testInputHandling() = runTest(testDispatcher) {
         // 入力を使用するプログラム
         val program = """
             age = 整数変換(【外部からの入力】)
@@ -179,7 +182,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testArrayOrigin0() = runTest {
+    fun testArrayOrigin0() = runTest(testDispatcher) {
         // 配列インデックスが0始まりの場合
         val program = """
             arr = [10, 20, 30, 40, 50]
@@ -194,7 +197,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testArrayOrigin1() = runTest {
+    fun testArrayOrigin1() = runTest(testDispatcher) {
         // 配列インデックスが1始まりの場合
         val program = """
             arr = [10, 20, 30, 40, 50]
@@ -209,7 +212,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testFileImport() = runTest {
+    fun testFileImport() = runTest(testDispatcher) {
         // インポートされるファイルの内容を設定
         val importedFile = ProgramFile(
             FileName("utils"),
@@ -243,7 +246,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testFileImportError() = runTest {
+    fun testFileImportError() = runTest(testDispatcher) {
         // 存在しないファイルをインポート
         val program = """
             インポート("non_existent_file")
@@ -259,7 +262,7 @@ Int[...] が実行されようとしました""", runtimeError.value.message
     }
 
     @Test
-    fun testComplexProgram() = runTest {
+    fun testComplexProgram() = runTest(testDispatcher) {
         // 複雑なプログラム（クイックソート）
         val program = """
             関数 forEach(array, f) を:

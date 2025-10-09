@@ -29,6 +29,13 @@ dependencyResolutionManagement {
         maven("https://packages.jetbrains.team/maven/p/firework/dev")
         mavenCentral()
     }
+
+    versionCatalogs {
+        create("kotlinWrappers") {
+            val wrappersVersion = "2025.10.4"
+            from("org.jetbrains.kotlin-wrappers:kotlin-wrappers-catalog:$wrappersVersion")
+        }
+    }
 }
 
 

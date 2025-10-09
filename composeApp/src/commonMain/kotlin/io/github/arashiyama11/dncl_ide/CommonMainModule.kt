@@ -15,8 +15,10 @@ import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
+import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
+import io.github.arashiyama11.dncl_ide.util.ioDispatcher
 import kotlinx.coroutines.CoroutineScope
 import org.koin.core.module.dsl.binds
 import org.koin.core.module.dsl.singleOf
@@ -33,6 +35,10 @@ val commonMainModule = module {
     single<AppStateStore<StatePermission.Write>> {
         AppStateStore(get(), get(), get())
     }.bind<AppStateStore<StatePermission.Read>>()
+
+    single {
+        ExecuteUseCase(get(), get(), ioDispatcher)
+    }
 
     singleOf(::AppScope) { binds(listOf(CoroutineScope::class)) }
     singleOf(::NotebookViewModel)

@@ -14,10 +14,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +25,8 @@ import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readString
 import kotlinx.io.writeString
-import kotlin.time.Duration.Companion.seconds
 import dncl_ide.composeapp.generated.resources.Res
+import io.github.arashiyama11.dncl_ide.util.ioDispatcher
 
 class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScope: AppScope) :
     FileRepository {
@@ -46,7 +43,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
 
     init {
         updateRootFolder()
-        appScope.launch(Dispatchers.IO) {
+        appScope.launch(ioDispatcher) {
             val root = getEntryByPath(rootPath)
             if (root == null) {
                 createFolder(rootPath)
@@ -74,7 +71,8 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
 
             rootPath.plus(FileName("getting_start.dnclnb")).let {
                 if (getEntryByPath(it) == null) {
-                    val content = Res.readBytes("files/getting_start_template.dnclnb").decodeToString()
+                    val content =
+                        Res.readBytes("files/getting_start_template.dnclnb").decodeToString()
                     saveFile(
                         it,
                         FileContent(content),
@@ -87,17 +85,17 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
 
 
     private fun updateRootFolder() {
-        appScope.launch(Dispatchers.IO) {
+        appScope.launch(ioDispatcher) {
             _rootFolder.value = getRootFolder()
         }
     }
 
-    override suspend fun getRootFolder(): Folder = withContext(Dispatchers.IO) {
+    override suspend fun getRootFolder(): Folder = withContext(ioDispatcher) {
         getEntryByPath(rootPath) as Folder
     }
 
     override suspend fun getEntryByPath(entryPath: EntryPath): Entry? =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             if (!SystemFileSystem.exists(entryPath.toPath())) return@withContext null
             when (SystemFileSystem.metadataOrNull(entryPath.toPath())?.isDirectory) {
                 null -> null
@@ -132,7 +130,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         fileContent: FileContent,
         cursorPosition: CursorPosition
     ): Job {
-        return appScope.launch(Dispatchers.IO) {
+        return appScope.launch(ioDispatcher) {
             val tmpPath = programFile.path.copy(
                 value = programFile.path.value.let { it.dropLast(1) + FileName(it.last().value + ".tmp") }
             ).toPath()
@@ -150,7 +148,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         fileContent: FileContent,
         cursorPosition: CursorPosition
     ): Job {
-        return appScope.launch(Dispatchers.IO) {
+        return appScope.launch(ioDispatcher) {
             val tmpPath = entryPath.copy(
                 value = entryPath.value.let { it.dropLast(1) + FileName(it.last().value + ".tmp") }
             ).toPath()
@@ -170,7 +168,7 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
     }
 
     override suspend fun getNotebookFileContent(notebookFile: NotebookFile): FileContent {
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             FileContent(
                 SystemFileSystem.source(notebookFile.path.toPath()).buffered()
                     .use { it.readString() }
@@ -178,24 +176,24 @@ class FileRepositoryImpl(rootPathProvider: RootPathProvider, private val appScop
         }
     }
 
-    override suspend fun createFolder(path: EntryPath) = withContext(Dispatchers.IO) {
+    override suspend fun createFolder(path: EntryPath) = withContext(ioDispatcher) {
         SystemFileSystem.createDirectories(path.toPath()).also { updateRootFolder() }
     }
 
     override suspend fun deleteEntry(path: EntryPath) {
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             SystemFileSystem.delete(path.toPath(), false)
             updateRootFolder()
         }
     }
 
-    override suspend fun selectFile(entryPath: EntryPath) = withContext(Dispatchers.IO) {
+    override suspend fun selectFile(entryPath: EntryPath) = withContext(ioDispatcher) {
         _selectedEntryPath.value = entryPath
         setting[SELECTED_ENTRY_PATH] = entryPath.toString()
     }
 
     override suspend fun getFileContent(programFile: ProgramFile): FileContent =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             FileContent(
                 SystemFileSystem.source(programFile.path.toPath()).buffered()
                     .use { it.readString() }

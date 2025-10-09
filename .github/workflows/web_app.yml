@@ -1,0 +1,65 @@
+name: Publish Web App to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build wasmJs distribution
+    runs-on: ubuntu-latest
+    outputs:
+      built-path: ${{ steps.set-path.outputs.dist_path }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK & Gradle
+        uses: ./.github/actions/setup-java
+
+      - name: Build wasmJsBrowserDistribution
+        run: |
+          ./gradlew :composeApp:wasmJsBrowserDistribution --no-daemon --stacktrace
+        env:
+          CI: true
+
+      - name: Verify build output
+        id: set-path
+        run: |
+          DIST_DIR=composeApp/build/dist/wasmJs/productionExecutable
+          if [ ! -d "$DIST_DIR" ]; then
+            echo "ERROR: expected build output at $DIST_DIR but it's missing"
+            ls -la composeApp/build/dist || true
+            exit 1
+          fi
+          echo "dist_path=$DIST_DIR" >> $GITHUB_OUTPUT
+          echo "Files in $DIST_DIR:"
+          ls -la "$DIST_DIR"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ steps.set-path.outputs.dist_path }}
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

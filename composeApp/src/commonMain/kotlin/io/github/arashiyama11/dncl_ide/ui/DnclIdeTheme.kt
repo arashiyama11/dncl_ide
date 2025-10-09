@@ -91,6 +91,7 @@ fun DnclIdeTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme = if (isDark) darkColorScheme else lightColorScheme,
+        typography = codeTypography
     ) {
         CompositionLocalProvider(
             LocalCodeTypography provides codeTypography,

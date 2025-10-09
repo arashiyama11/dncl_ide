@@ -35,7 +35,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileSystem
 import io.github.arashiyama11.dncl_ide.interpreter.api.asVirtualFile
-import kotlinx.coroutines.IO
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.ensureActive
 
@@ -45,7 +45,8 @@ private enum class DebugStepRunMode {
 
 class ExecuteUseCase(
     private val fileRepository: FileRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : InputLifecycleCallback {
     private val stepChannel = Channel<Unit>(Channel.CONFLATED)
     private val lineChannel = Channel<Unit>(Channel.CONFLATED)
@@ -63,7 +64,7 @@ class ExecuteUseCase(
     }
 
     init {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(ioDispatcher).launch {
             settingsRepository.debugRunningMode.collect {
                 if (it == DebugRunningMode.NON_BLOCKING) {
                     lastDebugStepRunMode = null
@@ -120,11 +121,11 @@ class ExecuteUseCase(
                         }
                         when (settingsRepository.debugRunningMode.value) {
                             DebugRunningMode.BUTTON -> {
-                                val step = launch(Dispatchers.IO) {
+                                val step = launch(ioDispatcher) {
                                     stepChannel.receive()
                                 }
 
-                                val line = launch(Dispatchers.IO) {
+                                val line = launch(ioDispatcher) {
                                     lineChannel.receive()
                                 }
 

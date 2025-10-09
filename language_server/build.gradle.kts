@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 import java.util.jar.Attributes
 
@@ -10,6 +13,12 @@ plugins {
 
 kotlin {
     jvmToolchain(17)
+
+    wasmJs {
+        browser {
+            binaries.executable()
+        }
+    }
 
     // Target declarations - add or remove as needed below. These define
     // which platforms this KMP module supports.

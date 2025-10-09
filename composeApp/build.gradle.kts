@@ -1,7 +1,11 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -16,6 +20,22 @@ plugins {
 val version = "1.0.20"
 
 kotlin {
+
+    wasmJs {
+        outputModuleName = "composeApp"
+        browser {
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
+                    static = (static ?: mutableListOf()).apply {
+                        add(project.projectDir.path)
+                    }
+                }
+            }
+            binaries.executable()
+        }
+    }
+
     jvmToolchain(17)
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -46,7 +66,6 @@ kotlin {
 
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(compose.desktop.macos_arm64)
             implementation(libs.kotlinx.coroutinesSwing)
         }
 
@@ -96,6 +115,14 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+
+        wasmJsMain.dependencies {
+            implementation(project(":domain"))
+            implementation(project(":interpreter"))
+            implementation(project(":language_server"))
+            implementation(project(":editor"))
+        }
+
 
         val desktopTest by getting {
             dependencies {
@@ -160,6 +187,8 @@ compose.desktop {
             packageName = "io.github.arashiyama11.dncl_ide"
             packageVersion = version
         }
+
+
     }
 }
 

@@ -145,7 +145,7 @@ fun AppFab(
 ) {
     val uiState by selectNotebookViewModel.uiState.collectAsStateWithLifecycle()
     when (currentRoute) {
-        Destination.SelectFileScreen::class.qualifiedName -> {
+        Destination.SelectFileScreen.route -> {
             FabsWith2Options(
                 onFileAddClicked = { selectFileViewModel.onFileAddClicked() },
                 onFolderAddClicked = {
@@ -154,7 +154,7 @@ fun AppFab(
             )
         }
 
-        Destination.SelectNotebookScreen::class.qualifiedName -> {
+        Destination.SelectNotebookScreen.route -> {
             FabsWith2Options(
                 onFileAddClicked = {
                     selectNotebookViewModel.onFileAddClicked()
@@ -165,7 +165,7 @@ fun AppFab(
             )
         }
 
-        Destination.CodingScreen::class.qualifiedName -> {
+        Destination.CodingScreen.route -> {
             if (uiState.selectedEntryPath?.isNotebookFile() == true) {
                 val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
                 var showDropdown by remember { mutableStateOf(false) }
@@ -244,7 +244,7 @@ fun App() {
                 val currentRoute =
                     navController.currentBackStackEntryAsState().value?.destination?.route
                 when (currentRoute) {
-                    Destination.LicensesScreen::class.qualifiedName -> {
+                    Destination.LicensesScreen.route -> {
                         TopAppBar(
                             title = { Text("ライセンス表示") },
                             navigationIcon = {
@@ -258,7 +258,7 @@ fun App() {
                         )
                     }
 
-                    Destination.SingleLicenseScreen::class.qualifiedName -> {
+                    Destination.SingleLicenseScreen.route -> {
                         TopAppBar(
                             title = { Text("License") },
                             navigationIcon = {
@@ -290,7 +290,7 @@ fun App() {
                             navController.navigate(Destination.SelectFileScreen)
                         }) {
                             val icon =
-                                if (bse?.destination?.route == Destination.SelectFileScreen::class.qualifiedName) {
+                                if (bse?.destination?.route == Destination.SelectFileScreen.route) {
                                     Icons.AutoMirrored.Filled.InsertDriveFile
                                 } else {
                                     Icons.AutoMirrored.Outlined.InsertDriveFile
@@ -300,7 +300,7 @@ fun App() {
 
                         run {
                             val isSelected =
-                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName }
+                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.SelectNotebookScreen.route }
                             IconButton(
                                 onClick = {
                                     navController.navigate(Destination.SelectNotebookScreen)
@@ -309,7 +309,7 @@ fun App() {
                                     .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
                             ) {
                                 val icon =
-                                    if (bse?.destination?.route == Destination.SelectNotebookScreen::class.qualifiedName) {
+                                    if (bse?.destination?.route == Destination.SelectNotebookScreen.route) {
                                         Icons.Filled.FormatListNumbered
                                     } else {
                                         Icons.Outlined.FormatListNumbered
@@ -324,7 +324,7 @@ fun App() {
 
                         run {
                             val isSelected =
-                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.CodingScreen::class.qualifiedName }
+                                remember(bse?.destination?.route) { bse?.destination?.route == Destination.CodingScreen.route }
                             IconButton(
                                 onClick = {
                                     navController.navigate(Destination.CodingScreen)
@@ -333,7 +333,7 @@ fun App() {
                                     .background(if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent),
                             ) {
                                 val icon =
-                                    if (bse?.destination?.route == Destination.CodingScreen::class.qualifiedName) {
+                                    if (bse?.destination?.route == Destination.CodingScreen.route) {
                                         Icons.Filled.Code
                                     } else {
                                         Icons.Outlined.Code
@@ -350,7 +350,7 @@ fun App() {
                             navController.navigate(Destination.SettingsScreen)
                         }) {
                             val icon =
-                                if (bse?.destination?.route == Destination.SettingsScreen::class.qualifiedName) {
+                                if (bse?.destination?.route == Destination.SettingsScreen.route) {
                                     Icons.Filled.Settings
                                 } else {
                                     Icons.Outlined.Settings
@@ -429,23 +429,44 @@ fun App() {
 
 
 sealed interface Destination {
-    @Serializable
-    object SelectFileScreen : Destination
+    val route: String
 
     @Serializable
-    object SelectNotebookScreen : Destination
+    object SelectFileScreen : Destination {
+        override val route: String
+            get() = "SelectFileScreen"
+    }
 
     @Serializable
-    object CodingScreen : Destination
+    object SelectNotebookScreen : Destination {
+        override val route: String
+            get() = "SelectNotebookScreen"
+    }
 
     @Serializable
-    object SettingsScreen : Destination
+    object CodingScreen : Destination {
+        override val route: String
+            get() = "CodingScreen"
+    }
 
     @Serializable
-    object LicensesScreen : Destination
+    object SettingsScreen : Destination {
+        override val route: String
+            get() = "SettingsScreen"
+    }
+
+    @Serializable
+    object LicensesScreen : Destination {
+        override val route: String
+            get() = "LicensesScreen"
+    }
 
     @Serializable
     data class SingleLicenseScreen(
-        val content: String,
-    ) : Destination
+        val content: String, override val route: String = "SingleLicenseScreen/$content",
+    ) : Destination {
+        companion object {
+            val route = "SingleLicenseScreen/{content}"
+        }
+    }
 }

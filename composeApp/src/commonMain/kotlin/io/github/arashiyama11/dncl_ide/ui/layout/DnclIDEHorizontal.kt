@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.ui.layout
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
@@ -42,7 +44,6 @@ import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorState
 import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorController
 import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
 import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
-import io.github.arashiyama11.dncl_ide.editor.core.EditorSelection
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
@@ -58,135 +59,29 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
     Row(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .imePadding()
     ) {
-        Column(
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            tonalElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(uiState.selectedEntryPath?.value?.lastOrNull()?.value.orEmpty())
+            }
+        }
+
+        HorizontalDivider()
+
+        Editor(
+            uiState = uiState,
+            viewModel = viewModel,
             modifier = Modifier
                 .weight(2f)
                 .fillMaxHeight()
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                tonalElevation = 4.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(uiState.selectedEntryPath?.value?.lastOrNull()?.value.orEmpty())
-                }
-            }
+        )
 
-            HorizontalDivider()
-
-            val editorController: CodeEditorController = rememberCodeEditorController()
-            val editorContent = EditorContent(text = uiState.codeTextFieldValue)
-            val editorState: CodeEditorState = rememberCodeEditorState(
-                content = editorContent,
-                annotatedText = uiState.annotatedString,
-                evaluatingLine = uiState.currentEvaluatingLine,
-                verticalScrollEnabled = true,
-            )
-
-            BindCodeEditorState(
-                state = editorState,
-                content = editorContent,
-                annotatedText = uiState.annotatedString,
-                highlightRevision = uiState.highlightRevision,
-                evaluatingLine = uiState.currentEvaluatingLine,
-                verticalScrollEnabled = true,
-            )
-
-            LaunchedEffect(
-                uiState.annotatedString,
-                uiState.codeTextFieldValue.text,
-                uiState.highlightRevision
-            ) {
-                if (
-                    uiState.highlightRevision == 0L &&
-                    uiState.annotatedString == null &&
-                    uiState.codeTextFieldValue.text.isNotEmpty()
-                ) {
-                    viewModel.onTextChanged(uiState.codeTextFieldValue)
-                }
-            }
-
-            LaunchedEffect(uiState.codeTextFieldValue) {
-                val currentContent = editorState.content
-                val nextRevision = if (
-                    currentContent.text == uiState.codeTextFieldValue
-                ) {
-                    currentContent.revision
-                } else {
-                    currentContent.revision + 1
-                }
-                editorState.updateContent(
-                    content = EditorContent(
-                        text = uiState.codeTextFieldValue,
-                        revision = nextRevision
-                    ),
-                )
-            }
-
-            LaunchedEffect(uiState.currentEvaluatingLine) {
-                editorState.updateEvaluatingLine(uiState.currentEvaluatingLine)
-            }
-
-            LaunchedEffect(editorController) {
-                editorController.events.contentChanges.collectLatest { event ->
-                    val content = event.update.content
-                    viewModel.onTextChanged(content.text)
-                }
-            }
-
-            LaunchedEffect(editorController) {
-                editorController.events.focusChanges.collectLatest { event ->
-                    viewModel.onCodeEditorFocused(event.isFocused)
-                }
-            }
-
-            val editorOptions = CodeEditorOptions(
-                fontSize = uiState.fontSize,
-                textStyle = LocalCodeTypography.current.bodyMedium,
-                verticalScrollEnabled = true
-            )
-
-            CodeEditor(
-                state = editorState,
-                modifier = Modifier.weight(1f),
-                options = editorOptions,
-                controller = editorController
-            )
-
-            if (uiState.isWaitingForInput) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.currentInput,
-                            onValueChange = { viewModel.onCurrentInputChanged(it) },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("入力待ち...") },
-                        )
-                        Button(
-                            onClick = { viewModel.onSendInputClicked() },
-                            enabled = uiState.running
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "送信")
-                        }
-                    }
-                }
-            }
-
-            AnimatedVisibility(uiState.isFocused) {
-                SuggestionListView(
-                    uiState.textSuggestions,
-                    modifier = Modifier.height(48.dp)
-                ) { viewModel.onConfirmTextSuggestion(it) }
-            }
-        }
 
         Row(
             modifier = Modifier
@@ -230,6 +125,129 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
             with(viewModel) {
                 IdeSideButtons(Modifier.fillMaxHeight())
             }
+        }
+    }
+}
+
+@Composable
+fun Editor(
+    uiState: IdeUiState,
+    viewModel: IdeViewModel,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+    ) {
+        val editorController: CodeEditorController = rememberCodeEditorController()
+        val editorContent = EditorContent(text = uiState.codeTextFieldValue)
+        val editorState: CodeEditorState = rememberCodeEditorState(
+            content = editorContent,
+            annotatedText = uiState.annotatedString,
+            evaluatingLine = uiState.currentEvaluatingLine,
+            verticalScrollEnabled = true,
+        )
+
+        BindCodeEditorState(
+            state = editorState,
+            content = editorContent,
+            annotatedText = uiState.annotatedString,
+            highlightRevision = uiState.highlightRevision,
+            evaluatingLine = uiState.currentEvaluatingLine,
+            verticalScrollEnabled = true,
+        )
+
+        LaunchedEffect(
+            uiState.annotatedString,
+            uiState.codeTextFieldValue.text,
+            uiState.highlightRevision
+        ) {
+            if (
+                uiState.highlightRevision == 0L &&
+                uiState.annotatedString == null &&
+                uiState.codeTextFieldValue.text.isNotEmpty()
+            ) {
+                viewModel.onTextChanged(uiState.codeTextFieldValue)
+            }
+        }
+
+        LaunchedEffect(uiState.codeTextFieldValue) {
+            val currentContent = editorState.content
+            val nextRevision = if (
+                currentContent.text == uiState.codeTextFieldValue
+            ) {
+                currentContent.revision
+            } else {
+                currentContent.revision + 1
+            }
+            editorState.updateContent(
+                content = EditorContent(
+                    text = uiState.codeTextFieldValue,
+                    revision = nextRevision
+                ),
+            )
+        }
+
+        LaunchedEffect(uiState.currentEvaluatingLine) {
+            editorState.updateEvaluatingLine(uiState.currentEvaluatingLine)
+        }
+
+        LaunchedEffect(editorController) {
+            editorController.events.contentChanges.collectLatest { event ->
+                val content = event.update.content
+                viewModel.onTextChanged(content.text)
+            }
+        }
+
+        LaunchedEffect(editorController) {
+            editorController.events.focusChanges.collectLatest { event ->
+                viewModel.onCodeEditorFocused(event.isFocused)
+            }
+        }
+
+        val editorOptions = CodeEditorOptions(
+            fontSize = uiState.fontSize,
+            textStyle = LocalCodeTypography.current.bodyMedium,
+            verticalScrollEnabled = true
+        )
+
+        CodeEditor(
+            state = editorState,
+            modifier = Modifier.weight(1f),
+            options = editorOptions,
+            controller = editorController
+        )
+
+        if (uiState.isWaitingForInput) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = uiState.currentInput,
+                        onValueChange = { viewModel.onCurrentInputChanged(it) },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("入力待ち...") },
+                    )
+                    Button(
+                        onClick = { viewModel.onSendInputClicked() },
+                        enabled = uiState.running
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "送信")
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(uiState.isFocused) {
+            SuggestionListView(
+                uiState.textSuggestions,
+                modifier = Modifier.height(48.dp).background(MaterialTheme.colorScheme.surface)
+            ) { viewModel.onConfirmTextSuggestion(it) }
         }
     }
 }
