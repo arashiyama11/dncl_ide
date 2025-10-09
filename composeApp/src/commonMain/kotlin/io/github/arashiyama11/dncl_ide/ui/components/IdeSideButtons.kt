@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -251,7 +252,11 @@ fun IdeViewModel.IdeSideButtons(
                 onClick = ::onRunButtonClicked,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Outlined.PlayArrow, contentDescription = "Run")
+                Icon(
+                    Icons.Outlined.PlayArrow,
+                    contentDescription = "Run",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
 
             IconButton(
@@ -259,7 +264,11 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.running // Disable Stop when not running
             ) {
-                Icon(Icons.Outlined.Close, contentDescription = "Stop")
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "Stop",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
 
             IconButton(
@@ -272,6 +281,7 @@ fun IdeViewModel.IdeSideButtons(
                         TextFieldType.DEBUG_OUTPUT -> Icons.Outlined.FileDownload
                     },
                     contentDescription = "Change IO",
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
 
@@ -283,7 +293,11 @@ fun IdeViewModel.IdeSideButtons(
                     .fillMaxWidth()
                     .rotate(if (openSyntaxTemplate) 270f else 90f)
             ) {
-                Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Syntax Template")
+                Icon(
+                    Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = "Syntax Template",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
         }
     }

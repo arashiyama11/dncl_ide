@@ -1,4 +1,7 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -12,6 +15,12 @@ plugins {
 
 kotlin {
     jvmToolchain(17)
+
+    wasmJs {
+        browser {
+            binaries.executable()
+        }
+    }
 
     androidLibrary {
         namespace = "io.github.arashiyama11.dncl_ide.editor"

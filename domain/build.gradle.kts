@@ -1,3 +1,7 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
@@ -12,6 +16,13 @@ kotlin {
 // Target declarations - add or remove as needed below. These define
 // which platforms this KMP module supports.
 // See: https://kotlinlang.org/docs/multiplatform-discover-project.html#targets
+
+    wasmJs {
+        browser {
+            binaries.executable()
+        }
+    }
+
     compilerOptions {
         freeCompilerArgs.add("-Xcontext-parameters")
     }
