@@ -1,6 +1,9 @@
 name: Publish Web App to GitHub Pages
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
