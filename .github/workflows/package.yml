@@ -108,7 +108,7 @@ jobs:
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ${{ env.JAR_PATH }}
-          asset_name: interpreter-${{ needs.create_release.outputs.version }}-all.jar
+          asset_name: dncl-cli-all-${{ needs.create_release.outputs.version }}.jar
           asset_content_type: application/java-archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

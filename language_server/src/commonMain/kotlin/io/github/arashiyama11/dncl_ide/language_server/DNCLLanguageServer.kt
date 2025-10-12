@@ -72,7 +72,9 @@ class DNCLLanguageServer(
                 "textDocument/formatting" -> handleFormatting(jsonRpcRequest)
                 "textDocument/codeAction" -> handleCodeAction(jsonRpcRequest)
                 "textDocument/semanticTokens/full" -> handleSemanticTokensFull(jsonRpcRequest)
-                else -> sendErrorResponse(jsonRpcRequest.id, -32601, "Method not found")
+                else -> if (jsonRpcRequest.method.startsWith("$/") || jsonRpcRequest.id == null) {
+                    // とりあえず Do Nothing
+                } else sendErrorResponse(jsonRpcRequest.id, -32601, "Method not found")
             }
         } catch (e: Exception) {
             if (debug) throw e
