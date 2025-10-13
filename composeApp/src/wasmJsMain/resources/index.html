@@ -17,7 +17,7 @@
          style="position:absolute; width:80%; height:100vh; overflow:hidden"></div>
     <div id="controller"></div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.53.0/min/vs/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/monaco-languageclient@10.1.0/lib/index.min.js"></script>
 <script>
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }}); require(['vs/editor/editor.main'], function() { editor = monaco.editor.create(document.getElementById("monaco-editor"), { value: '// ここにコードを入力します\nfunction hello() {\n console.log("Hello, world!");\n}', language: 'javascript' }); window.monaco = editor; });
