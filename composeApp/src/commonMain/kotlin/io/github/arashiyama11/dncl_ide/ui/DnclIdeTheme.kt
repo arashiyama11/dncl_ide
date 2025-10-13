@@ -10,11 +10,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.MarkdownColors
 import com.mikepenz.markdown.model.MarkdownTypography
 import org.jetbrains.compose.resources.Font
@@ -111,42 +112,33 @@ val LocalCodeTypography = compositionLocalOf<Typography> {
 
 @Composable
 fun rememberMarkdownColors(): MarkdownColors {
-    return object : MarkdownColors {
-        override val text: Color = MaterialTheme.colorScheme.onBackground
-        override val codeText: Color = MaterialTheme.colorScheme.onSurface
-        override val inlineCodeText: Color = MaterialTheme.colorScheme.onSurfaceVariant
-        override val linkText: Color = MaterialTheme.colorScheme.primary
-        override val codeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val inlineCodeBackground: Color = MaterialTheme.colorScheme.surfaceVariant
-        override val dividerColor: Color = MaterialTheme.colorScheme.outline
-        override val tableText: Color = MaterialTheme.colorScheme.onSurface
-        override val tableBackground: Color = MaterialTheme.colorScheme.surface
-    }
+    return markdownColor(
+        text = MaterialTheme.colorScheme.onBackground,
+        codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+        inlineCodeBackground = MaterialTheme.colorScheme.surfaceVariant,
+        dividerColor = MaterialTheme.colorScheme.outline,
+        tableBackground = MaterialTheme.colorScheme.surface
+    )
 }
 
 @Composable
 fun rememberMarkdownTypography(): MarkdownTypography {
-    return object : MarkdownTypography {
-        override val text: TextStyle = MaterialTheme.typography.bodyLarge
-        override val code: TextStyle =
-            MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-        override val inlineCode: TextStyle =
-            MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
-        override val h1: TextStyle = MaterialTheme.typography.headlineLarge
-        override val h2: TextStyle = MaterialTheme.typography.headlineMedium
-        override val h3: TextStyle = MaterialTheme.typography.headlineSmall
-        override val h4: TextStyle = MaterialTheme.typography.titleLarge
-        override val h5: TextStyle = MaterialTheme.typography.titleMedium
-        override val h6: TextStyle = MaterialTheme.typography.titleSmall
-        override val quote: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary)
-        override val paragraph: TextStyle = MaterialTheme.typography.bodyLarge
-        override val ordered: TextStyle = MaterialTheme.typography.bodyLarge
-        override val bullet: TextStyle = MaterialTheme.typography.bodyLarge
-        override val list: TextStyle = MaterialTheme.typography.bodyLarge
-        override val link: TextStyle =
-            MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
-        override val textLink: TextLinkStyles = TextLinkStyles()
-        override val table: TextStyle = MaterialTheme.typography.bodyMedium
-    }
+    return markdownTypography(
+        text = MaterialTheme.typography.bodyLarge,
+        code = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+        inlineCode = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        h1 = MaterialTheme.typography.headlineLarge,
+        h2 = MaterialTheme.typography.headlineMedium,
+        h3 = MaterialTheme.typography.headlineSmall,
+        h4 = MaterialTheme.typography.titleLarge,
+        h5 = MaterialTheme.typography.titleMedium,
+        h6 = MaterialTheme.typography.titleSmall,
+        quote = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.secondary),
+        paragraph = MaterialTheme.typography.bodyLarge,
+        ordered = MaterialTheme.typography.bodyLarge,
+        bullet = MaterialTheme.typography.bodyLarge,
+        list = MaterialTheme.typography.bodyLarge,
+        textLink = TextLinkStyles(),
+        table = MaterialTheme.typography.bodyMedium
+    )
 }
