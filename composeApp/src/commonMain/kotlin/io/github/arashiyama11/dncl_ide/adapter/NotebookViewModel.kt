@@ -5,8 +5,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import arrow.core.Either
-import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -20,17 +18,18 @@ import io.github.arashiyama11.dncl_ide.domain.notebook.Notebook
 import io.github.arashiyama11.dncl_ide.domain.notebook.Output
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.NotebookFileUseCase
-import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageServerDocument
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
-import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
@@ -59,6 +58,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -109,8 +110,8 @@ class NotebookViewModel(
     private val fileUseCase: FileUseCase,
     private val notebookFileUseCase: NotebookFileUseCase,
     private val syntaxHighLighter: SyntaxHighLighter,
-    private val suggestionUseCase: SuggestionUseCase,
-    private val appStateStore: AppStateStore<StatePermission.Write>
+    private val appStateStore: AppStateStore<StatePermission.Write>,
+    private val languageFeatureProvider: LanguageFeatureProvider
 ) : ViewModel() {
 
 
@@ -172,6 +173,9 @@ class NotebookViewModel(
     private lateinit var environment: Environment
     private var started = false
     private lateinit var _currentStdout: Stdout
+
+    private val openedCellUris = mutableSetOf<String>()
+    private val notebookDocumentMutex = Mutex()
 
     private inner class DynamicStdout() : Stdout {
         override suspend fun append(text: String) {
@@ -273,6 +277,7 @@ class NotebookViewModel(
                 saveNotebook()
 
                 coroutineScope {
+                    closeAllNotebookCellDocuments()
                     if (entryPath?.isNotebookFile() == true) {
                         val notebookFile = fileUseCase.getEntryByPath(entryPath)
                         if (notebookFile is NotebookFile) {
@@ -303,11 +308,22 @@ class NotebookViewModel(
                                     notebookFile = notebookFile,
                                     domainNotebook = notebook,
                                     codeCellStateMap = initialCodeCellStateMap,
+                                    cellSuggestionsMap = persistentMapOf(),
                                     loading = false
                                 )
                             }
                         } else {
                             errorChannel.send("ノートブックを開くことができません: $notebookFile")
+                        }
+                    } else {
+                        _state.update {
+                            it.copy(
+                                notebookFile = null,
+                                domainNotebook = null,
+                                codeCellStateMap = persistentMapOf(),
+                                cellSuggestionsMap = persistentMapOf(),
+                                loading = false
+                            )
                         }
                     }
                 }
@@ -398,6 +414,7 @@ class NotebookViewModel(
                             codeCellStateMap = updatedStateMap.toImmutableMap()
                         )
                     }
+                    closeNotebookCellDocument(file.path, action.cellId)
                 }
             }
 
@@ -525,6 +542,9 @@ class NotebookViewModel(
                             )
                         }
                     }
+                    if (action.cellType != CellType.CODE) {
+                        closeNotebookCellDocument(file.path, action.cellId)
+                    }
                 }
             }
 
@@ -542,24 +562,16 @@ class NotebookViewModel(
                         newText, true, null, tokens
                     )
 
-                    var suggestions = emptyList<Definition>()
-                    if (newTextFieldValue.selection.end > 0 && newText.isNotEmpty()) {
-                        val parser: Either<DnclError, Parser> = Parser(Lexer(newText))
-
-                        val parsedProgram = parser.getOrElse { return@launch }.parseProgram()
-                        suggestions = if (parsedProgram.isRight()) {
-                            suggestionUseCase.suggestWithParsedData(
-                                newText,
-                                newTextFieldValue.selection.end,
-                                tokens,
-                                parsedProgram.getOrNull()!!
-                            )
-                        } else {
-                            suggestionUseCase.suggestWhenFailingParse(
-                                newText,
-                                newTextFieldValue.selection.end
-                            )
-                        }
+                    val notebookFile = _state.value.notebookFile
+                    val suggestions = if (notebookFile != null) {
+                        requestNotebookCompletions(
+                            notebookFile.path,
+                            action.cellId,
+                            newText,
+                            newTextFieldValue.selection.end
+                        )
+                    } else {
+                        emptyList()
                     }
 
                     _state.update { currentState ->
@@ -692,6 +704,85 @@ class NotebookViewModel(
 
         _currentStdout.flush()
         appStateStore.dispatch(Action.SetRunning(false))
+    }
+
+    private suspend fun requestNotebookCompletions(
+        notebookPath: EntryPath,
+        cellId: String,
+        text: String,
+        cursorIndex: Int
+    ): List<Definition> {
+        if (cursorIndex < 0) return emptyList()
+        val targetIndex = cursorIndex.coerceAtMost(text.length)
+        val uri = ensureNotebookCellDocument(notebookPath, cellId, text) ?: return emptyList()
+        return runCatching {
+            val position = calculatePosition(text, targetIndex)
+            languageFeatureProvider.requestCompletion(uri, position).items.toDefinitionList()
+        }.getOrElse { emptyList() }
+    }
+
+    private suspend fun ensureNotebookCellDocument(
+        notebookPath: EntryPath,
+        cellId: String,
+        text: String
+    ): String? {
+        val uri = buildNotebookCellUri(notebookPath, cellId)
+        val needsOpen = notebookDocumentMutex.withLock {
+            if (openedCellUris.contains(uri)) {
+                false
+            } else {
+                openedCellUris.add(uri)
+                true
+            }
+        }
+
+        if (needsOpen) {
+            val openResult = runCatching {
+                languageFeatureProvider.openDocument(
+                    LanguageServerDocument(
+                        uri = uri,
+                        languageId = "dncl",
+                        text = text
+                    )
+                )
+            }
+            if (openResult.isFailure) {
+                notebookDocumentMutex.withLock { openedCellUris.remove(uri) }
+                return null
+            }
+        }
+
+        val applyResult = runCatching {
+            languageFeatureProvider.applyChanges(uri, text)
+        }
+        if (applyResult.isFailure) {
+            return null
+        }
+        return uri
+    }
+
+    private suspend fun closeNotebookCellDocument(notebookPath: EntryPath, cellId: String) {
+        val uri = buildNotebookCellUri(notebookPath, cellId)
+        val shouldClose = notebookDocumentMutex.withLock { openedCellUris.remove(uri) }
+        if (shouldClose) {
+            runCatching { languageFeatureProvider.closeDocument(uri) }
+        }
+    }
+
+    private suspend fun closeAllNotebookCellDocuments() {
+        val uris = notebookDocumentMutex.withLock {
+            val snapshot = openedCellUris.toList()
+            openedCellUris.clear()
+            snapshot
+        }
+        uris.forEach { uri ->
+            runCatching { languageFeatureProvider.closeDocument(uri) }
+        }
+    }
+
+    private fun buildNotebookCellUri(notebookPath: EntryPath, cellId: String): String {
+        val baseUri = notebookPath.toFileUri()
+        return "vscode-notebook-cell:$baseUri#$cellId"
     }
 
     fun autoIndent(

@@ -23,7 +23,6 @@ import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Comp
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
-import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 import io.github.arashiyama11.dncl_ide.editor.compose.toEditorContentUpdate
 import io.github.arashiyama11.dncl_ide.editor.core.DefaultEditorSession
 import io.github.arashiyama11.dncl_ide.editor.core.EditorDocument
@@ -91,7 +90,6 @@ class IdeViewModel(
     private val syntaxHighLighter: SyntaxHighLighter,
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
-    private val suggestionUseCase: SuggestionUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>,
     private val languageFeatureProvider: LanguageFeatureProvider
 ) : ViewModel() {
@@ -126,19 +124,12 @@ class IdeViewModel(
     init {
         viewModelScope.launch {
             editorStateFlow.collect { editorState ->
-                val lspSuggestions =
-                    editorState.completions.takeIf { it.isNotEmpty() }?.map { item ->
-                        Definition(
-                            literal = item.label,
-                            position = null,
-                            isFunction = item.kind == 2
-                        )
-                    } ?: emptyList()
+                val lspSuggestions = editorState.completions.toDefinitionList()
                 _localState.update { state ->
                     state.copy(
                         codeTextFieldValue = editorState.content.text,
                         languageDiagnostics = editorState.diagnostics,
-                        textSuggestions = if (lspSuggestions.isNotEmpty()) lspSuggestions else state.textSuggestions
+                        textSuggestions = lspSuggestions
                     )
                 }
             }
@@ -314,23 +305,11 @@ class IdeViewModel(
                 }
             }
 
-            val suggestions = if (parsedProgram?.isRight() == true) {
-                suggestionUseCase.suggestWithParsedData(
-                    indentedText.text,
-                    indentedText.selection.end,
-                    tokens,
-                    parsedProgram.getOrNull()!!
-                )
-            } else {
-                emptyList()
-            }
-
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
                     it.copy(
                         annotatedString = annotatedString,
-                        highlightRevision = it.highlightRevision + 1,
-                        textSuggestions = suggestions
+                        highlightRevision = it.highlightRevision + 1
                     )
                 }
             }

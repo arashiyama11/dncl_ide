@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
-import io.github.arashiyama11.dncl_ide.domain.usecase.SuggestionUseCase
 
 private val Definition.insertText
     get() = literal + if (isFunction) "()" else ""

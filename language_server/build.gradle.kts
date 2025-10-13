@@ -82,7 +82,6 @@ kotlin {
                 implementation(libs.arrow.core)
                 implementation(libs.arrow.fx.coroutines)
                 implementation(project(":interpreter"))
-                implementation(project(":domain"))
             }
         }
 
