@@ -18,8 +18,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.domain.model.Definition
 
-private val Definition.insertText
-    get() = literal + if (isFunction) "()" else ""
+private val Definition.displayInsertText: String
+    get() = insertText
+
+private val Definition.displayLabelSuffix: String
+    get() = detail?.takeIf { it.isNotBlank() && it != literal }?.let { " · $it" } ?: ""
 
 @Composable
 fun SuggestionListView(
@@ -31,11 +34,12 @@ fun SuggestionListView(
         itemsIndexed(textSuggestions) { index, def ->
             Box(
                 Modifier.widthIn(min = 32.dp).fillMaxHeight()
-                    .clickable { onConfirmTextSuggestion(def.insertText) },
+                    .clickable { onConfirmTextSuggestion(def.displayInsertText) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    def.literal, color = MaterialTheme.colorScheme.onBackground,
+                    text = def.literal,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 8.dp), textAlign = TextAlign.Center
                 )
             }

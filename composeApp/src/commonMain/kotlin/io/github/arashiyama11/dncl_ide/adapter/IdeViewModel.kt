@@ -53,7 +53,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlin.math.min
 
 
 data class IdeUiState(
@@ -309,7 +309,11 @@ class IdeViewModel(
                 _localState.update {
                     it.copy(
                         annotatedString = annotatedString,
-                        highlightRevision = it.highlightRevision + 1
+                        highlightRevision = if (it.annotatedString != annotatedString) {
+                            it.highlightRevision + 1
+                        } else {
+                            it.highlightRevision
+                        }
                     )
                 }
             }
@@ -475,25 +479,32 @@ class IdeViewModel(
         onTextChanged(TextFieldValue(newText, newRange))
     }
 
-    fun onConfirmTextSuggestion(text: String) {
-        val beforeText = uiState.value.codeTextFieldValue.text.substring(
-            0,
-            uiState.value.codeTextFieldValue.selection.start
-        )
-        val toInsert = mutableListOf<Char>()
-        for (i in text.indices) {
-            if (text[text.length - i - 1] != beforeText.lastOrNull()) {
-                toInsert.add(text[text.length - i - 1])
-            } else break
+    fun onConfirmTextSuggestion(suggestionText: String) {
+        val currentValue = uiState.value.codeTextFieldValue
+        val selection = currentValue.selection
+        val beforeText = currentValue.text.substring(0, selection.start)
+        val afterText = currentValue.text.substring(selection.end)
+
+        val overlapLength = longestOverlapWithSuffix(beforeText, suggestionText)
+        val textToInsert = suggestionText.drop(overlapLength)
+
+        val newText = buildString {
+            append(beforeText)
+            append(textToInsert)
+            append(afterText)
         }
-        val newText = uiState.value.codeTextFieldValue.text.substring(
-            0,
-            uiState.value.codeTextFieldValue.selection.start
-        ) + toInsert.reversed().joinToString("") + uiState.value.codeTextFieldValue.text.substring(
-            uiState.value.codeTextFieldValue.selection.end
-        )
-        val newRange = TextRange(uiState.value.codeTextFieldValue.selection.start + toInsert.size)
-        onTextChanged(TextFieldValue(newText, newRange))
+        val newCursor = beforeText.length + textToInsert.length
+        onTextChanged(TextFieldValue(newText, TextRange(newCursor)))
+    }
+
+    private fun longestOverlapWithSuffix(base: String, suggestion: String): Int {
+        val maxLength = min(base.length, suggestion.length)
+        for (length in maxLength downTo 0) {
+            if (base.endsWith(suggestion.substring(0, length))) {
+                return length
+            }
+        }
+        return 0
     }
 
 
