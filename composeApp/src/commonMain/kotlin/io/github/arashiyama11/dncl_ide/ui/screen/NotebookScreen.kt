@@ -350,20 +350,28 @@ fun CodeCellContent(
                         val currentText = currentValue.text
                         val cursorPos = currentValue.selection.end
 
-                        var startPos = cursorPos
-                        while (startPos > 0) {
-                            val char = currentText.getOrNull(startPos - 1)
-                            if (char != null && (char.isLetterOrDigit() || char == '_')) {
-                                startPos--
-                            } else {
-                                break
+                        val beforeCursorFull = currentText.substring(0, cursorPos)
+                        val afterCursor = currentText.substring(cursorPos)
+
+                        val overlapLength = run {
+                            val maxLen = minOf(beforeCursorFull.length, suggestion.length)
+                            var overlap = 0
+                            for (len in maxLen downTo 0) {
+                                if (beforeCursorFull.endsWith(suggestion.substring(0, len))) {
+                                    overlap = len
+                                    break
+                                }
                             }
+                            overlap
                         }
 
-                        val beforeCursor = currentText.substring(0, startPos)
-                        val afterCursor = currentText.substring(cursorPos)
-                        val newText = beforeCursor + suggestion + afterCursor
-                        val newCursorPos = startPos + suggestion.length
+                        val trimmedBefore = beforeCursorFull.dropLast(overlapLength)
+                        val newText = buildString {
+                            append(trimmedBefore)
+                            append(suggestion)
+                            append(afterCursor)
+                        }
+                        val newCursorPos = trimmedBefore.length + suggestion.length
 
                         val newValue = TextFieldValue(
                             text = newText,

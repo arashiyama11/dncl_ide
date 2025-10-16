@@ -183,7 +183,9 @@ data class CompletionItem(
     @SerialName("label") val label: String,
     @SerialName("kind") val kind: Int? = null,
     @SerialName("detail") val detail: String? = null,
-    @SerialName("documentation") val documentation: String? = null
+    @SerialName("documentation") val documentation: String? = null,
+    @SerialName("insertText") val insertText: String? = null,
+    @SerialName("insertTextFormat") val insertTextFormat: Int? = null
 )
 
 @Serializable
