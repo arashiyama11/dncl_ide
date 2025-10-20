@@ -8,6 +8,7 @@ import org.koin.dsl.module
 import io.github.arashiyama11.dncl_ide.domain.domainModule
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.util.RootPathProvider
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalWasmJsInterop::class)
 fun main() {
@@ -21,6 +22,7 @@ fun main() {
     val koin = startKoin {
         modules(commonMainModule, domainModule, module {
             single { RootPathProviderImpl() } bind RootPathProvider::class
+            single { MockFileRepository() } bind FileRepository::class
         })
     }.koin
 

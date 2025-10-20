@@ -30,6 +30,10 @@ fun SuggestionListView(
     modifier: Modifier = Modifier,
     onConfirmTextSuggestion: (String) -> Unit
 ) {
+    if (textSuggestions.isEmpty()) {
+        Text("No Suggestions", modifier = modifier.padding(8.dp))
+        return
+    }
     LazyRow(modifier.height(48.dp)) {
         itemsIndexed(textSuggestions) { index, def ->
             Box(
@@ -39,7 +43,7 @@ fun SuggestionListView(
             ) {
                 Text(
                     text = def.literal,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 8.dp), textAlign = TextAlign.Center
                 )
             }
