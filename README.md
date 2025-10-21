@@ -27,6 +27,8 @@ CLIはJava 17以上が必要で、以下のコマンドで実行します。
 引数なしでREPL, 引数でファイルを指定するとそのファイルを実行します。
 ネイティブバイナリを実行する際OSからの警告が発生する場合があります。
 
+### Install from GitHub Releases
+
 ```
 alias dncl="java -jar path/to/dncl-cli-all-<version>.jar"
 # or
@@ -36,16 +38,59 @@ dncl # REPL
 dncl path/to/file.dncl # run file
 ```
 
+### Install with mise
+
+- native binary
+
+```toml
+[tools."github:arashiyama11/dncl_ide"]
+version = "latest"
+bin = "dncl"
+
+[tools."github:arashiyama11/dncl_ide".platforms]
+linux-x64 = { asset_pattern = "dncl-cli-linux-amd64-*.kexe" }
+macos-arm64 = { asset_pattern = "dncl-cli-macos-arm64-*.kexe" }
+windows-x64 = { asset_pattern = "dncl-cli-windows-x86_64-*.exe" }
+
+[tasks.dncl-repl]
+run = "dncl"
+
+[tasks.dncl-run-file]
+run = "dncl {{arg(name='file')}}"
+```
+
+- jar binary
+
+```toml
+[tools.java]
+version = "temurin-17" # or higher
+
+[tools."github:arashiyama11/dncl_ide"]
+version = "latest"
+asset_pattern = "dncl-cli-all-*.jar"
+bin = "dncl"
+
+[tasks.dncl-repl]
+run = "java -jar $(which dncl)"
+
+[tasks.dncl-run-file]
+run = "java -jar $(which dncl) {{arg(name='file')}}"
+```
+
 ### Language Server
 
 言語サーバーはJava 17以上が必要で、以下のコマンドで標準入出力で起動します。
 
 ```
+
 java -jar language-server-all-<version>.jar
+
 ```
 
 環境変数`DNCL_LS_LOG_FILE`でログファイルのパスを指定できます。
 
 ```
+
 DNCL_LS_LOG_FILE=./dncl-ls.log java -jar language-server-all-<version>.jar
+
 ```
