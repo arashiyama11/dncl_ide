@@ -81,16 +81,12 @@ run = "java -jar $(which dncl) {{arg(name='file')}}"
 
 言語サーバーはJava 17以上が必要で、以下のコマンドで標準入出力で起動します。
 
-```
-
+```shell
 java -jar language-server-all-<version>.jar
-
 ```
 
 環境変数`DNCL_LS_LOG_FILE`でログファイルのパスを指定できます。
 
-```
-
+```shell
 DNCL_LS_LOG_FILE=./dncl-ls.log java -jar language-server-all-<version>.jar
-
 ```
