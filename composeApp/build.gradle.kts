@@ -17,7 +17,7 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-val version = "1.0.21"
+val version = "1.0.22"
 
 kotlin {
 
