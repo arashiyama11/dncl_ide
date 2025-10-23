@@ -22,17 +22,24 @@ import kotlin.time.Duration.Companion.seconds
 
 // 統合された状態を表すデータクラス
 data class AppState(
-    // 設定関連の状態
-    val fontSize: Int = 16,
-    val onEvalDelay: Int = 0,
-    val debugModeEnabled: Boolean = false,
-    val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING,
-    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
+    val uiConfig: UiConfig = UiConfig(),
+    val dnclConfig: DnclConfig = DnclConfig(),
     val selectedEntryPath: EntryPath? = null,
-    val arrayOriginIndex: Int = 0,
     val rootFolder: Folder? = null,
     val running: Boolean = false,
-)
+) {
+    data class UiConfig(
+        val fontSize: Int = 16,
+        val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
+    )
+
+    data class DnclConfig(
+        val onEvalDelay: Int = 0,
+        val debugModeEnabled: Boolean = false,
+        val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING,
+        val arrayOriginIndex: Int = 0,
+    )
+}
 
 sealed interface Action {
     @JvmInline
@@ -83,29 +90,31 @@ open class AppStateStore<out T : StatePermission>(
         combine(
             combine(
                 settingsRepository.fontSize,
+                settingsRepository.suggestionPanelStyle
+            ) { fontSize, suggestionPanelStyle ->
+                AppState.UiConfig(
+                    fontSize = fontSize,
+                    suggestionPanelStyle = suggestionPanelStyle
+                )
+            },
+            combine(
                 settingsRepository.onEvalDelay,
                 settingsRepository.debugRunningMode,
                 settingsRepository.debugMode,
                 settingsRepository.arrayOriginIndex
-            ) { fontSize, onEvalDelay, debugRunningMode, debugModeEnabled, arrayOriginIndex ->
-                SettingsSnapshot(
-                    fontSize = fontSize,
+            ) { onEvalDelay, debugRunningMode, debugModeEnabled, arrayOriginIndex ->
+                AppState.DnclConfig(
                     onEvalDelay = onEvalDelay,
-                    debugRunningMode = debugRunningMode,
                     debugModeEnabled = debugModeEnabled,
+                    debugRunningMode = debugRunningMode,
                     arrayOriginIndex = arrayOriginIndex
                 )
-            },
-            settingsRepository.suggestionPanelStyle
-        ) { snapshot, suggestionPanelStyle ->
+            }
+        ) { uiConfig, dnclConfig ->
             _state.update {
                 it.copy(
-                    fontSize = snapshot.fontSize,
-                    onEvalDelay = snapshot.onEvalDelay,
-                    debugRunningMode = snapshot.debugRunningMode,
-                    debugModeEnabled = snapshot.debugModeEnabled,
-                    arrayOriginIndex = snapshot.arrayOriginIndex,
-                    suggestionPanelStyle = suggestionPanelStyle
+                    uiConfig = uiConfig,
+                    dnclConfig = dnclConfig
                 )
             }
         }.launchIn(appScope)
@@ -152,23 +161,37 @@ open class AppStateStore<out T : StatePermission>(
                 }
 
                 is Action.SetFontSize -> {
-                    _state.update { it.copy(fontSize = action.fontSize) }
+                    _state.update { it.copy(uiConfig = it.uiConfig.copy(fontSize = action.fontSize)) }
                 }
 
                 is Action.SetOnEvalDelay -> {
-                    _state.update { it.copy(onEvalDelay = action.onEvalDelay) }
+                    _state.update {
+                        it.copy(dnclConfig = it.dnclConfig.copy(onEvalDelay = action.onEvalDelay))
+                    }
                 }
 
                 is Action.SetDebugMode -> {
-                    _state.update { it.copy(debugModeEnabled = action.enabled) }
+                    _state.update {
+                        it.copy(
+                            dnclConfig = it.dnclConfig.copy(debugModeEnabled = action.enabled)
+                        )
+                    }
                 }
 
                 is Action.SetDebugRunningMode -> {
-                    _state.update { it.copy(debugRunningMode = action.mode) }
+                    _state.update {
+                        it.copy(
+                            dnclConfig = it.dnclConfig.copy(debugRunningMode = action.mode)
+                        )
+                    }
                 }
 
                 is Action.SetSuggestionPanelStyle -> {
-                    _state.update { it.copy(suggestionPanelStyle = action.style) }
+                    _state.update {
+                        it.copy(
+                            uiConfig = it.uiConfig.copy(suggestionPanelStyle = action.style)
+                        )
+                    }
                 }
 
                 is Action.SetSelectedEntryPath -> {
@@ -188,11 +211,3 @@ open class AppStateStore<out T : StatePermission>(
         }
     }
 }
-
-private data class SettingsSnapshot(
-    val fontSize: Int,
-    val onEvalDelay: Int,
-    val debugRunningMode: DebugRunningMode,
-    val debugModeEnabled: Boolean,
-    val arrayOriginIndex: Int
-)

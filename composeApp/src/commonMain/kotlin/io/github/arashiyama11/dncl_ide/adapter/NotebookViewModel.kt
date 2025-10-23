@@ -139,7 +139,7 @@ class NotebookViewModel(
     val uiState = combine(
         _state,
         appStateStore.state.distinctUntilChangedBy {
-            Triple(it.fontSize, it.selectedEntryPath, it.running)
+            Triple(it.uiConfig.fontSize, it.selectedEntryPath, it.running)
         }
     ) { state, appState ->
         NotebookUiState(
@@ -149,7 +149,7 @@ class NotebookViewModel(
             loading = state.loading,
             focusedCellId = state.focusedCellId,
             cellSuggestionsMap = state.cellSuggestionsMap,
-            fontSize = appState.fontSize,
+            fontSize = appState.uiConfig.fontSize,
             selectedEntryPath = appState.selectedEntryPath,
             unsavedChanges = state.unsavedChanges,
             running = appState.running,

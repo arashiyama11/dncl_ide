@@ -27,12 +27,12 @@ class SettingsScreenViewModel(
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = appStateStore.state.map { appState ->
         SettingsUiState(
-            fontSize = appState.fontSize,
-            onEvalDelay = appState.onEvalDelay,
-            debugModeEnabled = appState.debugModeEnabled,
-            debugRunningMode = appState.debugRunningMode,
-            list1IndexSwitchEnabled = appState.arrayOriginIndex == 1,
-            suggestionPanelStyle = appState.suggestionPanelStyle
+            fontSize = appState.uiConfig.fontSize,
+            onEvalDelay = appState.dnclConfig.onEvalDelay,
+            debugModeEnabled = appState.dnclConfig.debugModeEnabled,
+            debugRunningMode = appState.dnclConfig.debugRunningMode,
+            list1IndexSwitchEnabled = appState.dnclConfig.arrayOriginIndex == 1,
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 

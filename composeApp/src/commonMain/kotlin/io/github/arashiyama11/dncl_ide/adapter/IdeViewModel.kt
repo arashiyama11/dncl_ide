@@ -153,15 +153,15 @@ class IdeViewModel(
             currentInput = localState.currentInput,
             isError = localState.isError,
             errorRange = localState.errorRange,
-            fontSize = appState.fontSize,
+            fontSize = appState.uiConfig.fontSize,
             currentEvaluatingLine = localState.currentEvaluatingLine,
             textFieldType = localState.textFieldType,
             currentEnvironment = localState.currentEnvironment,
             isStepMode = localState.isStepMode,
             isLineMode = localState.isLineMode,
             isWaitingForInput = localState.isWaitingForInput,
-            debugMode = appState.debugModeEnabled,
-            debugRunningMode = appState.debugRunningMode,
+            debugMode = appState.dnclConfig.debugModeEnabled,
+            debugRunningMode = appState.dnclConfig.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
@@ -169,7 +169,7 @@ class IdeViewModel(
             languageDiagnostics = localState.languageDiagnostics,
             selectedEntryPath = appState.selectedEntryPath,
             running = appState.running,
-            suggestionPanelStyle = appState.suggestionPanelStyle
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -377,7 +377,7 @@ class IdeViewModel(
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
                 inputChannel!!,
-                appState.arrayOriginIndex,
+                appState.dnclConfig.arrayOriginIndex,
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
