@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 
 class SettingsUseCase(
@@ -24,5 +25,9 @@ class SettingsUseCase(
 
     fun setDebugRunningMode(mode: DebugRunningMode) {
         settingsRepository.setDebugRunningMode(mode)
+    }
+
+    fun setSuggestionPanelStyle(style: SuggestionPanelStyle) {
+        settingsRepository.setSuggestionPanelStyle(style)
     }
 }

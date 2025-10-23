@@ -11,6 +11,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
@@ -314,6 +315,8 @@ Int[...] が実行されようとしました""", runtimeError.value.message
         override val debugMode = MutableStateFlow(SettingsRepository.DEFAULT_DEBUG_MODE)
         override val debugRunningMode =
             MutableStateFlow(SettingsRepository.DEFAULT_DEBUG_RUNNING_MODE)
+        override val suggestionPanelStyle =
+            MutableStateFlow(SettingsRepository.DEFAULT_SUGGESTION_PANEL_STYLE)
 
         override fun setListFirstIndex(index: Int) {
             arrayOriginIndex.value = index
@@ -333,6 +336,10 @@ Int[...] が実行されようとしました""", runtimeError.value.message
 
         override fun setDebugRunningMode(mode: DebugRunningMode) {
             debugRunningMode.value = mode
+        }
+
+        override fun setSuggestionPanelStyle(style: SuggestionPanelStyle) {
+            suggestionPanelStyle.value = style
         }
     }
 

@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.common
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import kotlinx.coroutines.Job
@@ -26,6 +27,7 @@ data class AppState(
     val onEvalDelay: Int = 0,
     val debugModeEnabled: Boolean = false,
     val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING,
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
     val selectedEntryPath: EntryPath? = null,
     val arrayOriginIndex: Int = 0,
     val rootFolder: Folder? = null,
@@ -47,6 +49,9 @@ sealed interface Action {
 
     @JvmInline
     value class SetDebugRunningMode(val mode: DebugRunningMode) : Action
+
+    @JvmInline
+    value class SetSuggestionPanelStyle(val style: SuggestionPanelStyle) : Action
 
     @JvmInline
     value class SetSelectedEntryPath(val entryPath: EntryPath?) : Action
@@ -76,19 +81,31 @@ open class AppStateStore<out T : StatePermission>(
 
     init {
         combine(
-            settingsRepository.fontSize,
-            settingsRepository.onEvalDelay,
-            settingsRepository.debugRunningMode,
-            settingsRepository.debugMode,
-            settingsRepository.arrayOriginIndex
-        ) { f, e, d, dm, i ->
+            combine(
+                settingsRepository.fontSize,
+                settingsRepository.onEvalDelay,
+                settingsRepository.debugRunningMode,
+                settingsRepository.debugMode,
+                settingsRepository.arrayOriginIndex
+            ) { fontSize, onEvalDelay, debugRunningMode, debugModeEnabled, arrayOriginIndex ->
+                SettingsSnapshot(
+                    fontSize = fontSize,
+                    onEvalDelay = onEvalDelay,
+                    debugRunningMode = debugRunningMode,
+                    debugModeEnabled = debugModeEnabled,
+                    arrayOriginIndex = arrayOriginIndex
+                )
+            },
+            settingsRepository.suggestionPanelStyle
+        ) { snapshot, suggestionPanelStyle ->
             _state.update {
                 it.copy(
-                    fontSize = f,
-                    onEvalDelay = e,
-                    debugRunningMode = d,
-                    debugModeEnabled = dm,
-                    arrayOriginIndex = i
+                    fontSize = snapshot.fontSize,
+                    onEvalDelay = snapshot.onEvalDelay,
+                    debugRunningMode = snapshot.debugRunningMode,
+                    debugModeEnabled = snapshot.debugModeEnabled,
+                    arrayOriginIndex = snapshot.arrayOriginIndex,
+                    suggestionPanelStyle = suggestionPanelStyle
                 )
             }
         }.launchIn(appScope)
@@ -117,11 +134,6 @@ open class AppStateStore<out T : StatePermission>(
 
         appScope.launch {
             startProcessAction()
-        }
-
-        appScope.launch {
-            delay(5.seconds)
-            println(_state.value)
         }
     }
 
@@ -155,6 +167,10 @@ open class AppStateStore<out T : StatePermission>(
                     _state.update { it.copy(debugRunningMode = action.mode) }
                 }
 
+                is Action.SetSuggestionPanelStyle -> {
+                    _state.update { it.copy(suggestionPanelStyle = action.style) }
+                }
+
                 is Action.SetSelectedEntryPath -> {
                     _state.update { it.copy(selectedEntryPath = action.entryPath) }
                 }
@@ -172,3 +188,11 @@ open class AppStateStore<out T : StatePermission>(
         }
     }
 }
+
+private data class SettingsSnapshot(
+    val fontSize: Int,
+    val onEvalDelay: Int,
+    val debugRunningMode: DebugRunningMode,
+    val debugModeEnabled: Boolean,
+    val arrayOriginIndex: Int
+)

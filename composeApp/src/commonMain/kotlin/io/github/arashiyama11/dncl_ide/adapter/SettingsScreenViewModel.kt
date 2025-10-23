@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,8 @@ data class SettingsUiState(
     val fontSize: Int = 16,
     val onEvalDelay: Int = 1000,
     val debugModeEnabled: Boolean = false,
-    val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING
+    val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING,
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP
 )
 
 class SettingsScreenViewModel(
@@ -29,7 +31,8 @@ class SettingsScreenViewModel(
             onEvalDelay = appState.onEvalDelay,
             debugModeEnabled = appState.debugModeEnabled,
             debugRunningMode = appState.debugRunningMode,
-            list1IndexSwitchEnabled = appState.arrayOriginIndex == 1
+            list1IndexSwitchEnabled = appState.arrayOriginIndex == 1,
+            suggestionPanelStyle = appState.suggestionPanelStyle
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 
@@ -55,5 +58,9 @@ class SettingsScreenViewModel(
 
     fun onDebugRunNonBlockingClicked() {
         settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
+    }
+
+    fun onSuggestionPanelStyleChanged(style: SuggestionPanelStyle) {
+        settingsUseCase.setSuggestionPanelStyle(style)
     }
 }

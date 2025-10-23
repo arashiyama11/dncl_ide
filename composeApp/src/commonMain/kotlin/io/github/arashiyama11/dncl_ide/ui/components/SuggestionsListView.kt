@@ -25,7 +25,7 @@ private val Definition.displayLabelSuffix: String
     get() = detail?.takeIf { it.isNotBlank() && it != literal }?.let { " · $it" } ?: ""
 
 @Composable
-fun SuggestionListView(
+fun SuggestionStripView(
     textSuggestions: List<Definition>,
     modifier: Modifier = Modifier,
     onConfirmTextSuggestion: (String) -> Unit
@@ -42,7 +42,10 @@ fun SuggestionListView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = def.literal,
+                    text = buildString {
+                        append(def.literal)
+                        append(def.displayLabelSuffix)
+                    },
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 8.dp), textAlign = TextAlign.Center
                 )
@@ -54,3 +57,10 @@ fun SuggestionListView(
         }
     }
 }
+
+@Composable
+fun SuggestionListView(
+    textSuggestions: List<Definition>,
+    modifier: Modifier = Modifier,
+    onConfirmTextSuggestion: (String) -> Unit
+) = SuggestionStripView(textSuggestions, modifier, onConfirmTextSuggestion)

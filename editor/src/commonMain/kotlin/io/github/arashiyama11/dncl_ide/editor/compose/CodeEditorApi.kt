@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -70,6 +72,14 @@ class CodeEditorState internal constructor(
 
     private val _decorations = mutableStateListOf(*initialDecorations.toTypedArray())
     val decorations: List<EditorDecoration> get() = _decorations
+    private var cursorRectState by mutableStateOf<Rect?>(null)
+    val cursorRect: Rect? get() = cursorRectState
+
+    private var cursorAnchorInEditorState by mutableStateOf<Offset?>(null)
+    val cursorAnchorInEditor: Offset? get() = cursorAnchorInEditorState
+
+    private var cursorLineHeightPxState by mutableStateOf<Float?>(null)
+    val cursorLineHeightPx: Float? get() = cursorLineHeightPxState
 
     fun updateDocument(next: EditorDocument?) {
         document = next
@@ -100,6 +110,21 @@ class CodeEditorState internal constructor(
     fun updateContent(content: EditorContent) {
         if (contentState == content) return
         contentState = content
+    }
+
+    fun updateCursorRect(rect: Rect?) {
+        if (cursorRectState == rect) return
+        cursorRectState = rect
+    }
+
+    fun updateCursorAnchorInEditor(offset: Offset?) {
+        if (cursorAnchorInEditorState == offset) return
+        cursorAnchorInEditorState = offset
+    }
+
+    fun updateCursorLineHeightPx(height: Float?) {
+        if (cursorLineHeightPxState == height) return
+        cursorLineHeightPxState = height
     }
 
     fun consumeTextFieldValue(

@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -53,6 +54,12 @@ class SettingsUseCaseTest {
         assertEquals(newMode, settingsRepository.debugRunningMode.value)
     }
 
+    @Test
+    fun `補完候補スタイルが正しく設定されること`() = runTest {
+        val newStyle = SuggestionPanelStyle.INLINE_DROPDOWN
+        settingsUseCase.setSuggestionPanelStyle(newStyle)
+        assertEquals(newStyle, settingsRepository.suggestionPanelStyle.value)
+    }
 
     private class MockSettingsRepository : SettingsRepository {
         override val arrayOriginIndex =
@@ -62,6 +69,8 @@ class SettingsUseCaseTest {
         override val debugMode = MutableStateFlow(SettingsRepository.DEFAULT_DEBUG_MODE)
         override val debugRunningMode =
             MutableStateFlow(SettingsRepository.DEFAULT_DEBUG_RUNNING_MODE)
+        override val suggestionPanelStyle =
+            MutableStateFlow(SettingsRepository.DEFAULT_SUGGESTION_PANEL_STYLE)
 
         override fun setListFirstIndex(index: Int) {
             arrayOriginIndex.value = index
@@ -81,6 +90,10 @@ class SettingsUseCaseTest {
 
         override fun setDebugRunningMode(mode: DebugRunningMode) {
             debugRunningMode.value = mode
+        }
+
+        override fun setSuggestionPanelStyle(style: SuggestionPanelStyle) {
+            suggestionPanelStyle.value = style
         }
     }
 }

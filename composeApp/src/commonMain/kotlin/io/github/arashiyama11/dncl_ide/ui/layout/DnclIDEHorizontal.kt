@@ -47,7 +47,9 @@ import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
-import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
+import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
+import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -211,12 +213,32 @@ fun Editor(
             verticalScrollEnabled = true
         )
 
-        CodeEditor(
-            state = editorState,
-            modifier = Modifier.weight(1f),
-            options = editorOptions,
-            controller = editorController
-        )
+        val suggestionPanelStyle = uiState.suggestionPanelStyle
+        val canRenderInline = editorState.cursorAnchorInEditor != null && editorState.cursorLineHeightPx != null
+        val showSuggestionStrip = uiState.isFocused && uiState.showInlineSuggestions
+        val shouldRenderInlineSuggestions =
+            suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN &&
+                shouldShowInlineSuggestions(uiState, editorState)
+
+        Box(modifier = Modifier.weight(1f)) {
+            CodeEditor(
+                state = editorState,
+                modifier = Modifier.fillMaxSize(),
+                options = editorOptions,
+                controller = editorController
+            )
+
+            if (shouldRenderInlineSuggestions) {
+                InlineSuggestionPopup(
+                    suggestions = uiState.textSuggestions,
+                    cursorAnchor = editorState.cursorAnchorInEditor,
+                    lineHeightPx = editorState.cursorLineHeightPx,
+                    modifier = Modifier.fillMaxSize(),
+                    onConfirmTextSuggestion = { viewModel.onConfirmTextSuggestion(it) },
+                    onRequestEditorFocus = { editorController.requestFocus() }
+                )
+            }
+        }
 
         if (uiState.isWaitingForInput) {
             ElevatedCard(
@@ -243,11 +265,15 @@ fun Editor(
             }
         }
 
-        AnimatedVisibility(uiState.isFocused) {
-            SuggestionListView(
-                uiState.textSuggestions,
-                modifier = Modifier.height(48.dp).background(MaterialTheme.colorScheme.surface)
-            ) { viewModel.onConfirmTextSuggestion(it) }
+        val shouldShowStrip = suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP || !canRenderInline
+
+        if (shouldShowStrip) {
+            AnimatedVisibility(showSuggestionStrip) {
+                SuggestionStripView(
+                    uiState.textSuggestions,
+                    modifier = Modifier.height(48.dp).background(MaterialTheme.colorScheme.surface)
+                ) { viewModel.onConfirmTextSuggestion(it) }
+            }
         }
     }
 }
