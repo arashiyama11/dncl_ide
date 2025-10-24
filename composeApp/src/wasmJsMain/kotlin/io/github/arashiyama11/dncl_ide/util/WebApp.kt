@@ -17,6 +17,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.window.ComposeViewport
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
@@ -25,9 +26,11 @@ import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.layout.Editor
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.koin.compose.koinInject
 import org.koin.core.Koin
 import org.w3c.dom.HTMLElement
 
@@ -116,6 +119,8 @@ fun ControllerUi(
             Switch(isMonacoEditor, setIsMonacoEditor)
         }
 
+        SettingsUi(Modifier)
+
         Row(
             modifier = Modifier
                 .fillMaxHeight()
@@ -157,6 +162,31 @@ fun ControllerUi(
             with(viewModel) {
                 IdeSideButtons(Modifier.fillMaxHeight())
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsUi(modifier: Modifier) {
+    val usecase = koinInject<io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase>()
+    val uiState by
+    koinInject<io.github.arashiyama11.dncl_ide.common.AppStateStore<io.github.arashiyama11.dncl_ide.common.StatePermission.Read>>().state.collectAsStateWithLifecycle()
+
+    Column(modifier) {
+        Row {
+            Text(
+                "Suggestion Panel Style: ${uiState.uiConfig.suggestionPanelStyle}",
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Switch(uiState.uiConfig.suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP, {
+                val newStyle =
+                    if (uiState.uiConfig.suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP) {
+                        SuggestionPanelStyle.INLINE_DROPDOWN
+                    } else {
+                        SuggestionPanelStyle.BOTTOM_STRIP
+                    }
+                usecase.setSuggestionPanelStyle(newStyle)
+            })
         }
     }
 }
