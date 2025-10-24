@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.model
 
 import kotlin.math.max
-import kotlin.math.min
 
 sealed interface DnclError {
     val message: String?
@@ -19,35 +18,6 @@ sealed class LexerError(override val message: String, open val index: Int) :
     DnclError {
     override fun explain(program: String): String {
         return explainError(program, message, index until index)
-        val programLines = program.split("\n")
-        val (column, line, spaces) = run {
-            var idx = 0
-            for ((i, line) in programLines.withIndex()) {
-                if (idx + line.length < index) {
-                    idx += line.length + 1
-                } else {
-                    val col = index - idx
-                    val sp = line.substring(0, col)
-                        .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col + 1, i + 1, sp)
-                }
-            }
-            return@run Triple(0, 0, 0)
-        }
-
-        return """${line}行${column}文字目でエラーが発生しました
-$message
-${"=".repeat(15)}
-${
-            programLines.withIndex().toList().subList(max(0, line - 3), line)
-                .joinToString("\n") { (index, value) ->
-                    "${
-                        (index + 1).toString().padStart((line).toString().length, ' ')
-                    }| $value"
-                }
-        }
-${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^"}
-"""
     }
 
     data class UnExpectedCharacter(
@@ -68,38 +38,6 @@ sealed class ParserError(
 ) : DnclError {
     override fun explain(program: String): String {
         return explainError(program, message, errorRange)
-        val programLines = program.split("\n")
-        val (column, line, spaces) = run {
-            var index = 0
-            for ((l, str) in programLines.withIndex()) {
-                if (index + str.length < failToken.range.first) {
-                    index += str.length + 1
-                } else {
-                    val col = failToken.range.first - index
-                    val sp = str.substring(0, col)
-                        .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                    return@run Triple(col + 1, l + 1, sp)
-                }
-            }
-            return@run Triple(0, 0, 0)
-        }
-
-        val hats =
-            program.substring(errorRange.first, min(program.length, errorRange.last + 1))
-                .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-                .let { if (it == 0) 1 else it }
-        return """${line}行${column}文字目でエラーが発生しました
-$message
-${"=".repeat(15)}
-${
-            programLines.withIndex().toList().subList(max(0, line - 3), line)
-                .joinToString("\n") { (index, value) ->
-                    "${
-                        (index + 1).toString().padStart((line).toString().length, ' ')
-                    }| $value"
-                }
-        }
-${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
     }
 
     data class ParseError(
@@ -215,10 +153,9 @@ private fun explainError(
         return@run Triple(0, 0, 0)
     }
 
-    val hats =
-        program.substring(errorRange.first, min(program.length, errorRange.last + 1))
-            .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
-            .let { if (it <= 0) 1 else it }
+    val hats = program.safeSubstring(errorRange.first, errorRange.last + 1)
+        .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
+        .let { if (it <= 0) 1 else it }
     return """${line}行${column}文字目でエラーが発生しました
 $message
 ${"=".repeat(15)}
@@ -236,4 +173,14 @@ ${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
 
 fun DnclObject.Error.explain(program: String): String {
     return explainError(program, message, astNode.range)
+}
+
+private fun String.safeSubstring(startIndex: Int, endIndex: Int): String {
+    if (this.isEmpty()) return ""
+
+    val safeStart = startIndex.coerceIn(0, this.length)
+    val safeEnd = endIndex.coerceIn(0, this.length)
+
+    if (safeStart >= safeEnd) return ""
+    return this.substring(safeStart, safeEnd)
 }
