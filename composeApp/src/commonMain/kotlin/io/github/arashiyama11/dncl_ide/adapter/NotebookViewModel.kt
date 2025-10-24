@@ -117,6 +117,7 @@ class NotebookViewModel(
 
     companion object {
         private const val SAVE_DELAY_MS = 500L
+        private const val COMPLETION_DEBOUNCE_MS = 100L
     }
 
     private data class NotebookState(
@@ -134,6 +135,7 @@ class NotebookViewModel(
     private val _state = MutableStateFlow(NotebookState())
 
     private val saveJobs = mutableMapOf<String, Job>()
+    private val completionJobs = mutableMapOf<String, Job>()
 
     // UI状態
     val uiState = combine(
@@ -415,6 +417,7 @@ class NotebookViewModel(
                         )
                     }
                     closeNotebookCellDocument(file.path, action.cellId)
+                    completionJobs.remove(action.cellId)?.cancel()
                 }
             }
 
@@ -544,6 +547,7 @@ class NotebookViewModel(
                     }
                     if (action.cellType != CellType.CODE) {
                         closeNotebookCellDocument(file.path, action.cellId)
+                        completionJobs.remove(action.cellId)?.cancel()
                     }
                 }
             }
@@ -563,16 +567,6 @@ class NotebookViewModel(
                     )
 
                     val notebookFile = _state.value.notebookFile
-                    val suggestions = if (notebookFile != null) {
-                        requestNotebookCompletions(
-                            notebookFile.path,
-                            action.cellId,
-                            newText,
-                            newTextFieldValue.selection.end
-                        )
-                    } else {
-                        emptyList()
-                    }
 
                     _state.update { currentState ->
                         val notebook = currentState.domainNotebook ?: return@update currentState
@@ -592,18 +586,38 @@ class NotebookViewModel(
                                 highlightRevision = previousRevision + 1
                             )
                         }.toImmutableMap()
-                        val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
-                            this[action.cellId] = suggestions.toImmutableList()
-                        }.toImmutableMap()
 
                         currentState.copy(
                             domainNotebook = newNotebook,
                             codeCellStateMap = newCodeMap,
-                            cellSuggestionsMap = newSugMap,
                             unsavedChanges = (currentState.unsavedChanges || newText != (notebook.cells.firstOrNull { it.id == action.cellId }?.source?.joinToString(
                                 "\n"
                             ))),
                         )
+                    }
+                    if (notebookFile != null) {
+                        val notebookPath = notebookFile.path
+                        completionJobs[action.cellId]?.cancel()
+                        completionJobs[action.cellId] = viewModelScope.launch(Dispatchers.Default) {
+                            delay(COMPLETION_DEBOUNCE_MS)
+                            val suggestions = requestNotebookCompletions(
+                                notebookPath,
+                                action.cellId,
+                                newText,
+                                newTextFieldValue.selection.end
+                            )
+                            _state.update { currentState ->
+                                if (!currentState.codeCellStateMap.containsKey(action.cellId)) {
+                                    return@update currentState
+                                }
+                                val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
+                                    this[action.cellId] = suggestions.toImmutableList()
+                                }.toImmutableMap()
+                                currentState.copy(cellSuggestionsMap = newSugMap)
+                            }
+                        }
+                    } else {
+                        completionJobs.remove(action.cellId)?.cancel()
                     }
                     saveJobs[action.cellId]?.cancel()
                     saveJobs[action.cellId] = viewModelScope.launch(Dispatchers.Default) {

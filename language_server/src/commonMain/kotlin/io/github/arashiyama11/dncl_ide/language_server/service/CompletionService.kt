@@ -224,11 +224,20 @@ private class SuggestionUseCase {
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
         val lexer = Lexer(fixedCode)
         val program = parseProgramOrNull(lexer)
-            ?: return BASE_SUGGESTIONS + BUILTIN_FUNCTION_SUGGESTIONS
+            ?: run {
+                val fallback = BASE_SUGGESTIONS + BUILTIN_FUNCTION_SUGGESTIONS
+                val query = extractActiveQuery(code, position)
+                return sortCandidates(
+                    candidates = fallback,
+                    query = query,
+                    position = position,
+                    codeLength = code.length
+                )
+            }
         return suggestWithParsedProgram(
             code = code,
             position = position,
-            tokens = lexer.toList(),
+            tokens = Lexer(code).toList(),
             program = program
         )
 
@@ -265,7 +274,10 @@ private class SuggestionUseCase {
                 else -> null
             }
         }
-        return sortCandidates(words, activeTokenLiteral, position, code.length)
+
+        val query = activeTokenLiteral ?: extractActiveQuery(code, position)
+        println("query: $query")
+        return sortCandidates(words, query, position, code.length)
     }
 
     private fun collectGlobalDefinitions(program: AstNode.Program): List<Definition> {
@@ -396,8 +408,21 @@ private class SuggestionUseCase {
             } ?: Int.MAX_VALUE
             val proximity = computeProximity(definition, position, codeLength)
 
-            val kindPriority = SUGGESTION_KIND_PRIORITY.getOrElse(definition.kind) {
+            val basePriority = SUGGESTION_KIND_PRIORITY.getOrElse(definition.kind) {
                 Int.MAX_VALUE
+            }
+            val kindPriority = when {
+                normalizedQuery == null -> when (definition.kind) {
+                    SuggestionKind.Keyword -> basePriority - 10
+                    SuggestionKind.Snippet -> basePriority - 9
+                    else -> basePriority
+                }
+
+                else -> when (definition.kind) {
+                    SuggestionKind.Keyword -> basePriority + 10
+                    SuggestionKind.Snippet -> basePriority + 9
+                    else -> basePriority
+                }
             }
 
             val lengthPriority =
@@ -505,4 +530,19 @@ private class SuggestionUseCase {
         val literalLength: Int,
         val originalIndex: Int
     )
+
+    private fun extractActiveQuery(code: String, position: Int): String? {
+        if (code.isEmpty()) return null
+        val clamp = position.coerceIn(0, code.length)
+        var start = clamp
+        while (start > 0 && code[start - 1].isIdentifierChar()) {
+            start--
+        }
+        if (start == clamp) return null
+        return code.substring(start, clamp)
+    }
+
+    private fun Char.isIdentifierChar(): Boolean {
+        return this == '_' || isLetterOrDigit()
+    }
 }

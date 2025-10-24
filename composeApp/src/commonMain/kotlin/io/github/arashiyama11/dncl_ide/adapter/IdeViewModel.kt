@@ -178,6 +178,7 @@ class IdeViewModel(
     val errorChannel = Channel<String>(Channel.BUFFERED)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
+    private var completionTriggerJob: Job? = null
 
     fun onPause() {
         viewModelScope.launch {
@@ -336,8 +337,16 @@ class IdeViewModel(
             editorStateFlow.value.document?.let {
                 val position: Position =
                     calculatePosition(indentedText.text, indentedText.selection.end)
-                editorSession.dispatch(EditorIntent.TriggerCompletion(position))
+                triggerCompletionDebounced(position)
             }
+        }
+    }
+
+    private fun triggerCompletionDebounced(position: Position) {
+        completionTriggerJob?.cancel()
+        completionTriggerJob = viewModelScope.launch {
+            delay(COMPLETION_DEBOUNCE_MS)
+            editorSession.dispatch(EditorIntent.TriggerCompletion(position))
         }
     }
 
@@ -661,6 +670,10 @@ class IdeViewModel(
 
             else -> errorChannel.send("ファイルを保存できませんでした")
         }
+    }
+
+    companion object {
+        private const val COMPLETION_DEBOUNCE_MS = 100L
     }
 
     private data class LocalIdeState(
