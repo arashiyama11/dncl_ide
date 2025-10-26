@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.StatePermission
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.usecase.SettingsUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,8 @@ data class SettingsUiState(
     val fontSize: Int = 16,
     val onEvalDelay: Int = 1000,
     val debugModeEnabled: Boolean = false,
-    val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING
+    val debugRunningMode: DebugRunningMode = DebugRunningMode.NON_BLOCKING,
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP
 )
 
 class SettingsScreenViewModel(
@@ -25,11 +27,12 @@ class SettingsScreenViewModel(
 ) : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = appStateStore.state.map { appState ->
         SettingsUiState(
-            fontSize = appState.fontSize,
-            onEvalDelay = appState.onEvalDelay,
-            debugModeEnabled = appState.debugModeEnabled,
-            debugRunningMode = appState.debugRunningMode,
-            list1IndexSwitchEnabled = appState.arrayOriginIndex == 1
+            fontSize = appState.uiConfig.fontSize,
+            onEvalDelay = appState.dnclConfig.onEvalDelay,
+            debugModeEnabled = appState.dnclConfig.debugModeEnabled,
+            debugRunningMode = appState.dnclConfig.debugRunningMode,
+            list1IndexSwitchEnabled = appState.dnclConfig.arrayOriginIndex == 1,
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 
@@ -55,5 +58,9 @@ class SettingsScreenViewModel(
 
     fun onDebugRunNonBlockingClicked() {
         settingsUseCase.setDebugRunningMode(DebugRunningMode.NON_BLOCKING)
+    }
+
+    fun onSuggestionPanelStyleChanged(style: SuggestionPanelStyle) {
+        settingsUseCase.setSuggestionPanelStyle(style)
     }
 }

@@ -19,6 +19,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
@@ -77,9 +78,11 @@ data class IdeUiState(
     val isDarkTheme: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
     val isFocused: Boolean = false,
+    val showInlineSuggestions: Boolean = false,
     val languageDiagnostics: List<Diagnostic> = emptyList(),
     val selectedEntryPath: EntryPath? = null,
-    val running: Boolean = false
+    val running: Boolean = false,
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP
 )
 
 enum class TextFieldType {
@@ -116,6 +119,7 @@ class IdeViewModel(
             isDarkTheme = false,
             textSuggestions = emptyList(),
             isFocused = false,
+            showInlineSuggestions = false,
             languageDiagnostics = emptyList()
         )
     )
@@ -149,21 +153,23 @@ class IdeViewModel(
             currentInput = localState.currentInput,
             isError = localState.isError,
             errorRange = localState.errorRange,
-            fontSize = appState.fontSize,
+            fontSize = appState.uiConfig.fontSize,
             currentEvaluatingLine = localState.currentEvaluatingLine,
             textFieldType = localState.textFieldType,
             currentEnvironment = localState.currentEnvironment,
             isStepMode = localState.isStepMode,
             isLineMode = localState.isLineMode,
             isWaitingForInput = localState.isWaitingForInput,
-            debugMode = appState.debugModeEnabled,
-            debugRunningMode = appState.debugRunningMode,
+            debugMode = appState.dnclConfig.debugModeEnabled,
+            debugRunningMode = appState.dnclConfig.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
+            showInlineSuggestions = localState.showInlineSuggestions,
             languageDiagnostics = localState.languageDiagnostics,
             selectedEntryPath = appState.selectedEntryPath,
-            running = appState.running
+            running = appState.running,
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -172,6 +178,7 @@ class IdeViewModel(
     val errorChannel = Channel<String>(Channel.BUFFERED)
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
+    private var completionTriggerJob: Job? = null
 
     fun onPause() {
         viewModelScope.launch {
@@ -194,7 +201,7 @@ class IdeViewModel(
                     state.copy(isDarkTheme = it)
                 }
 
-                onTextChanged(uiState.value.codeTextFieldValue)
+                onTextChanged(uiState.value.codeTextFieldValue, userTriggeredTyping = false)
             }
         }
 
@@ -226,7 +233,7 @@ class IdeViewModel(
                             )
                             editorSession.dispatch(EditorIntent.Initialize(document))
 
-                            onTextChanged(textValue)
+                            onTextChanged(textValue, userTriggeredTyping = false)
                         }
 
                         is NotebookFile -> {
@@ -250,8 +257,15 @@ class IdeViewModel(
         }
     }
 
-    fun onTextChanged(text: TextFieldValue) {
-        val indentedText = autoIndent(uiState.value.codeTextFieldValue, text)
+    fun onTextChanged(text: TextFieldValue, userTriggeredTyping: Boolean? = null) {
+        val previousValue = uiState.value.codeTextFieldValue
+        val indentedText = autoIndent(previousValue, text)
+        val visibilityDecision = decideInlineSuggestionVisibility(
+            previousValue = previousValue,
+            updatedValue = indentedText,
+            userTriggeredTyping = userTriggeredTyping,
+            currentVisibility = _localState.value.showInlineSuggestions
+        )
         val currentEditorState: EditorState = editorStateFlow.value
         if (currentEditorState.document != null) {
             editorSession.dispatch(
@@ -264,7 +278,9 @@ class IdeViewModel(
         viewModelScope.launch(Dispatchers.Default) {
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
-                    it.copy(codeTextFieldValue = indentedText)
+                    it.copy(
+                        codeTextFieldValue = indentedText
+                    ).applyInlineSuggestionDecision(visibilityDecision)
                 }
             }
 
@@ -321,8 +337,16 @@ class IdeViewModel(
             editorStateFlow.value.document?.let {
                 val position: Position =
                     calculatePosition(indentedText.text, indentedText.selection.end)
-                editorSession.dispatch(EditorIntent.TriggerCompletion(position))
+                triggerCompletionDebounced(position)
             }
+        }
+    }
+
+    private fun triggerCompletionDebounced(position: Position) {
+        completionTriggerJob?.cancel()
+        completionTriggerJob = viewModelScope.launch {
+            delay(COMPLETION_DEBOUNCE_MS)
+            editorSession.dispatch(EditorIntent.TriggerCompletion(position))
         }
     }
 
@@ -357,12 +381,12 @@ class IdeViewModel(
                     isWaitingForInput = false
                 )
             }
-            onTextChanged(uiState.value.codeTextFieldValue)
+            onTextChanged(uiState.value.codeTextFieldValue, userTriggeredTyping = false)
 
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
                 inputChannel!!,
-                appState.arrayOriginIndex,
+                appState.dnclConfig.arrayOriginIndex,
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
@@ -445,7 +469,7 @@ class IdeViewModel(
                 _localState.update { it.copy(currentEvaluatingLine = null /*, isExecuting = false */) }
             } // isExecuting controlled by AppState
             appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
-            onTextChanged(uiState.value.codeTextFieldValue)
+            onTextChanged(uiState.value.codeTextFieldValue, userTriggeredTyping = false)
         }
     }
 
@@ -569,11 +593,51 @@ class IdeViewModel(
 
     fun onCodeEditorFocused(isFocused: Boolean) {
         _localState.update {
-            it.copy(
-                isFocused = isFocused
-            )
+            it.withFocusState(isFocused)
         }
     }
+
+    private fun decideInlineSuggestionVisibility(
+        previousValue: TextFieldValue,
+        updatedValue: TextFieldValue,
+        userTriggeredTyping: Boolean?,
+        currentVisibility: Boolean
+    ): InlineSuggestionVisibilityDecision {
+        userTriggeredTyping?.let { explicit ->
+            return InlineSuggestionVisibilityDecision(shouldUpdate = true, show = explicit)
+        }
+
+        if (previousValue.text != updatedValue.text) {
+            return InlineSuggestionVisibilityDecision(shouldUpdate = true, show = true)
+        }
+
+        if (previousValue.selection != updatedValue.selection) {
+            return InlineSuggestionVisibilityDecision(shouldUpdate = true, show = false)
+        }
+
+        return InlineSuggestionVisibilityDecision(shouldUpdate = false, show = currentVisibility)
+    }
+
+    private fun LocalIdeState.applyInlineSuggestionDecision(
+        decision: InlineSuggestionVisibilityDecision
+    ): LocalIdeState =
+        if (!decision.shouldUpdate) {
+            this
+        } else {
+            copy(showInlineSuggestions = decision.show)
+        }
+
+    private fun LocalIdeState.withFocusState(isFocused: Boolean): LocalIdeState =
+        if (isFocused) {
+            copy(isFocused = true)
+        } else {
+            copy(isFocused = false, showInlineSuggestions = false)
+        }
+
+    private data class InlineSuggestionVisibilityDecision(
+        val shouldUpdate: Boolean,
+        val show: Boolean
+    )
 
     override fun onCleared() {
         viewModelScope.launch {
@@ -608,6 +672,10 @@ class IdeViewModel(
         }
     }
 
+    companion object {
+        private const val COMPLETION_DEBOUNCE_MS = 100L
+    }
+
     private data class LocalIdeState(
         val codeTextFieldValue: TextFieldValue,
         val dnclError: DnclError?,
@@ -626,6 +694,7 @@ class IdeViewModel(
         val isDarkTheme: Boolean,
         val textSuggestions: List<Definition>,
         val isFocused: Boolean,
+        val showInlineSuggestions: Boolean,
         val languageDiagnostics: List<Diagnostic>
     )
 }

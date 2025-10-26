@@ -2,12 +2,14 @@ package io.github.arashiyama11.dncl_ide.repository
 
 import com.russhwolf.settings.Settings
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ARRAY_ORIGIN_INDEX
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_ON_EVAL_DELAY
+import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_SUGGESTION_PANEL_STYLE
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -17,12 +19,14 @@ class SettingsRepositoryImpl() : SettingsRepository {
     private val _onEvalDelay = MutableStateFlow(DEFAULT_ON_EVAL_DELAY)
     private val _debugMode = MutableStateFlow(DEFAULT_DEBUG_MODE)
     private val _debugRunningMode = MutableStateFlow(DEFAULT_DEBUG_RUNNING_MODE)
+    private val _suggestionPanelStyle = MutableStateFlow(DEFAULT_SUGGESTION_PANEL_STYLE)
 
     override val arrayOriginIndex: StateFlow<Int> = _arrayOriginIndex
     override val fontSize: StateFlow<Int> = _fontSize
     override val onEvalDelay: StateFlow<Int> = _onEvalDelay
     override val debugMode: StateFlow<Boolean> = _debugMode
     override val debugRunningMode: StateFlow<DebugRunningMode> = _debugRunningMode
+    override val suggestionPanelStyle: StateFlow<SuggestionPanelStyle> = _suggestionPanelStyle
     private val setting = Settings()
 
     init {
@@ -43,6 +47,10 @@ class SettingsRepositoryImpl() : SettingsRepository {
         } catch (e: IllegalArgumentException) {
             DEFAULT_DEBUG_RUNNING_MODE
         }
+        _suggestionPanelStyle.value = setting.getString(
+            SUGGESTION_PANEL_STYLE,
+            DEFAULT_SUGGESTION_PANEL_STYLE.name
+        ).toSuggestionPanelStyle()
     }
 
     override fun setListFirstIndex(index: Int) {
@@ -70,11 +78,21 @@ class SettingsRepositoryImpl() : SettingsRepository {
         _debugRunningMode.value = mode
     }
 
+    override fun setSuggestionPanelStyle(style: SuggestionPanelStyle) {
+        setting.putString(SUGGESTION_PANEL_STYLE, style.name)
+        _suggestionPanelStyle.value = style
+    }
+
     companion object {
         const val ARRAY_ORIGIN_INDEX = "arrayOriginIndex"
         const val FONT_SIZE = "fontSize"
         const val ON_EVAL_DELAY = "onEvalDelay"
         const val DEBUG_MODE = "debugMode"
         const val DEBUG_RUNNING_MODE = "debugRunningMode"
+        const val SUGGESTION_PANEL_STYLE = "suggestionPanelStyle"
+
+        private fun String.toSuggestionPanelStyle(): SuggestionPanelStyle =
+            runCatching { SuggestionPanelStyle.valueOf(this) }
+                .getOrElse { DEFAULT_SUGGESTION_PANEL_STYLE }
     }
 }

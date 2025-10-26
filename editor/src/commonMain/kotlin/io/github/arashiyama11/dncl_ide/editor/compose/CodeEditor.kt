@@ -34,22 +34,22 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.arashiyama11.dncl_ide.editor.core.EditorSelection
 import io.github.arashiyama11.dncl_ide.editor.core.EditorContentUpdate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -67,18 +67,46 @@ fun CodeEditor(
         fontWeight = FontWeight.Normal
     )
 
-    var lineHeightDp = with(LocalDensity.current) {
+    val density = LocalDensity.current
+
+    var lineHeightDp = with(density) {
         resolvedTextStyle.lineHeight.toDp()
     }
 
-    val lineHeightPx = with(LocalDensity.current) { lineHeightDp.toPx() }
+    val lineHeightPx = with(density) { lineHeightDp.toPx() }
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
 
     var editorHeightPx by remember { mutableIntStateOf(0) }
+    var editorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var textFieldCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var latestTextLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
+
+    fun recalcCursorAnchor() {
+        val rect = state.cursorRect
+        val tfCoords = textFieldCoordinates
+        val editorCoords = editorCoordinates
+        if (rect == null || tfCoords == null || editorCoords == null) {
+            state.updateCursorAnchorInEditor(null)
+            return
+        }
+        val anchorTopLeft = tfCoords.localPositionOf(editorCoords, rect.topLeft)
+        state.updateCursorAnchorInEditor(anchorTopLeft)
+    }
+
+    fun updateCursorMetrics(layoutResult: TextLayoutResult?, selection: TextRange) {
+        if (layoutResult == null) return
+        val textLength = layoutResult.layoutInput.text.length
+        val selectionEnd = selection.end.coerceIn(0, textLength)
+        val cursorRect = layoutResult.getCursorRect(selectionEnd)
+        lineHeightDp = with(density) { cursorRect.height.toDp() }
+        state.updateCursorRect(cursorRect)
+        state.updateCursorLineHeightPx(cursorRect.height)
+        recalcCursorAnchor()
+    }
 
     DisposableEffect(controller, focusRequester) {
         controller.attachFocusRequester(focusRequester)
@@ -115,6 +143,8 @@ fun CodeEditor(
             .fillMaxSize()
             .onGloballyPositioned { coordinates ->
                 editorHeightPx = coordinates.size.height
+                editorCoordinates = coordinates
+                recalcCursorAnchor()
             }
             .clickable(
                 indication = null,
@@ -163,12 +193,22 @@ fun CodeEditor(
                     .padding(bottom = 32.dp)
                     .horizontalScroll(horizontalScrollState)
                     .focusRequester(focusRequester)
+                    .onGloballyPositioned { coordinates ->
+                        textFieldCoordinates = coordinates
+                        recalcCursorAnchor()
+                    }
                     .onFocusChanged { focusState ->
                         controller.emitFocusChanged(CodeEditorEvents.FocusChanged(focusState.isFocused))
+                        if (!focusState.isFocused) {
+                            state.updateCursorAnchorInEditor(null)
+                            state.updateCursorRect(null)
+                            state.updateCursorLineHeightPx(null)
+                        }
                     },
                 cursorBrush = SolidColor(cursorColor),
                 onTextLayout = { layoutResult ->
-                    lineHeightDp = layoutResult.multiParagraph.getLineHeight(0).dp
+                    latestTextLayoutResult = layoutResult
+                    updateCursorMetrics(layoutResult, state.content.text.selection)
                 },
                 decorationBox = { innerTextField ->
                     innerTextField()
@@ -218,6 +258,10 @@ fun CodeEditor(
                 }
             }
         }
+    }
+
+    LaunchedEffect(state.content.text.selection, latestTextLayoutResult) {
+        updateCursorMetrics(latestTextLayoutResult, state.content.text.selection)
     }
 }
 

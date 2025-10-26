@@ -51,9 +51,9 @@ private fun CompletionItem.toDefinition(): Definition {
     )
 }
 
-private val snippetPlaceholderWithDefault = Regex("\\$\\{\\d+:([^}]+)}")
-private val snippetPlaceholderWithoutDefault = Regex("\\$\\{\\d+}")
-private val simpleTabStop = Regex("\\$\\d+")
+private val snippetPlaceholderWithDefault = Regex("""\$\{\d+:([^}]+)\}""")
+private val snippetPlaceholderWithoutDefault = Regex("""\$\{\d+\}""")
+private val simpleTabStop = Regex("""\$\d+""")
 
 private fun String.toPlainTextSnippet(): String =
     this.replace(snippetPlaceholderWithDefault) { matchResult ->

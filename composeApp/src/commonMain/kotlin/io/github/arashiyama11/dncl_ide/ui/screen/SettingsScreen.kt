@@ -17,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
+import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -97,6 +99,28 @@ fun SettingsScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                     )
+                }
+            )
+
+            SettingsItem(
+                title = "補完候補の表示方式",
+                control = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SuggestionPanelStyleSelector(
+                            label = "画面下部に横並び",
+                            selected = uiState.suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP,
+                            onClick = {
+                                viewModel.onSuggestionPanelStyleChanged(SuggestionPanelStyle.BOTTOM_STRIP)
+                            }
+                        )
+                        SuggestionPanelStyleSelector(
+                            label = "カーソル直下にポップアップ",
+                            selected = uiState.suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN,
+                            onClick = {
+                                viewModel.onSuggestionPanelStyleChanged(SuggestionPanelStyle.INLINE_DROPDOWN)
+                            }
+                        )
+                    }
                 }
             )
 
@@ -210,5 +234,26 @@ private fun SettingsItem(
             )
             control()
         }
+    }
+}
+
+@Composable
+private fun SuggestionPanelStyleSelector(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
