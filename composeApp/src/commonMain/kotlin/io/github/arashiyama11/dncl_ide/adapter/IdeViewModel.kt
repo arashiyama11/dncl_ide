@@ -82,7 +82,10 @@ data class IdeUiState(
     val languageDiagnostics: List<Diagnostic> = emptyList(),
     val selectedEntryPath: EntryPath? = null,
     val running: Boolean = false,
-    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
+    val textInputMode: TextInputMode = TextInputMode.STANDARD,
+    val customImeSnippets: List<CustomImeSnippet> = emptyList(),
+    val customImeQuickKeys: List<String> = emptyList()
 )
 
 enum class TextFieldType {
@@ -96,6 +99,42 @@ class IdeViewModel(
     private val appStateStore: AppStateStore<StatePermission.Write>,
     private val languageFeatureProvider: LanguageFeatureProvider
 ) : ViewModel() {
+    private val defaultCustomImeSnippets: List<CustomImeSnippet> = listOf(
+        CustomImeSnippet(
+            id = "if-basic",
+            title = "もし〜ならば",
+            body = "もし 条件 ならば:\n  \n終わり\n",
+            description = "条件分岐の基本形"
+        ),
+        CustomImeSnippet(
+            id = "if-else",
+            title = "もし〜そうでなければ",
+            body = "もし 条件 ならば:\n  \nそうでなければ:\n  \n終わり\n",
+            description = "if/else テンプレート"
+        ),
+        CustomImeSnippet(
+            id = "repeat-loop",
+            title = "繰り返しテンプレ",
+            body = "i を 0 から 上限 まで 1 ずつ増やしながら繰り返す:\n  \n",
+            description = "カウンタ付き繰り返し構文"
+        ),
+        CustomImeSnippet(
+            id = "function",
+            title = "関数定義",
+            body = "関数 名前(引数)を:\n  \nと定義する\n",
+            description = "基本的な関数の骨組み"
+        )
+    )
+
+    private val defaultCustomImeQuickKeys: List<String> = listOf(
+        "(", ")",
+        "[", "]",
+        "{", "}",
+        "\"\"",
+        "==", "!=", "<=", ">=",
+        "+", "-", "*", "/",
+        ":", ";"
+    )
     private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
     private val editorStateFlow = editorSession.state
     private val appState by appStateStore
@@ -120,7 +159,10 @@ class IdeViewModel(
             textSuggestions = emptyList(),
             isFocused = false,
             showInlineSuggestions = false,
-            languageDiagnostics = emptyList()
+            languageDiagnostics = emptyList(),
+            textInputMode = TextInputMode.STANDARD,
+            customImeSnippets = defaultCustomImeSnippets,
+            customImeQuickKeys = defaultCustomImeQuickKeys
         )
     )
 
@@ -169,7 +211,10 @@ class IdeViewModel(
             languageDiagnostics = localState.languageDiagnostics,
             selectedEntryPath = appState.selectedEntryPath,
             running = appState.running,
-            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle,
+            textInputMode = localState.textInputMode,
+            customImeSnippets = localState.customImeSnippets,
+            customImeQuickKeys = localState.customImeQuickKeys
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -494,6 +539,76 @@ class IdeViewModel(
         }
     }
 
+    fun toggleTextInputMode() {
+        val next = if (uiState.value.textInputMode == TextInputMode.CUSTOM) {
+            TextInputMode.STANDARD
+        } else {
+            TextInputMode.CUSTOM
+        }
+        setTextInputMode(next)
+    }
+
+    fun setTextInputMode(mode: TextInputMode) {
+        _localState.update { state ->
+            if (state.textInputMode == mode) {
+                state
+            } else {
+                state.copy(
+                    textInputMode = mode,
+                    showInlineSuggestions = if (mode == TextInputMode.CUSTOM) {
+                        false
+                    } else {
+                        state.showInlineSuggestions
+                    }
+                )
+            }
+        }
+    }
+
+    fun onCustomImeSnippetSelected(snippet: CustomImeSnippet) {
+        insertText(snippet.body)
+    }
+
+    fun onCustomImeQuickKeySelected(symbol: String) {
+        insertText(symbol)
+    }
+
+    fun onCustomImeInsertNewLine() {
+        insertText("\n")
+    }
+
+    fun onCustomImeDeleteBackward() {
+        val currentValue = uiState.value.codeTextFieldValue
+        val selection = currentValue.selection
+        val start = selection.start
+        val end = selection.end
+
+        if (start == 0 && end == 0) {
+            return
+        }
+
+        val (deleteStart, deleteEnd) = if (start != end) {
+            start to end
+        } else if (start > 0) {
+            (start - 1) to start
+        } else {
+            return
+        }
+
+        val newText = buildString {
+            append(currentValue.text.substring(0, deleteStart))
+            append(currentValue.text.substring(deleteEnd))
+        }
+
+        onTextChanged(
+            TextFieldValue(
+                text = newText,
+                selection = TextRange(deleteStart)
+            ),
+            userTriggeredTyping = true
+        )
+    }
+
     fun insertText(text: String) {
         val newText = uiState.value.codeTextFieldValue.text.substring(
             0,
@@ -627,12 +742,22 @@ class IdeViewModel(
             copy(showInlineSuggestions = decision.show)
         }
 
-    private fun LocalIdeState.withFocusState(isFocused: Boolean): LocalIdeState =
-        if (isFocused) {
+    private fun LocalIdeState.withFocusState(isFocused: Boolean): LocalIdeState {
+        return if (isFocused) {
             copy(isFocused = true)
         } else {
-            copy(isFocused = false, showInlineSuggestions = false)
+            val nextInputMode = if (textInputMode == TextInputMode.CUSTOM) {
+                TextInputMode.CUSTOM
+            } else {
+                TextInputMode.STANDARD
+            }
+            copy(
+                isFocused = false,
+                showInlineSuggestions = false,
+                textInputMode = nextInputMode
+            )
         }
+    }
 
     private data class InlineSuggestionVisibilityDecision(
         val shouldUpdate: Boolean,
@@ -695,6 +820,9 @@ class IdeViewModel(
         val textSuggestions: List<Definition>,
         val isFocused: Boolean,
         val showInlineSuggestions: Boolean,
-        val languageDiagnostics: List<Diagnostic>
+        val languageDiagnostics: List<Diagnostic>,
+        val textInputMode: TextInputMode,
+        val customImeSnippets: List<CustomImeSnippet>,
+        val customImeQuickKeys: List<String>
     )
 }

@@ -1,8 +1,6 @@
 package io.github.arashiyama11.dncl_ide.ui.components
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.consumeDownChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -197,13 +194,11 @@ private fun Modifier.inlineSuggestionClickHandler(
     val currentOnRequestFocus by rememberUpdatedState(onRequestEditorFocus)
     val currentOnConfirm by rememberUpdatedState(onConfirm)
     pointerInput(Unit) {
-        @Suppress("DEPRECATION")
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            down.consumeDownChange()
-            currentOnConfirm()
-            currentOnRequestFocus()
-            waitForUpOrCancellation()
-        }
+        detectTapGestures(
+            onTap = {
+                currentOnConfirm()
+                currentOnRequestFocus()
+            }
+        )
     }
 }
