@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -14,12 +15,18 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
@@ -39,8 +46,8 @@ import kotlinx.browser.window
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.compose.koinInject
 import org.koin.core.Koin
-import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.events.Event
 import org.w3c.dom.pointerevents.PointerEvent
 import kotlin.js.unsafeCast
 import kotlin.math.roundToInt
@@ -56,12 +63,32 @@ fun webApp() {
     val monacoWrapper = document.getElementById("monaco-wrapper")!! as HTMLElement
     val monacoControllerElem = document.getElementById("monaco-controller")!! as HTMLElement
     val monacoHandleElem = document.getElementById("monaco-resize-handle")!! as HTMLElement
-    val switchToComposeButton = document.getElementById("switch-to-compose") as? HTMLButtonElement
+    val monacoComposeContainer = document.createElement("div") as HTMLElement
+    monacoComposeContainer.style.width = "100%"
+    monacoComposeContainer.style.height = "100%"
+    monacoComposeContainer.style.display = "flex"
+    monacoComposeContainer.style.flexDirection = "column"
+    monacoComposeContainer.style.flex = "1 1 auto"
+    monacoComposeContainer.style.position = "relative"
+    monacoControllerElem.appendChild(monacoComposeContainer)
 
     val isMonacoEditorState = MutableStateFlow(false)
     val composeControllerWidthState = MutableStateFlow(DEFAULT_CONTROLLER_WIDTH_PX)
     val monacoControllerWidthState = MutableStateFlow(DEFAULT_CONTROLLER_WIDTH_PX)
     val viewModel by koin.inject<IdeViewModel>()
+
+    var composeCursorActive = false
+    var monacoCursorActive = false
+    var monacoHandleHover = false
+
+    fun applyGlobalResizeCursor() {
+        val bodyStyle = document.body?.style ?: return
+        if (composeCursorActive || monacoCursorActive) {
+            bodyStyle.cursor = "col-resize"
+        } else {
+            bodyStyle.cursor = ""
+        }
+    }
 
     composeWrapper.hidden = false
     monacoWrapper.hidden = true
@@ -74,10 +101,6 @@ fun webApp() {
             println("Content changed: ${monaco.getValue()}")
         }
     }
-
-    switchToComposeButton?.addEventListener("click", {
-        isMonacoEditorState.value = false
-    })
 
     fun clampWidth(width: Int): Int =
         width.coerceIn(MIN_CONTROLLER_WIDTH_PX, MAX_CONTROLLER_WIDTH_PX)
@@ -94,9 +117,26 @@ fun webApp() {
     var monacoDragStartX = 0
     var monacoStartWidth = monacoControllerWidthState.value
 
+    monacoHandleElem.addEventListener("pointerenter", {
+        monacoHandleHover = true
+        monacoCursorActive = true
+        applyGlobalResizeCursor()
+    })
+
+    monacoHandleElem.addEventListener("pointerleave", {
+        monacoHandleHover = false
+        if (!monacoDragging) {
+            monacoCursorActive = false
+            applyGlobalResizeCursor()
+        }
+    })
+
     monacoHandleElem.addEventListener("pointerdown", { event ->
         val pointerEvent = event.unsafeCast<PointerEvent>()
         monacoDragging = true
+        monacoHandleHover = true
+        monacoCursorActive = true
+        applyGlobalResizeCursor()
         monacoDragStartX = pointerEvent.clientX
         monacoStartWidth = monacoControllerWidthState.value
         pointerEvent.preventDefault()
@@ -112,6 +152,8 @@ fun webApp() {
     fun finishMonacoDrag(pointerEvent: PointerEvent) {
         if (!monacoDragging) return
         monacoDragging = false
+        monacoCursorActive = monacoHandleHover
+        applyGlobalResizeCursor()
     }
 
     document.addEventListener("pointerup", { event ->
@@ -132,12 +174,21 @@ fun webApp() {
                 composeWrapper.hidden = true
                 monacoWrapper.hidden = false
                 monacoControllerElem.style.width = "${monacoControllerWidthState.value}px"
+                composeCursorActive = false
+                applyGlobalResizeCursor()
                 window.requestAnimationFrame {
                     monaco.layout()
+                    window.dispatchEvent(Event("resize"))
                 }
             } else {
                 composeWrapper.hidden = false
                 monacoWrapper.hidden = true
+                monacoHandleHover = false
+                monacoCursorActive = false
+                applyGlobalResizeCursor()
+                window.requestAnimationFrame {
+                    window.dispatchEvent(Event("resize"))
+                }
             }
         }
 
@@ -150,6 +201,20 @@ fun webApp() {
                 val density = LocalDensity.current
                 val controllerWidthDp = with(density) { controllerWidthPx.toDp() }
                 val latestWidth = rememberUpdatedState(controllerWidthPx)
+                var composeHandleHover by remember { mutableStateOf(false) }
+                var composeHandleDragging by remember { mutableStateOf(false) }
+
+                LaunchedEffect(composeHandleHover, composeHandleDragging) {
+                    composeCursorActive = composeHandleHover || composeHandleDragging
+                    applyGlobalResizeCursor()
+                }
+
+                DisposableEffect(Unit) {
+                    onDispose {
+                        composeCursorActive = false
+                        applyGlobalResizeCursor()
+                    }
+                }
 
                 Row(Modifier.fillMaxSize()) {
                     Box(
@@ -169,18 +234,32 @@ fun webApp() {
                             .fillMaxHeight()
                             .width(8.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .onPointerEvent(PointerEventType.Enter) {
+                                composeHandleHover = true
+                            }
+                            .onPointerEvent(PointerEventType.Exit) {
+                                composeHandleHover = false
+                            }
                             .pointerInput(Unit) {
                                 var currentWidth = latestWidth.value.toFloat()
                                 detectHorizontalDragGestures(
                                     onDragStart = {
+                                        composeHandleDragging = true
                                         currentWidth = latestWidth.value.toFloat()
+                                    },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        currentWidth -= dragAmount
+                                        val clamped = clampWidth(currentWidth.roundToInt())
+                                        composeControllerWidthState.value = clamped
+                                        currentWidth = clamped.toFloat()
+                                    },
+                                    onDragEnd = {
+                                        composeHandleDragging = false
+                                    },
+                                    onDragCancel = {
+                                        composeHandleDragging = false
                                     }
-                                ) { _, dragAmount ->
-                                    currentWidth -= dragAmount
-                                    val clamped = clampWidth(currentWidth.roundToInt())
-                                    composeControllerWidthState.value = clamped
-                                    currentWidth = clamped.toFloat()
-                                }
+                                )
                             }
                     )
 
@@ -195,6 +274,35 @@ fun webApp() {
                             .background(MaterialTheme.colorScheme.background)
                     )
                 }
+            }
+        }
+    }
+
+    ComposeViewport(monacoComposeContainer) {
+        val isMonacoEditor by isMonacoEditorState.collectAsState()
+        val uiState by viewModel.uiState.collectAsState()
+
+        LaunchedEffect(isMonacoEditor) {
+            if (!isMonacoEditor) {
+                monacoCursorActive = false
+                applyGlobalResizeCursor()
+            }
+        }
+
+        DnclIdeTheme {
+            if (isMonacoEditor) {
+                ControllerUi(
+                    isMonacoEditor = isMonacoEditor,
+                    setIsMonacoEditor = { isMonacoEditorState.value = it },
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(16.dp)
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
             }
         }
     }

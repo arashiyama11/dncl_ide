@@ -40,7 +40,7 @@ html, body {
 .controller-layer {
   width: min(22vw, 360px);
   min-width: 240px;
-  max-width: 420px;
+  max-width: 480px;
   height: 100%;
   box-sizing: border-box;
   background: #fff;
@@ -52,34 +52,4 @@ html, body {
 #monaco-editor {
   width: 100%;
   height: 100%;
-}
-
-#monaco-controller {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-}
-
-.monaco-toolbar {
-  display: flex;
-  gap: 12px;
-}
-
-.monaco-toolbar button {
-  padding: 8px 12px;
-  border: 1px solid #1f6feb;
-  background: #1f6feb;
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.monaco-toolbar button:hover {
-  background: #1557b0;
-}
-
-.monaco-placeholder {
-  color: #444;
-  line-height: 1.5;
 }
