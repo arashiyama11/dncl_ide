@@ -10,17 +10,36 @@
     <script type="application/javascript" src="composeApp.js"></script>
 </head>
 <body>
-<div id="editor-root" style="position:relative; width:100%; height:100vh;">
-    <div id="compose-canvas" class="editor-layer"
-         style="position:absolute; width:80%; height:100vh;"></div>
-    <div id="monaco-editor" class="editor-layer"
-         style="position:absolute; width:80%; height:100vh; overflow:hidden"></div>
-    <div id="controller"></div>
+<div id="editor-root">
+    <div id="compose-wrapper" class="mode-wrapper">
+        <div id="compose-canvas" class="editor-layer"></div>
+        <div id="controller" class="controller-layer"></div>
+    </div>
+    <div id="monaco-wrapper" class="mode-wrapper" hidden>
+        <div id="monaco-editor" class="editor-layer"></div>
+        <div id="monaco-resize-handle" class="resize-handle" role="separator" aria-orientation="vertical"></div>
+        <div id="monaco-controller" class="controller-layer">
+            <div class="monaco-toolbar">
+                <button id="switch-to-compose" type="button">Composeモードに戻る</button>
+            </div>
+            <div class="monaco-placeholder">
+                <p>Monacoエディタを使用中です。</p>
+                <p>Composeモードへ戻るには上のボタンを押してください。</p>
+            </div>
+        </div>
+    </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.53.0/min/vs/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/monaco-languageclient@10.1.0/lib/index.min.js"></script>
 <script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }}); require(['vs/editor/editor.main'], function() { editor = monaco.editor.create(document.getElementById("monaco-editor"), { value: '// ここにコードを入力します\nfunction hello() {\n console.log("Hello, world!");\n}', language: 'javascript' }); window.monaco = editor; });
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }});
+    require(['vs/editor/editor.main'], function() {
+        const editor = monaco.editor.create(document.getElementById("monaco-editor"), {
+            value: '// ここにコードを入力します\nfunction hello() {\n console.log("Hello, world!");\n}',
+            language: 'javascript'
+        });
+        window.monaco = editor;
+    });
 </script>
 </body>
 </html>

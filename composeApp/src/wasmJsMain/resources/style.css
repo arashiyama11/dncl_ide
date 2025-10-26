@@ -9,25 +9,77 @@ html, body {
 #editor-root {
   position: relative;
   width: 100%;
-  height: 100vh; /* or 100% if parent chain set */
+  height: 100vh;
 }
 
-#monaco-editor{
-  visibility: hidden;
+.mode-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
 }
 
-/* 右コントローラ */
- #controller {
-    position: absolute;
-    margin: 0;
-    padding: 0;
-    top: 0;
-    right: 0;
-    width: 20%;
-    height: 100svh;
-    box-sizing: border-box;
-    background: #fff;
-    border-left: 1px solid rgba(0,0,0,0.06);
-    z-index: 5;
-    overflow: hidden;
-  }
+.mode-wrapper[hidden] {
+  display: none;
+}
+
+.editor-layer {
+  flex: 1 1 auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+.resize-handle {
+  width: 8px;
+  min-width: 8px;
+  max-width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  background: linear-gradient(180deg, rgba(31,111,235,0.2), rgba(31,111,235,0.05));
+}
+
+.controller-layer {
+  width: min(22vw, 360px);
+  min-width: 240px;
+  max-width: 420px;
+  height: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border-left: 1px solid rgba(0,0,0,0.06);
+  overflow: auto;
+  padding: 0;
+}
+
+#monaco-editor {
+  width: 100%;
+  height: 100%;
+}
+
+#monaco-controller {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.monaco-toolbar {
+  display: flex;
+  gap: 12px;
+}
+
+.monaco-toolbar button {
+  padding: 8px 12px;
+  border: 1px solid #1f6feb;
+  background: #1f6feb;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.monaco-toolbar button:hover {
+  background: #1557b0;
+}
+
+.monaco-placeholder {
+  color: #444;
+  line-height: 1.5;
+}

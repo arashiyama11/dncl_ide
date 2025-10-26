@@ -1,10 +1,13 @@
 package io.github.arashiyama11.dncl_ide.util
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -13,10 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeViewport
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
@@ -32,17 +39,33 @@ import kotlinx.browser.window
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.compose.koinInject
 import org.koin.core.Koin
+import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.pointerevents.PointerEvent
+import kotlin.js.unsafeCast
+import kotlin.math.roundToInt
+
+private const val DEFAULT_CONTROLLER_WIDTH_PX = 320
+private const val MIN_CONTROLLER_WIDTH_PX = 240
+private const val MAX_CONTROLLER_WIDTH_PX = 480
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalWasmJsInterop::class)
 context(koin: Koin)
 fun webApp() {
-    val composeElem = document.getElementById("compose-canvas")!! as HTMLElement
-    val controllerElem = document.getElementById("controller")!! as HTMLElement
-    val monacoElem = document.getElementById("monaco-editor")!! as HTMLElement
+    val composeWrapper = document.getElementById("compose-wrapper")!! as HTMLElement
+    val monacoWrapper = document.getElementById("monaco-wrapper")!! as HTMLElement
+    val monacoControllerElem = document.getElementById("monaco-controller")!! as HTMLElement
+    val monacoHandleElem = document.getElementById("monaco-resize-handle")!! as HTMLElement
+    val switchToComposeButton = document.getElementById("switch-to-compose") as? HTMLButtonElement
 
     val isMonacoEditorState = MutableStateFlow(false)
+    val composeControllerWidthState = MutableStateFlow(DEFAULT_CONTROLLER_WIDTH_PX)
+    val monacoControllerWidthState = MutableStateFlow(DEFAULT_CONTROLLER_WIDTH_PX)
     val viewModel by koin.inject<IdeViewModel>()
+
+    composeWrapper.hidden = false
+    monacoWrapper.hidden = true
+    monacoControllerElem.style.width = "${monacoControllerWidthState.value}px"
 
     onMonacoLoaded {
         it.onDidChangeModelContent {
@@ -52,35 +75,69 @@ fun webApp() {
         }
     }
 
-    ComposeViewport(controllerElem) {
-        val isMonacoEditor by isMonacoEditorState.collectAsState()
-        val uiState by viewModel.uiState.collectAsState()
-        DnclIdeTheme {
-            ControllerUi(
-                isMonacoEditor,
-                {
-                    isMonacoEditorState.value = it
-                },
-                viewModel, uiState, Modifier.background(MaterialTheme.colorScheme.background)
-            )
+    switchToComposeButton?.addEventListener("click", {
+        isMonacoEditorState.value = false
+    })
+
+    fun clampWidth(width: Int): Int =
+        width.coerceIn(MIN_CONTROLLER_WIDTH_PX, MAX_CONTROLLER_WIDTH_PX)
+
+    fun applyMonacoWidth(width: Int) {
+        val clamped = clampWidth(width)
+        if (monacoControllerWidthState.value != clamped) {
+            monacoControllerWidthState.value = clamped
         }
+        monacoControllerElem.style.width = "${clamped}px"
     }
 
-    ComposeViewport(composeElem) {
+    var monacoDragging = false
+    var monacoDragStartX = 0
+    var monacoStartWidth = monacoControllerWidthState.value
+
+    monacoHandleElem.addEventListener("pointerdown", { event ->
+        val pointerEvent = event.unsafeCast<PointerEvent>()
+        monacoDragging = true
+        monacoDragStartX = pointerEvent.clientX
+        monacoStartWidth = monacoControllerWidthState.value
+        pointerEvent.preventDefault()
+    })
+
+    document.addEventListener("pointermove", { event ->
+        if (!monacoDragging) return@addEventListener
+        val pointerEvent = event.unsafeCast<PointerEvent>()
+        val delta = monacoDragStartX - pointerEvent.clientX
+        applyMonacoWidth(monacoStartWidth + delta)
+    })
+
+    fun finishMonacoDrag(pointerEvent: PointerEvent) {
+        if (!monacoDragging) return
+        monacoDragging = false
+    }
+
+    document.addEventListener("pointerup", { event ->
+        finishMonacoDrag(event.unsafeCast<PointerEvent>())
+    })
+
+    document.addEventListener("pointercancel", { event ->
+        finishMonacoDrag(event.unsafeCast<PointerEvent>())
+    })
+
+    ComposeViewport(composeWrapper) {
         val isMonacoEditor by isMonacoEditorState.collectAsState()
         val uiState by viewModel.uiState.collectAsState()
+        val controllerWidthPx by composeControllerWidthState.collectAsState()
 
         LaunchedEffect(isMonacoEditor) {
-            if (!isMonacoEditor) {
-                composeElem.style.visibility = "visible"
-                monacoElem.style.visibility = "hidden"
-            } else {
-                composeElem.style.visibility = "hidden"
-                monacoElem.style.visibility = "visible"
-
+            if (isMonacoEditor) {
+                composeWrapper.hidden = true
+                monacoWrapper.hidden = false
+                monacoControllerElem.style.width = "${monacoControllerWidthState.value}px"
                 window.requestAnimationFrame {
                     monaco.layout()
                 }
+            } else {
+                composeWrapper.hidden = false
+                monacoWrapper.hidden = true
             }
         }
 
@@ -90,12 +147,54 @@ fun webApp() {
             }
 
             if (!isMonacoEditor) {
-                Editor(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier
-                        .fillMaxSize()
-                )
+                val density = LocalDensity.current
+                val controllerWidthDp = with(density) { controllerWidthPx.toDp() }
+                val latestWidth = rememberUpdatedState(controllerWidthPx)
+
+                Row(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        Editor(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .width(8.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .pointerInput(Unit) {
+                                var currentWidth = latestWidth.value.toFloat()
+                                detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        currentWidth = latestWidth.value.toFloat()
+                                    }
+                                ) { _, dragAmount ->
+                                    currentWidth -= dragAmount
+                                    val clamped = clampWidth(currentWidth.roundToInt())
+                                    composeControllerWidthState.value = clamped
+                                    currentWidth = clamped.toFloat()
+                                }
+                            }
+                    )
+
+                    ControllerUi(
+                        isMonacoEditor,
+                        { isMonacoEditorState.value = it },
+                        viewModel,
+                        uiState,
+                        Modifier
+                            .fillMaxHeight()
+                            .width(controllerWidthDp)
+                            .background(MaterialTheme.colorScheme.background)
+                    )
+                }
             }
         }
     }
@@ -175,7 +274,7 @@ fun SettingsUi(modifier: Modifier) {
     Column(modifier) {
         Row {
             Text(
-                "Suggestion Panel Style: ${uiState.uiConfig.suggestionPanelStyle}",
+                "Suggestion Panel Style:\n ${uiState.uiConfig.suggestionPanelStyle}",
                 color = MaterialTheme.colorScheme.onBackground
             )
             Switch(uiState.uiConfig.suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP, {
