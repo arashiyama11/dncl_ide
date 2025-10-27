@@ -285,8 +285,8 @@ class CustomImeController(
             ),
             CustomImeSnippet(
                 id = "while-loop",
-                title = "条件繰り返し",
-                body = "i < 10 の間繰り返す:",
+                title = "の間繰り返す",
+                body = "の間繰り返す:",
                 description = "条件成立時に継続するループ"
             ),
             CustomImeSnippet(

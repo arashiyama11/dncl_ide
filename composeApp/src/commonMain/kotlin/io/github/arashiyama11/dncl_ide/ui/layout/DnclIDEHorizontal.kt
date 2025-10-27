@@ -90,15 +90,16 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
         }
     }
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .imePadding()
     ) {
-
         Surface(
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
             tonalElevation = 4.dp
         ) {
             Row(
@@ -114,74 +115,77 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (isMobilePlatform) {
-                    FilterChip(
-                        selected = isCustomMode,
-                        onClick = { viewModel.toggleTextInputMode() },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Keyboard,
-                                contentDescription = null
-                            )
-                        },
-                        label = { Text(if (isCustomMode) "専用IME中" else "専用IME") }
-                    )
-                }
+                FilterChip(
+                    selected = isCustomMode,
+                    onClick = { viewModel.toggleTextInputMode() },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Keyboard,
+                            contentDescription = null
+                        )
+                    },
+                    label = { Text(if (isCustomMode) "専用IME中" else "専用IME") }
+                )
             }
         }
 
         HorizontalDivider()
 
-        Editor(
-            uiState = uiState,
-            viewModel = viewModel,
-            modifier = Modifier
-                .weight(2f)
-                .fillMaxHeight()
-        )
-
-
         Row(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
+                .fillMaxWidth()
         ) {
-            when (uiState.textFieldType) {
-                TextFieldType.DEBUG_OUTPUT -> {
-                    uiState.currentEnvironment?.let { environment ->
-                        EnvironmentDebugView(
-                            environment = environment,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        )
-                    } ?: run {
-                        val textFieldDesc = "デバッグ出力"
+            Editor(
+                uiState = uiState,
+                viewModel = viewModel,
+                modifier = Modifier
+                    .weight(2f)
+                    .fillMaxHeight()
+            )
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) {
+                when (uiState.textFieldType) {
+                    TextFieldType.DEBUG_OUTPUT -> {
+                        uiState.currentEnvironment?.let { environment ->
+                            EnvironmentDebugView(
+                                environment = environment,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+                        } ?: run {
+                            val textFieldDesc = "デバッグ出力"
+                            OutlinedTextField(
+                                value = uiState.output,
+                                onValueChange = { },
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                textStyle = MaterialTheme.typography.bodyLarge,
+                                label = { Text(textFieldDesc) },
+                                readOnly = true
+                            )
+                        }
+                    }
+
+                    TextFieldType.OUTPUT -> {
+                        val textFieldDesc = "出力"
                         OutlinedTextField(
                             value = uiState.output,
                             onValueChange = { },
                             modifier = Modifier.weight(1f).fillMaxHeight(),
-                            textStyle = MaterialTheme.typography.bodyLarge,
+                            textStyle = LocalCodeTypography.current.bodyLarge,
                             label = { Text(textFieldDesc) },
-                            readOnly = true
+                            readOnly = true,
                         )
                     }
                 }
-
-                TextFieldType.OUTPUT -> {
-                    val textFieldDesc = "出力"
-                    OutlinedTextField(
-                        value = uiState.output,
-                        onValueChange = { },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        textStyle = LocalCodeTypography.current.bodyLarge,
-                        label = { Text(textFieldDesc) },
-                        readOnly = true,
-                    )
+                with(viewModel) {
+                    IdeSideButtons(Modifier.fillMaxHeight())
                 }
-            }
-            with(viewModel) {
-                IdeSideButtons(Modifier.fillMaxHeight())
             }
         }
     }
@@ -374,13 +378,23 @@ fun Editor(
             }
         }
 
-        val shouldShowCustomImePanel = isMobilePlatform && isCustomMode && uiState.isFocused
-        AnimatedVisibility(shouldShowCustomImePanel) {
+        val shouldShowCustomImePanel = isCustomMode
+        AnimatedVisibility(
+            shouldShowCustomImePanel,
+            modifier = Modifier.height(320.dp)
+        ) {
             CustomImePanel(
                 snippets = uiState.customImeSnippets,
                 quickKeys = uiState.customImeQuickKeys,
+                keywords = uiState.customImeKeywords,
+                panelMode = uiState.customImePanelMode,
+                onModeChange = { viewModel.onCustomImePanelModeChange(it) },
                 onQuickKeyClick = {
                     viewModel.onCustomImeQuickKeySelected(it)
+                    editorController.requestFocus()
+                },
+                onKeywordClick = {
+                    viewModel.onCustomImeKeywordSelected(it)
                     editorController.requestFocus()
                 },
                 onSnippetClick = {
