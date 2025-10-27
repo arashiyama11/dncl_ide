@@ -6,7 +6,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
-import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -38,7 +37,10 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.util.OutputHandler
+import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -85,7 +87,9 @@ data class IdeUiState(
     val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
     val textInputMode: TextInputMode = TextInputMode.STANDARD,
     val customImeSnippets: List<CustomImeSnippet> = emptyList(),
-    val customImeQuickKeys: List<String> = emptyList()
+    val customImeQuickKeys: List<String> = emptyList(),
+    val customImeKeywords: List<CustomImeKeyword> = emptyList(),
+    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS
 )
 
 enum class TextFieldType {
@@ -99,45 +103,16 @@ class IdeViewModel(
     private val appStateStore: AppStateStore<StatePermission.Write>,
     private val languageFeatureProvider: LanguageFeatureProvider
 ) : ViewModel() {
-    private val defaultCustomImeSnippets: List<CustomImeSnippet> = listOf(
-        CustomImeSnippet(
-            id = "if-basic",
-            title = "もし〜ならば",
-            body = "もし 条件 ならば:\n  \n終わり\n",
-            description = "条件分岐の基本形"
-        ),
-        CustomImeSnippet(
-            id = "if-else",
-            title = "もし〜そうでなければ",
-            body = "もし 条件 ならば:\n  \nそうでなければ:\n  \n終わり\n",
-            description = "if/else テンプレート"
-        ),
-        CustomImeSnippet(
-            id = "repeat-loop",
-            title = "繰り返しテンプレ",
-            body = "i を 0 から 上限 まで 1 ずつ増やしながら繰り返す:\n  \n",
-            description = "カウンタ付き繰り返し構文"
-        ),
-        CustomImeSnippet(
-            id = "function",
-            title = "関数定義",
-            body = "関数 名前(引数)を:\n  \nと定義する\n",
-            description = "基本的な関数の骨組み"
-        )
-    )
-
-    private val defaultCustomImeQuickKeys: List<String> = listOf(
-        "(", ")",
-        "[", "]",
-        "{", "}",
-        "\"\"",
-        "==", "!=", "<=", ">=",
-        "+", "-", "*", "/",
-        ":", ";"
-    )
     private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
     private val editorStateFlow = editorSession.state
     private val appState by appStateStore
+
+    private val defaultTextInputMode: TextInputMode =
+        if (currentPlatform == Platform.Desktop || currentPlatform == Platform.Web) {
+            TextInputMode.CUSTOM
+        } else {
+            TextInputMode.STANDARD
+        }
 
     private val _localState = MutableStateFlow(
         LocalIdeState(
@@ -160,14 +135,32 @@ class IdeViewModel(
             isFocused = false,
             showInlineSuggestions = false,
             languageDiagnostics = emptyList(),
-            textInputMode = TextInputMode.STANDARD,
-            customImeSnippets = defaultCustomImeSnippets,
-            customImeQuickKeys = defaultCustomImeQuickKeys
+            textInputMode = defaultTextInputMode,
+            customImeSnippets = emptyList(),
+            customImeQuickKeys = emptyList(),
+            customImeKeywords = emptyList(),
+            customImePanelMode = CustomImePanelMode.QUICK_KEYS
         )
     )
 
+    private val customImeController = CustomImeController(
+        getCurrentTextValue = { _localState.value.codeTextFieldValue },
+        onTextChanged = { value, userTriggered ->
+            onTextChanged(value, userTriggered)
+        }
+    ).apply {
+        rankingStrategy = CustomImeController.SnippetRankingStrategy.PrefixMatch
+    }
 
     init {
+        _localState.update {
+            it.copy(
+                customImeSnippets = customImeController.snippets.value,
+                customImeQuickKeys = customImeController.quickKeys.value,
+                customImeKeywords = customImeController.keywords.value
+            )
+        }
+
         viewModelScope.launch {
             editorStateFlow.collect { editorState ->
                 val lspSuggestions = editorState.completions.toDefinitionList()
@@ -177,6 +170,30 @@ class IdeViewModel(
                         languageDiagnostics = editorState.diagnostics,
                         textSuggestions = lspSuggestions
                     )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.snippets.collect { snippets ->
+                _localState.update { state ->
+                    state.copy(customImeSnippets = snippets)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.quickKeys.collect { keys ->
+                _localState.update { state ->
+                    state.copy(customImeQuickKeys = keys)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.keywords.collect { keywords ->
+                _localState.update { state ->
+                    state.copy(customImeKeywords = keywords)
                 }
             }
         }
@@ -214,7 +231,9 @@ class IdeViewModel(
             suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle,
             textInputMode = localState.textInputMode,
             customImeSnippets = localState.customImeSnippets,
-            customImeQuickKeys = localState.customImeQuickKeys
+            customImeQuickKeys = localState.customImeQuickKeys,
+            customImeKeywords = localState.customImeKeywords,
+            customImePanelMode = localState.customImePanelMode
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -330,6 +349,10 @@ class IdeViewModel(
             }
 
             val tokens = Lexer(indentedText.text).toList()
+            
+            val lexicalTokens = tokens.mapNotNull { it.getOrNull() }
+            customImeController.onEditorContextChanged(indentedText, lexicalTokens)
+
             var error: DnclError? = null
             var parsedProgram: Either<DnclError, AstNode.Program>? = null
 
@@ -566,56 +589,29 @@ class IdeViewModel(
     }
 
     fun onCustomImeSnippetSelected(snippet: CustomImeSnippet) {
-        insertText(snippet.body)
+        customImeController.onSnippetSelected(snippet)
     }
 
     fun onCustomImeQuickKeySelected(symbol: String) {
-        insertText(symbol)
+        customImeController.onQuickKeySelected(symbol)
+    }
+
+    fun onCustomImeKeywordSelected(keyword: CustomImeKeyword) {
+        customImeController.onKeywordSelected(keyword)
     }
 
     fun onCustomImeInsertNewLine() {
-        insertText("\n")
+        customImeController.onInsertNewLine()
     }
 
     fun onCustomImeDeleteBackward() {
-        val currentValue = uiState.value.codeTextFieldValue
-        val selection = currentValue.selection
-        val start = selection.start
-        val end = selection.end
-
-        if (start == 0 && end == 0) {
-            return
-        }
-
-        val (deleteStart, deleteEnd) = if (start != end) {
-            start to end
-        } else if (start > 0) {
-            (start - 1) to start
-        } else {
-            return
-        }
-
-        val newText = buildString {
-            append(currentValue.text.substring(0, deleteStart))
-            append(currentValue.text.substring(deleteEnd))
-        }
-
-        onTextChanged(
-            TextFieldValue(
-                text = newText,
-                selection = TextRange(deleteStart)
-            ),
-            userTriggeredTyping = true
-        )
+        customImeController.onDeleteBackward()
     }
 
-    fun insertText(text: String) {
-        val newText = uiState.value.codeTextFieldValue.text.substring(
-            0,
-            uiState.value.codeTextFieldValue.selection.start
-        ) + text + uiState.value.codeTextFieldValue.text.substring(uiState.value.codeTextFieldValue.selection.end)
-        val newRange = TextRange(uiState.value.codeTextFieldValue.selection.start + text.length)
-        onTextChanged(TextFieldValue(newText, newRange))
+    fun onCustomImePanelModeChange(mode: CustomImePanelMode) {
+        _localState.update { state ->
+            if (state.customImePanelMode == mode) state else state.copy(customImePanelMode = mode)
+        }
     }
 
     fun onConfirmTextSuggestion(suggestionText: String) {
@@ -823,6 +819,8 @@ class IdeViewModel(
         val languageDiagnostics: List<Diagnostic>,
         val textInputMode: TextInputMode,
         val customImeSnippets: List<CustomImeSnippet>,
-        val customImeQuickKeys: List<String>
+        val customImeQuickKeys: List<String>,
+        val customImeKeywords: List<CustomImeKeyword>,
+        val customImePanelMode: CustomImePanelMode
     )
 }

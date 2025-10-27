@@ -166,6 +166,7 @@ data class CodeEditorOptions(
     val showLineNumbers: Boolean = true,
     val verticalScrollEnabled: Boolean = true,
     val keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    val readOnly: Boolean = false,
     val tabSize: Int = 4,
     val insertSpaces: Boolean = true
 )

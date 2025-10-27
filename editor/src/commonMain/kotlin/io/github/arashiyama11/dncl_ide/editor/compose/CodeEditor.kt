@@ -189,6 +189,7 @@ fun CodeEditor(
                 },
                 textStyle = resolvedTextStyle,
                 keyboardOptions = options.keyboardOptions,
+                readOnly = options.readOnly,
                 modifier = Modifier
                     .weight(1f)
                     .padding(bottom = 32.dp)

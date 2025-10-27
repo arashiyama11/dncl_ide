@@ -1,8 +1,5 @@
 package io.github.arashiyama11.dncl_ide.adapter
 
-/**
- * モバイル端末向けの入力モード。標準のシステムIMEとアプリ内カスタムパネルを切り替える。
- */
 enum class TextInputMode {
     STANDARD,
     CUSTOM
@@ -21,4 +18,15 @@ data class CustomImeSnippet(
     val title: String,
     val body: String,
     val description: String
+)
+
+enum class CustomImePanelMode {
+    QUICK_KEYS,
+    KEYWORDS
+}
+
+data class CustomImeKeyword(
+    val id: String,
+    val label: String,
+    val text: String
 )

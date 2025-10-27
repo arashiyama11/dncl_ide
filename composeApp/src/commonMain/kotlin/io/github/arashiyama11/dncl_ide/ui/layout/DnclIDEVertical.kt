@@ -109,21 +109,19 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (isMobilePlatform) {
-                    FilterChip(
-                        selected = isCustomMode,
-                        onClick = { viewModel.toggleTextInputMode() },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Keyboard,
-                                contentDescription = null
-                            )
-                        },
-                        label = {
-                            Text(if (isCustomMode) "専用IME中" else "専用IME")
-                        }
-                    )
-                }
+                FilterChip(
+                    selected = isCustomMode,
+                    onClick = { viewModel.toggleTextInputMode() },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Keyboard,
+                            contentDescription = null
+                        )
+                    },
+                    label = {
+                        Text(if (isCustomMode) "専用IME中" else "専用IME")
+                    }
+                )
             }
         }
 
@@ -179,6 +177,12 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
         LaunchedEffect(isCustomMode) {
             if (isCustomMode) {
                 editorController.requestFocus()
+            } else if (isMobilePlatform) {
+                editorController.requestFocus()
+                repeat(3) {
+                    keyboardController?.show()
+                    delay(50)
+                }
             }
         }
 
@@ -207,7 +211,8 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        val codeEditorKeyboardOptions = if (isCustomMode) {
+        val shouldDisableSystemKeyboard = isCustomMode && isMobilePlatform
+        val codeEditorKeyboardOptions = if (shouldDisableSystemKeyboard) {
             KeyboardOptions.Default.copy(showKeyboardOnFocus = false)
         } else {
             KeyboardOptions.Default
@@ -217,16 +222,19 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             fontSize = uiState.fontSize,
             textStyle = LocalCodeTypography.current.bodyMedium,
             verticalScrollEnabled = true,
-            keyboardOptions = codeEditorKeyboardOptions
+            keyboardOptions = codeEditorKeyboardOptions,
+            readOnly = shouldDisableSystemKeyboard
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle
-        val canRenderInline = editorState.cursorAnchorInEditor != null && editorState.cursorLineHeightPx != null
-        val showSuggestionStrip = uiState.isFocused && uiState.showInlineSuggestions && !isCustomMode
+        val canRenderInline =
+            editorState.cursorAnchorInEditor != null && editorState.cursorLineHeightPx != null
+        val showSuggestionStrip =
+            uiState.isFocused && uiState.showInlineSuggestions && !isCustomMode
         val shouldRenderInlineSuggestions =
             !isCustomMode &&
-                suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN &&
-                shouldShowInlineSuggestions(uiState, editorState)
+                    suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN &&
+                    shouldShowInlineSuggestions(uiState, editorState)
 
         val editorBox: @Composable (Modifier) -> Unit = { boxModifier ->
             Box(modifier = boxModifier) {
@@ -250,7 +258,7 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        if (isCustomMode && baseTextInputService != null) {
+        if (shouldDisableSystemKeyboard && baseTextInputService != null) {
             CompositionLocalProvider(LocalTextInputService provides null) {
                 editorBox(Modifier.weight(2f))
             }
@@ -331,7 +339,7 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
         }
 
         val shouldShowStrip = !isCustomMode &&
-            (suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP || !canRenderInline)
+                (suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP || !canRenderInline)
         if (shouldShowStrip) {
             AnimatedVisibility(showSuggestionStrip) {
                 SuggestionStripView(
@@ -341,13 +349,20 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        val shouldShowCustomImePanel = isMobilePlatform && isCustomMode && uiState.isFocused
-        AnimatedVisibility(shouldShowCustomImePanel) {
+        val shouldShowCustomImePanel = isCustomMode
+        AnimatedVisibility(shouldShowCustomImePanel, modifier = Modifier.height(320.dp)) {
             CustomImePanel(
                 snippets = uiState.customImeSnippets,
                 quickKeys = uiState.customImeQuickKeys,
+                keywords = uiState.customImeKeywords,
+                panelMode = uiState.customImePanelMode,
+                onModeChange = { viewModel.onCustomImePanelModeChange(it) },
                 onQuickKeyClick = {
                     viewModel.onCustomImeQuickKeySelected(it)
+                    editorController.requestFocus()
+                },
+                onKeywordClick = {
+                    viewModel.onCustomImeKeywordSelected(it)
                     editorController.requestFocus()
                 },
                 onSnippetClick = {
