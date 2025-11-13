@@ -175,6 +175,7 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    debugImplementation(compose.preview)
 }
 
 

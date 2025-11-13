@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
+import io.github.arashiyama11.dncl_ide.adapter.NotebookViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.Entry
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
@@ -16,19 +18,19 @@ import io.github.arashiyama11.dncl_ide.ui.layout.DnclIDE
 import org.koin.compose.koinInject
 
 @Composable
-fun CodingScreen(fileRepository: FileRepository = koinInject()) {
+fun CodingScreen(
+    ideViewModel: IdeViewModel,
+    notebookViewModel: NotebookViewModel,
+    fileRepository: FileRepository = koinInject()
+) {
     val selectedEntryPath by fileRepository.selectedEntryPath.collectAsStateWithLifecycle()
-    var entry by remember(selectedEntryPath) { mutableStateOf<Entry?>(null) }
+    var entry by remember { mutableStateOf<Entry?>(null) }
     LaunchedEffect(selectedEntryPath) {
-        entry = if (selectedEntryPath != null) {
-            fileRepository.getEntryByPath(selectedEntryPath!!)
-        } else {
-            null
-        }
+        entry = selectedEntryPath?.let { fileRepository.getEntryByPath(it) }
     }
     when (entry) {
-        is NotebookFile -> NotebookScreen()
-        is ProgramFile -> DnclIDE()
+        is NotebookFile -> NotebookScreen(notebookViewModel = notebookViewModel)
+        is ProgramFile -> DnclIDE(viewModel = ideViewModel)
         else -> {
             Text("No file selected or unsupported file type")
         }

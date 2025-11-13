@@ -139,9 +139,9 @@ fun FabsWith2Options(onFileAddClicked: () -> Unit, onFolderAddClicked: () -> Uni
 @Composable
 fun AppFab(
     currentRoute: String?,
-    notebookViewModel: NotebookViewModel = koinViewModel(),
-    selectFileViewModel: SelectFileScreenViewModel = koinViewModel(),
-    selectNotebookViewModel: SelectNotebookScreenViewModel = koinViewModel(),
+    notebookViewModel: NotebookViewModel,
+    selectFileViewModel: SelectFileScreenViewModel,
+    selectNotebookViewModel: SelectNotebookScreenViewModel,
 ) {
     val uiState by selectNotebookViewModel.uiState.collectAsStateWithLifecycle()
     when (currentRoute) {
@@ -214,6 +214,8 @@ fun App() {
     DnclIdeTheme {
         val ideViewModel = koinViewModel<IdeViewModel>()
         val notebookViewModel = koinViewModel<NotebookViewModel>()
+        val selectFileViewModel = koinViewModel<SelectFileScreenViewModel>()
+        val selectNotebookViewModel = koinViewModel<SelectNotebookScreenViewModel>()
         val snackbarHostState = remember { SnackbarHostState() }
         val isDarkThemeStateFlow = rememberDarkThemeStateFlow()
         val navController = rememberNavController()
@@ -366,7 +368,12 @@ fun App() {
                     modifier = Modifier.wrapContentSize()
                         .padding(bottom = bottomAppBarHeight)
                 ) {
-                    AppFab(dist?.route)
+                    AppFab(
+                        currentRoute = dist?.route,
+                        notebookViewModel = notebookViewModel,
+                        selectFileViewModel = selectFileViewModel,
+                        selectNotebookViewModel = selectNotebookViewModel
+                    )
                 }
             }, floatingActionButtonPosition = FabPosition.EndOverlay
         ) { contentPadding ->
@@ -402,19 +409,28 @@ fun App() {
                 }
 
                 composable<Destination.SelectFileScreen> {
-                    SelectFileScreen() {
+                    SelectFileScreen(
+                        viewModel = selectFileViewModel,
+                        navigateToCodeScreen = {
                         navController.navigate(Destination.CodingScreen)
-                    }
+                        }
+                    )
                 }
 
                 composable<Destination.SelectNotebookScreen> {
-                    SelectNotebookScreen() {
+                    SelectNotebookScreen(
+                        viewModel = selectNotebookViewModel,
+                        navigateToCodeScreen = {
                         navController.navigate(Destination.CodingScreen)
-                    }
+                        }
+                    )
                 }
 
                 composable<Destination.CodingScreen> {
-                    CodingScreen()
+                    CodingScreen(
+                        ideViewModel = ideViewModel,
+                        notebookViewModel = notebookViewModel
+                    )
                 }
 
                 composable<Destination.SettingsScreen> {

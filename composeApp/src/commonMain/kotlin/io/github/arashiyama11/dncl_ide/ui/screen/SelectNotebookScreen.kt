@@ -31,11 +31,10 @@ import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.CreatingType
 import io.github.arashiyama11.dncl_ide.adapter.SelectNotebookScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SelectNotebookScreen(
-    viewModel: SelectNotebookScreenViewModel = koinViewModel(),
+    viewModel: SelectNotebookScreenViewModel,
     navigateToCodeScreen: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()

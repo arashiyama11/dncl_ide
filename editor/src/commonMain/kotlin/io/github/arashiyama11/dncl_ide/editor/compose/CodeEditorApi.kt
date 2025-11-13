@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.editor.compose
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -164,6 +165,8 @@ data class CodeEditorOptions(
     val lineNumberColumnWidth: Dp? = null,
     val showLineNumbers: Boolean = true,
     val verticalScrollEnabled: Boolean = true,
+    val keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    val readOnly: Boolean = false,
     val tabSize: Int = 4,
     val insertSpaces: Boolean = true
 )

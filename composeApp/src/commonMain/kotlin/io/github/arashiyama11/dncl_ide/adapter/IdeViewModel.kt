@@ -6,7 +6,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
-import io.github.arashiyama11.dncl_ide.util.OutputHandler
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -38,7 +37,10 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.util.OutputHandler
+import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
+import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -82,7 +84,12 @@ data class IdeUiState(
     val languageDiagnostics: List<Diagnostic> = emptyList(),
     val selectedEntryPath: EntryPath? = null,
     val running: Boolean = false,
-    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP
+    val suggestionPanelStyle: SuggestionPanelStyle = SuggestionPanelStyle.BOTTOM_STRIP,
+    val textInputMode: TextInputMode = TextInputMode.STANDARD,
+    val customImeSnippets: List<CustomImeSnippet> = emptyList(),
+    val customImeQuickKeys: List<String> = emptyList(),
+    val customImeKeywords: List<CustomImeKeyword> = emptyList(),
+    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS
 )
 
 enum class TextFieldType {
@@ -99,6 +106,13 @@ class IdeViewModel(
     private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
     private val editorStateFlow = editorSession.state
     private val appState by appStateStore
+
+    private val defaultTextInputMode: TextInputMode =
+        if (currentPlatform == Platform.Desktop || currentPlatform == Platform.Web) {
+            TextInputMode.CUSTOM
+        } else {
+            TextInputMode.STANDARD
+        }
 
     private val _localState = MutableStateFlow(
         LocalIdeState(
@@ -120,21 +134,71 @@ class IdeViewModel(
             textSuggestions = emptyList(),
             isFocused = false,
             showInlineSuggestions = false,
-            languageDiagnostics = emptyList()
+            languageDiagnostics = emptyList(),
+            textInputMode = defaultTextInputMode,
+            customImeSnippets = emptyList(),
+            customImeQuickKeys = emptyList(),
+            customImeKeywords = emptyList(),
+            customImePanelMode = CustomImePanelMode.QUICK_KEYS
         )
     )
 
+    private val customImeController = CustomImeController(
+        getCurrentTextValue = { _localState.value.codeTextFieldValue },
+        onTextChanged = { value, userTriggered ->
+            onTextChanged(value, userTriggered)
+        }
+    ).apply {
+        rankingStrategy = CustomImeController.SnippetRankingStrategy.PrefixMatch
+    }
 
     init {
+        _localState.update {
+            it.copy(
+                customImeSnippets = customImeController.snippets.value,
+                customImeQuickKeys = customImeController.quickKeys.value,
+                customImeKeywords = customImeController.keywords.value
+            )
+        }
+
         viewModelScope.launch {
             editorStateFlow.collect { editorState ->
                 val lspSuggestions = editorState.completions.toDefinitionList()
+                val editorText = editorState.content.text
                 _localState.update { state ->
+                    val nextTextFieldValue = when {
+                        editorText.text.isEmpty() && state.codeTextFieldValue.text.isNotEmpty() -> state.codeTextFieldValue
+                        else -> editorText
+                    }
                     state.copy(
-                        codeTextFieldValue = editorState.content.text,
+                        codeTextFieldValue = nextTextFieldValue,
                         languageDiagnostics = editorState.diagnostics,
                         textSuggestions = lspSuggestions
                     )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.snippets.collect { snippets ->
+                _localState.update { state ->
+                    state.copy(customImeSnippets = snippets)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.quickKeys.collect { keys ->
+                _localState.update { state ->
+                    state.copy(customImeQuickKeys = keys)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            customImeController.keywords.collect { keywords ->
+                _localState.update { state ->
+                    state.copy(customImeKeywords = keywords)
                 }
             }
         }
@@ -169,7 +233,12 @@ class IdeViewModel(
             languageDiagnostics = localState.languageDiagnostics,
             selectedEntryPath = appState.selectedEntryPath,
             running = appState.running,
-            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle
+            suggestionPanelStyle = appState.uiConfig.suggestionPanelStyle,
+            textInputMode = localState.textInputMode,
+            customImeSnippets = localState.customImeSnippets,
+            customImeQuickKeys = localState.customImeQuickKeys,
+            customImeKeywords = localState.customImeKeywords,
+            customImePanelMode = localState.customImePanelMode
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -285,6 +354,10 @@ class IdeViewModel(
             }
 
             val tokens = Lexer(indentedText.text).toList()
+
+            val lexicalTokens = tokens.mapNotNull { it.getOrNull() }
+            customImeController.onEditorContextChanged(indentedText, lexicalTokens)
+
             var error: DnclError? = null
             var parsedProgram: Either<DnclError, AstNode.Program>? = null
 
@@ -494,13 +567,56 @@ class IdeViewModel(
         }
     }
 
-    fun insertText(text: String) {
-        val newText = uiState.value.codeTextFieldValue.text.substring(
-            0,
-            uiState.value.codeTextFieldValue.selection.start
-        ) + text + uiState.value.codeTextFieldValue.text.substring(uiState.value.codeTextFieldValue.selection.end)
-        val newRange = TextRange(uiState.value.codeTextFieldValue.selection.start + text.length)
-        onTextChanged(TextFieldValue(newText, newRange))
+    fun toggleTextInputMode() {
+        val next = if (uiState.value.textInputMode == TextInputMode.CUSTOM) {
+            TextInputMode.STANDARD
+        } else {
+            TextInputMode.CUSTOM
+        }
+        setTextInputMode(next)
+    }
+
+    fun setTextInputMode(mode: TextInputMode) {
+        _localState.update { state ->
+            if (state.textInputMode == mode) {
+                state
+            } else {
+                state.copy(
+                    textInputMode = mode,
+                    showInlineSuggestions = if (mode == TextInputMode.CUSTOM) {
+                        false
+                    } else {
+                        state.showInlineSuggestions
+                    }
+                )
+            }
+        }
+    }
+
+    fun onCustomImeSnippetSelected(snippet: CustomImeSnippet) {
+        customImeController.onSnippetSelected(snippet)
+    }
+
+    fun onCustomImeQuickKeySelected(symbol: String) {
+        customImeController.onQuickKeySelected(symbol)
+    }
+
+    fun onCustomImeKeywordSelected(keyword: CustomImeKeyword) {
+        customImeController.onKeywordSelected(keyword)
+    }
+
+    fun onCustomImeInsertNewLine() {
+        customImeController.onInsertNewLine()
+    }
+
+    fun onCustomImeDeleteBackward() {
+        customImeController.onDeleteBackward()
+    }
+
+    fun onCustomImePanelModeChange(mode: CustomImePanelMode) {
+        _localState.update { state ->
+            if (state.customImePanelMode == mode) state else state.copy(customImePanelMode = mode)
+        }
     }
 
     fun onConfirmTextSuggestion(suggestionText: String) {
@@ -627,12 +743,22 @@ class IdeViewModel(
             copy(showInlineSuggestions = decision.show)
         }
 
-    private fun LocalIdeState.withFocusState(isFocused: Boolean): LocalIdeState =
-        if (isFocused) {
+    private fun LocalIdeState.withFocusState(isFocused: Boolean): LocalIdeState {
+        return if (isFocused) {
             copy(isFocused = true)
         } else {
-            copy(isFocused = false, showInlineSuggestions = false)
+            val nextInputMode = if (textInputMode == TextInputMode.CUSTOM) {
+                TextInputMode.CUSTOM
+            } else {
+                TextInputMode.STANDARD
+            }
+            copy(
+                isFocused = false,
+                showInlineSuggestions = false,
+                textInputMode = nextInputMode
+            )
         }
+    }
 
     private data class InlineSuggestionVisibilityDecision(
         val shouldUpdate: Boolean,
@@ -695,6 +821,11 @@ class IdeViewModel(
         val textSuggestions: List<Definition>,
         val isFocused: Boolean,
         val showInlineSuggestions: Boolean,
-        val languageDiagnostics: List<Diagnostic>
+        val languageDiagnostics: List<Diagnostic>,
+        val textInputMode: TextInputMode,
+        val customImeSnippets: List<CustomImeSnippet>,
+        val customImeQuickKeys: List<String>,
+        val customImeKeywords: List<CustomImeKeyword>,
+        val customImePanelMode: CustomImePanelMode
     )
 }

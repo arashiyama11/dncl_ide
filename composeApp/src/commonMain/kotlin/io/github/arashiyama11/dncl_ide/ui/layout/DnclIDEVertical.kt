@@ -14,24 +14,33 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextInputService
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
 import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
+import io.github.arashiyama11.dncl_ide.adapter.TextInputMode
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorController
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorOptions
@@ -45,16 +54,36 @@ import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
+import io.github.arashiyama11.dncl_ide.ui.components.CustomImePanel
+import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
-import org.koin.compose.viewmodel.koinViewModel
+import io.github.arashiyama11.dncl_ide.util.Platform
+import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import kotlinx.coroutines.flow.collectLatest
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
+fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val isMobilePlatform = currentPlatform == Platform.Android || currentPlatform == Platform.Ios
+    val isCustomMode = uiState.textInputMode == TextInputMode.CUSTOM
+    val fileDisplayName = uiState.selectedEntryPath?.value?.lastOrNull()?.value.orEmpty()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val latestIsCustomMode = rememberUpdatedState(isCustomMode)
+    val baseTextInputService = LocalTextInputService.current
+    val systemImeVisible = if (isMobilePlatform) isImeVisible() else false
 
+    LaunchedEffect(isCustomMode, uiState.isFocused) {
+        if (!isMobilePlatform) return@LaunchedEffect
+        keyboardController?.let { controller ->
+            if (isCustomMode) {
+                controller.hide()
+            } else if (uiState.isFocused) {
+                controller.show()
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -65,8 +94,32 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             tonalElevation = 4.dp
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(uiState.selectedEntryPath?.value?.lastOrNull()?.value.orEmpty())
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = fileDisplayName,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                FilterChip(
+                    selected = isCustomMode,
+                    onClick = { viewModel.toggleTextInputMode() },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Keyboard,
+                            contentDescription = null
+                        )
+                    },
+                    label = {
+                        Text(if (isCustomMode) "専用IME中" else "専用IME")
+                    }
+                )
             }
         }
 
@@ -119,6 +172,18 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             editorState.updateEvaluatingLine(uiState.currentEvaluatingLine)
         }
 
+        LaunchedEffect(isCustomMode) {
+            if (isCustomMode) {
+                editorController.requestFocus()
+                if (isMobilePlatform) {
+                    keyboardController?.hide()
+                }
+            } else if (isMobilePlatform) {
+                editorController.requestFocus()
+                keyboardController?.show()
+            }
+        }
+
         LaunchedEffect(editorController) {
             editorController.events.contentChanges.collectLatest { event ->
                 val content = event.update.content
@@ -128,45 +193,73 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        LaunchedEffect(editorController) {
+        LaunchedEffect(editorController, keyboardController) {
             editorController.events.focusChanges.collectLatest { event ->
                 viewModel.onCodeEditorFocused(event.isFocused)
+                if (!isMobilePlatform) return@collectLatest
+                if (event.isFocused) {
+                    if (latestIsCustomMode.value) {
+                        keyboardController?.hide()
+                    } else {
+                        keyboardController?.show()
+                    }
+                }
             }
+        }
+
+        val shouldDisableSystemKeyboard = isCustomMode && isMobilePlatform
+        val codeEditorKeyboardOptions = if (shouldDisableSystemKeyboard) {
+            KeyboardOptions.Default.copy(showKeyboardOnFocus = false)
+        } else {
+            KeyboardOptions.Default
         }
 
         val editorOptions = CodeEditorOptions(
             fontSize = uiState.fontSize,
             textStyle = LocalCodeTypography.current.bodyMedium,
-            verticalScrollEnabled = true
+            verticalScrollEnabled = true,
+            keyboardOptions = codeEditorKeyboardOptions,
+            readOnly = shouldDisableSystemKeyboard
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle
-        val canRenderInline = editorState.cursorAnchorInEditor != null && editorState.cursorLineHeightPx != null
-        val showSuggestionStrip = uiState.isFocused && uiState.showInlineSuggestions
+        val canRenderInline =
+            editorState.cursorAnchorInEditor != null && editorState.cursorLineHeightPx != null
+        val showSuggestionStrip =
+            uiState.isFocused && uiState.showInlineSuggestions && !isCustomMode
         val shouldRenderInlineSuggestions =
-            suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN &&
-                shouldShowInlineSuggestions(uiState, editorState)
+            !isCustomMode &&
+                    suggestionPanelStyle == SuggestionPanelStyle.INLINE_DROPDOWN &&
+                    shouldShowInlineSuggestions(uiState, editorState)
 
-        Box(modifier = Modifier.weight(2f)) {
-            CodeEditor(
-                state = editorState,
-                modifier = Modifier.fillMaxSize(),
-                options = editorOptions,
-                controller = editorController
-            )
-
-            if (
-                shouldRenderInlineSuggestions
-            ) {
-                InlineSuggestionPopup(
-                    suggestions = uiState.textSuggestions,
-                    cursorAnchor = editorState.cursorAnchorInEditor,
-                    lineHeightPx = editorState.cursorLineHeightPx,
+        val editorBox: @Composable (Modifier) -> Unit = { boxModifier ->
+            Box(modifier = boxModifier) {
+                CodeEditor(
+                    state = editorState,
                     modifier = Modifier.fillMaxSize(),
-                    onConfirmTextSuggestion = { viewModel.onConfirmTextSuggestion(it) },
-                    onRequestEditorFocus = { editorController.requestFocus() }
+                    options = editorOptions,
+                    controller = editorController
                 )
+
+                if (shouldRenderInlineSuggestions) {
+                    InlineSuggestionPopup(
+                        suggestions = uiState.textSuggestions,
+                        cursorAnchor = editorState.cursorAnchorInEditor,
+                        lineHeightPx = editorState.cursorLineHeightPx,
+                        modifier = Modifier.fillMaxSize(),
+                        onConfirmTextSuggestion = { viewModel.onConfirmTextSuggestion(it) },
+                        onRequestEditorFocus = { editorController.requestFocus() }
+                    )
+                }
             }
+        }
+
+        if (shouldDisableSystemKeyboard && baseTextInputService != null) {
+            CompositionLocalProvider(LocalTextInputService provides null) {
+                editorBox(Modifier.weight(2f))
+            }
+        } else {
+            editorBox(Modifier.weight(2f))
         }
 
         // Conditionally display Input Row when isWaitingForInput is true
@@ -241,7 +334,8 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        val shouldShowStrip = suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP || !canRenderInline
+        val shouldShowStrip = !isCustomMode &&
+                (suggestionPanelStyle == SuggestionPanelStyle.BOTTOM_STRIP || !canRenderInline)
         if (shouldShowStrip) {
             AnimatedVisibility(showSuggestionStrip) {
                 SuggestionStripView(
@@ -249,6 +343,49 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
                     modifier = Modifier.height(48.dp)
                 ) { viewModel.onConfirmTextSuggestion(it) }
             }
+        }
+
+        val shouldShowCustomImePanel = when {
+            !isCustomMode -> false
+            isMobilePlatform -> !systemImeVisible
+            else -> true
+        }
+
+        AnimatedVisibility(
+            visible = shouldShowCustomImePanel,
+            modifier = Modifier.heightIn(max = 320.dp)
+        ) {
+            CustomImePanel(
+                snippets = uiState.customImeSnippets,
+                quickKeys = uiState.customImeQuickKeys,
+                keywords = uiState.customImeKeywords,
+                panelMode = uiState.customImePanelMode,
+                onModeChange = { viewModel.onCustomImePanelModeChange(it) },
+                onQuickKeyClick = {
+                    viewModel.onCustomImeQuickKeySelected(it)
+                    editorController.requestFocus()
+                },
+                onKeywordClick = {
+                    viewModel.onCustomImeKeywordSelected(it)
+                    editorController.requestFocus()
+                },
+                onSnippetClick = {
+                    viewModel.onCustomImeSnippetSelected(it)
+                    editorController.requestFocus()
+                },
+                onInsertNewLine = {
+                    viewModel.onCustomImeInsertNewLine()
+                    editorController.requestFocus()
+                },
+                onDeleteBackward = {
+                    viewModel.onCustomImeDeleteBackward()
+                    editorController.requestFocus()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .padding(vertical = 4.dp)
+            )
         }
     }
 }
