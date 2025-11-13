@@ -75,13 +75,12 @@ import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionListView
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
-import org.koin.compose.viewmodel.koinViewModel
 
 
 @Composable
 fun NotebookScreen(
     modifier: Modifier = Modifier,
-    notebookViewModel: NotebookViewModel = koinViewModel(),
+    notebookViewModel: NotebookViewModel,
 ) {
     val uiState by notebookViewModel.uiState.collectAsStateWithLifecycle()
     val onAction = remember(notebookViewModel) { notebookViewModel::handleAction }

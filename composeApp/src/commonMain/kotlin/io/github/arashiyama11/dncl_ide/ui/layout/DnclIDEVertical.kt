@@ -55,17 +55,16 @@ import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
 import io.github.arashiyama11.dncl_ide.ui.components.CustomImePanel
+import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.currentPlatform
-import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.delay
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
+fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val isMobilePlatform = currentPlatform == Platform.Android || currentPlatform == Platform.Ios
     val isCustomMode = uiState.textInputMode == TextInputMode.CUSTOM
@@ -73,14 +72,13 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
     val keyboardController = LocalSoftwareKeyboardController.current
     val latestIsCustomMode = rememberUpdatedState(isCustomMode)
     val baseTextInputService = LocalTextInputService.current
+    val systemImeVisible = if (isMobilePlatform) isImeVisible() else false
 
     LaunchedEffect(isCustomMode, uiState.isFocused) {
+        if (!isMobilePlatform) return@LaunchedEffect
         keyboardController?.let { controller ->
             if (isCustomMode) {
-                repeat(3) {
-                    controller.hide()
-                    delay(50)
-                }
+                controller.hide()
             } else if (uiState.isFocused) {
                 controller.show()
             }
@@ -177,12 +175,12 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
         LaunchedEffect(isCustomMode) {
             if (isCustomMode) {
                 editorController.requestFocus()
+                if (isMobilePlatform) {
+                    keyboardController?.hide()
+                }
             } else if (isMobilePlatform) {
                 editorController.requestFocus()
-                repeat(3) {
-                    keyboardController?.show()
-                    delay(50)
-                }
+                keyboardController?.show()
             }
         }
 
@@ -198,12 +196,10 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
         LaunchedEffect(editorController, keyboardController) {
             editorController.events.focusChanges.collectLatest { event ->
                 viewModel.onCodeEditorFocused(event.isFocused)
+                if (!isMobilePlatform) return@collectLatest
                 if (event.isFocused) {
                     if (latestIsCustomMode.value) {
-                        repeat(3) {
-                            keyboardController?.hide()
-                            delay(50)
-                        }
+                        keyboardController?.hide()
                     } else {
                         keyboardController?.show()
                     }
@@ -349,8 +345,16 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
             }
         }
 
-        val shouldShowCustomImePanel = isCustomMode
-        AnimatedVisibility(shouldShowCustomImePanel, modifier = Modifier.height(320.dp)) {
+        val shouldShowCustomImePanel = when {
+            !isCustomMode -> false
+            isMobilePlatform -> !systemImeVisible
+            else -> true
+        }
+
+        AnimatedVisibility(
+            visible = shouldShowCustomImePanel,
+            modifier = Modifier.heightIn(max = 320.dp)
+        ) {
             CustomImePanel(
                 snippets = uiState.customImeSnippets,
                 quickKeys = uiState.customImeQuickKeys,
@@ -379,7 +383,8 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel = koi
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .heightIn(max = 300.dp)
+                    .padding(vertical = 4.dp)
             )
         }
     }

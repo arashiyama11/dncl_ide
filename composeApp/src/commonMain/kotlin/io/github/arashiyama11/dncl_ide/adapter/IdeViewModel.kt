@@ -164,9 +164,14 @@ class IdeViewModel(
         viewModelScope.launch {
             editorStateFlow.collect { editorState ->
                 val lspSuggestions = editorState.completions.toDefinitionList()
+                val editorText = editorState.content.text
                 _localState.update { state ->
+                    val nextTextFieldValue = when {
+                        editorText.text.isEmpty() && state.codeTextFieldValue.text.isNotEmpty() -> state.codeTextFieldValue
+                        else -> editorText
+                    }
                     state.copy(
-                        codeTextFieldValue = editorState.content.text,
+                        codeTextFieldValue = nextTextFieldValue,
                         languageDiagnostics = editorState.diagnostics,
                         textSuggestions = lspSuggestions
                     )
@@ -349,7 +354,7 @@ class IdeViewModel(
             }
 
             val tokens = Lexer(indentedText.text).toList()
-            
+
             val lexicalTokens = tokens.mapNotNull { it.getOrNull() }
             customImeController.onEditorContextChanged(indentedText, lexicalTokens)
 

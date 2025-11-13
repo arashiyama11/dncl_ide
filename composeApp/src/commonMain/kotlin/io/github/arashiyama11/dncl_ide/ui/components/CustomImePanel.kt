@@ -1,15 +1,21 @@
 package io.github.arashiyama11.dncl_ide.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.automirrored.outlined.KeyboardReturn
-import androidx.compose.material.icons.outlined.Abc
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
@@ -32,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.arashiyama11.dncl_ide.adapter.CustomImeController
 import io.github.arashiyama11.dncl_ide.adapter.CustomImeKeyword
 import io.github.arashiyama11.dncl_ide.adapter.CustomImePanelMode
 import io.github.arashiyama11.dncl_ide.adapter.CustomImeSnippet
@@ -43,8 +49,8 @@ data class CustomImePanelStyle(
     val surfaceShadowElevation: Dp = 4.dp,
     val contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp),
     val sectionSpacing: Dp = 16.dp,
-    val quickKeyHorizontalSpacing: Dp = 8.dp,
-    val quickKeyVerticalSpacing: Dp = 8.dp,
+    val quickKeyHorizontalSpacing: Dp = 4.dp,
+    val quickKeyVerticalSpacing: Dp = 4.dp,
     val quickRowSpacing: Dp = 12.dp,
     val quickActionButtonSpacing: Dp = 8.dp,
     val snippetListSpacing: Dp = 12.dp,
@@ -98,7 +104,7 @@ fun CustomImePanel(
                                 quickKeys.forEach { key ->
                                     AssistChip(
                                         onClick = { onQuickKeyClick(key) },
-                                        label = { Text(key) }
+                                        label = { Text(key) },
                                     )
                                 }
                             }
@@ -114,16 +120,23 @@ fun CustomImePanel(
 
                     CustomImePanelMode.KEYWORDS -> {
                         if (keywords.isNotEmpty()) {
-                            FlowRow(
-                                modifier = Modifier.weight(1f, fill = true)
-                                    .verticalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(style.quickKeyHorizontalSpacing),
-                                verticalArrangement = Arrangement.spacedBy(style.quickKeyVerticalSpacing)
+                            LazyVerticalGrid(
+                                modifier = Modifier.weight(1f, fill = true),
+                                columns = GridCells.Adaptive(88.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
                             ) {
-                                keywords.forEach { keyword ->
+                                items(keywords) {
                                     AssistChip(
-                                        onClick = { onKeywordClick(keyword) },
-                                        label = { Text(keyword.label) }
+                                        onClick = { onKeywordClick(it) },
+                                        label = {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier.fillMaxSize()
+                                            ) {
+                                                Text(it.label, maxLines = 2)
+                                            }
+                                        },
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                     )
                                 }
                             }
@@ -230,12 +243,9 @@ private fun CustomImePanelPreview() {
     }
     CustomImePanel(
         snippets = snippets,
-        quickKeys = listOf("(", ")", "==", ":"),
-        keywords = listOf(
-            CustomImeKeyword("kw-if", "もし", "もし 条件 ならば:"),
-            CustomImeKeyword("kw-else", "そうでなければ", "そうでなければ:")
-        ),
-        panelMode = CustomImePanelMode.QUICK_KEYS,
+        quickKeys = CustomImeController.DEFAULT_QUICK_KEYS,
+        keywords = CustomImeController.DEFAULT_KEYWORDS,
+        panelMode = CustomImePanelMode.KEYWORDS,
         onModeChange = {},
         onQuickKeyClick = {},
         onKeywordClick = {},

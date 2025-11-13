@@ -46,7 +46,7 @@ class CustomImeController(
 
     private val snippetTokenCache: MutableMap<String, List<Token>> = mutableMapOf()
 
-    var rankingStrategy: SnippetRankingStrategy = SnippetRankingStrategy.PrefixMatch
+    var rankingStrategy: SnippetRankingStrategy = SnippetRankingStrategy.Identity
         set(value) {
             field = value
             refreshSnippetOrdering()
@@ -244,25 +244,19 @@ class CustomImeController(
             CustomImeSnippet(
                 id = "if-basic",
                 title = "もし〜ならば",
-                body = "もし 条件 ならば:\n  \n",
+                body = "もし 条件 ならば:\n  ",
                 description = "条件分岐の基本形"
             ),
             CustomImeSnippet(
                 id = "if-else",
                 title = "もし〜そうでなければ",
-                body = "もし 条件 ならば:\n  \nそうでなければ:\n  \n",
+                body = "もし 条件 ならば:\n  \nそうでなければ:\n  ",
                 description = "if/else テンプレート"
-            ),
-            CustomImeSnippet(
-                id = "if-inline",
-                title = "もし 1 ならば",
-                body = "もし 1 ならば:",
-                description = "単行の if プレースホルダー"
             ),
             CustomImeSnippet(
                 id = "elif-inline",
                 title = "そうでなくもし",
-                body = "そうでなくもし 1 ならば:",
+                body = "そうでなくもし 条件 ならば:",
                 description = "elif 節のテンプレート"
             ),
             CustomImeSnippet(
@@ -274,19 +268,13 @@ class CustomImeController(
             CustomImeSnippet(
                 id = "repeat-loop",
                 title = "繰り返しテンプレ",
-                body = "i を 0 から 上限 まで 1 ずつ増やしながら繰り返す:\n  \n",
+                body = "i を 0 から 上限 まで 1 ずつ増やしながら繰り返す:\n  ",
                 description = "カウンタ付き繰り返し構文"
-            ),
-            CustomImeSnippet(
-                id = "repeat-range",
-                title = "範囲繰り返し",
-                body = "i を 1 から 10 まで 1 ずつ増やしながら繰り返す:",
-                description = "典型的な範囲ループ"
             ),
             CustomImeSnippet(
                 id = "while-loop",
                 title = "の間繰り返す",
-                body = "の間繰り返す:",
+                body = "条件 の間繰り返す:",
                 description = "条件成立時に継続するループ"
             ),
             CustomImeSnippet(
@@ -316,7 +304,7 @@ class CustomImeController(
             "\"\"",
             "==", "!=", "<=", ">=",
             "+", "-", "*", "/",
-            ":", ";"
+            ":"
         )
 
         val DEFAULT_KEYWORDS: List<CustomImeKeyword> = listOf(

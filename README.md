@@ -1,3 +1,5 @@
+補完をIMEに
+
 # DNCL IDE
 
 DNCL IDEは共通テスト情報で用いられる擬似プログラミング言語「DNCL」の統合開発環境です
@@ -6,7 +8,7 @@ https://www.canva.com/design/DAG0nhGRe7w/1v3MxG1X_RDAeI5vwcFiQQ/edit?utm_content
 ## Packages
 
 リリースのAssetsからIDE, CLI, Language Serverをダウンロードできます。
-IDEは`dncl-ide-<platform>-<version>.<ext>`と`dncl-ide-android-universa-<version>-release.apk`
+IDEは`dncl-ide-<platform>-<version>.<ext>`と`dncl-ide-android-universal-<version>-release.apk`
 で、linux, macOS, Windows, Androidのインストーラが提供されています。
 またWeb版もGithub Pagesで公開しています。AndroidはPlayStoreリリース作業中です。
 

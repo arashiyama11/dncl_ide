@@ -52,11 +52,10 @@ import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SelectFileScreen(
-    viewModel: SelectFileScreenViewModel = koinViewModel(),
+    viewModel: SelectFileScreenViewModel,
     navigateToCodeScreen: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()

@@ -60,15 +60,14 @@ import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.ui.components.CustomImePanel
+import io.github.arashiyama11.dncl_ide.ui.components.isImeVisible
 import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.currentPlatform
-import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = koinViewModel()) {
+fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val isMobilePlatform = currentPlatform == Platform.Android || currentPlatform == Platform.Ios
     val isCustomMode = uiState.textInputMode == TextInputMode.CUSTOM
@@ -78,12 +77,10 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel = k
     val baseTextInputService = LocalTextInputService.current
 
     LaunchedEffect(isCustomMode, uiState.isFocused) {
+        if (!isMobilePlatform) return@LaunchedEffect
         keyboardController?.let { controller ->
             if (isCustomMode) {
-                repeat(3) {
-                    controller.hide()
-                    delay(50)
-                }
+                controller.hide()
             } else if (uiState.isFocused) {
                 controller.show()
             }
@@ -206,7 +203,8 @@ fun Editor(
         val isCustomMode = uiState.textInputMode == TextInputMode.CUSTOM
         val keyboardController = LocalSoftwareKeyboardController.current
         val latestIsCustomMode = rememberUpdatedState(isCustomMode)
-        val codeEditorKeyboardOptions = if (isCustomMode) {
+        val systemImeVisible = if (isMobilePlatform) isImeVisible() else false
+        val codeEditorKeyboardOptions = if (isMobilePlatform && isCustomMode) {
             KeyboardOptions.Default.copy(showKeyboardOnFocus = false)
         } else {
             KeyboardOptions.Default
@@ -268,6 +266,12 @@ fun Editor(
         LaunchedEffect(isCustomMode) {
             if (isCustomMode) {
                 editorController.requestFocus()
+                if (isMobilePlatform) {
+                    keyboardController?.hide()
+                }
+            } else if (isMobilePlatform) {
+                editorController.requestFocus()
+                keyboardController?.show()
             }
         }
 
@@ -281,12 +285,10 @@ fun Editor(
         LaunchedEffect(editorController, keyboardController) {
             editorController.events.focusChanges.collectLatest { event ->
                 viewModel.onCodeEditorFocused(event.isFocused)
+                if (!isMobilePlatform) return@collectLatest
                 if (event.isFocused) {
                     if (latestIsCustomMode.value) {
-                        repeat(3) {
-                            keyboardController?.hide()
-                            delay(50)
-                        }
+                        keyboardController?.hide()
                     } else {
                         keyboardController?.show()
                     }
@@ -333,7 +335,7 @@ fun Editor(
             }
         }
 
-        if (isCustomMode && baseTextInputService != null) {
+        if (isMobilePlatform && isCustomMode && baseTextInputService != null) {
             CompositionLocalProvider(LocalTextInputService provides null) {
                 editorBox(Modifier.weight(1f))
             }
@@ -378,11 +380,12 @@ fun Editor(
             }
         }
 
-        val shouldShowCustomImePanel = isCustomMode
-        AnimatedVisibility(
-            shouldShowCustomImePanel,
-            modifier = Modifier.height(320.dp)
-        ) {
+        val shouldShowCustomImePanel = when {
+            !isCustomMode -> false
+            isMobilePlatform -> !systemImeVisible
+            else -> true
+        }
+        val customImePanelContent: @Composable () -> Unit = {
             CustomImePanel(
                 snippets = uiState.customImeSnippets,
                 quickKeys = uiState.customImeQuickKeys,
@@ -411,8 +414,16 @@ fun Editor(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 320.dp)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
+        }
+
+        AnimatedVisibility(
+            visible = shouldShowCustomImePanel,
+            modifier = Modifier.heightIn(max = 320.dp)
+        ) {
+            customImePanelContent()
         }
     }
 }
