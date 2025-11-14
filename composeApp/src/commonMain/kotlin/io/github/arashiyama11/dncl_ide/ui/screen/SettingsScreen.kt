@@ -28,13 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.arashiyama11.dncl_ide.adapter.SettingsScreenViewModel
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
+import dncl_ide.composeApp.BuildConfig
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -187,6 +188,20 @@ fun SettingsScreen(
             }
 
             // License button
+            SettingsItem(
+                title = "アプリバージョン",
+                control = {
+                    Text(text = BuildConfig.APP_VERSION)
+                }
+            )
+
+            SettingsItem(
+                title = "DNCLバージョン",
+                control = {
+                    Text(text = BuildConfig.DNCL_VERSION)
+                }
+            )
+
             TextButton(
                 onClick = navigateToLicenses,
                 modifier = Modifier
