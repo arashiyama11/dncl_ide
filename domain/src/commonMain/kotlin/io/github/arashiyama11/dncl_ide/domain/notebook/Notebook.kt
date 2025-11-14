@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.notebook
 
 import androidx.compose.runtime.Immutable
+import dncl_ide.domain.BuildConfig
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.SerialName
@@ -14,7 +15,7 @@ data class Notebook(
 
 @Immutable
 data class Metadata(
-    val dnclVersion: String,
+    val dnclVersion: String = BuildConfig.DNCL_VERSION,
     val kernelspec: KernelSpec? = null
 )
 

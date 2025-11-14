@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import org.gradle.kotlin.dsl.buildConfig
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -15,9 +16,16 @@ plugins {
     alias(libs.plugins.aboutlLibraries)
     alias(libs.plugins.kotlinxSerialization)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.buildconfig)
 }
 
-val version = "1.0.22"
+val version = providers.gradleProperty("app.version")
+
+
+buildConfig {
+    buildConfigField("APP_VERSION", version)
+    buildConfigField("DNCL_VERSION", providers.gradleProperty("dncl.version"))
+}
 
 kotlin {
 
@@ -140,7 +148,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
-        versionName = version
+        versionName = version.get()
     }
     packaging {
         resources {
@@ -186,10 +194,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "io.github.arashiyama11.dncl_ide"
-            packageVersion = version
+            packageVersion = version.get()
         }
-
-
     }
 }
 

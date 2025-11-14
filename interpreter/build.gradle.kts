@@ -1,11 +1,18 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import org.gradle.kotlin.dsl.buildConfig
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.buildconfig)
+}
+
+
+buildConfig {
+    buildConfigField("DNCL_VERSION", providers.gradleProperty("dncl.version"))
 }
 
 kotlin {

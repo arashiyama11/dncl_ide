@@ -23,6 +23,7 @@ compose-hot-reload = "1.0.0-rc02"
 markdown-renderer = "0.38.1"
 atomicfu = "0.29.0"
 kotlinx-collections-immutable = "0.4.0"
+buildconfig = "5.7.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -67,3 +68,4 @@ aboutlLibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "ab
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }
 androidLint = { id = "com.android.lint", version.ref = "agp" }
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }

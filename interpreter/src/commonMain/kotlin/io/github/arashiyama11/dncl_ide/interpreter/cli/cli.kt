@@ -1,5 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter.cli
 
+import dncl_ide.interpreter.BuildConfig
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
@@ -9,28 +10,61 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 
-
-suspend fun mainEntry(args: Array<String>) {
-    runCli(args)
-}
+suspend fun mainEntry(args: Array<String>) = runCli(args)
 
 suspend fun runCli(args: Array<String>) {
-    if (args.isEmpty()) {
-        // stdin にデータが来ているかチェック（パイプかどうか等）
-        if (stdinHasData()) {
-            val sourceCode = readAllStdin()
-            executeSourceCode(sourceCode)
-        } else {
-            runRepl()
+    when (val result = parseCliOptions(args)) {
+        is CliParseResult.Help -> {
+            println(result.message)
+            exitProcess(0)
         }
-    } else {
-        val filePath = args[0]
-        if (!fileExists(filePath)) {
-            stderrPrintln("エラー: ファイルが見つかりません: $filePath")
-            exitProcess(1)
+
+        is CliParseResult.Error -> {
+            stderrPrintln(result.message)
+            exitProcess(result.exitCode)
         }
-        val sourceCode = readFileText(filePath)
+
+        is CliParseResult.Version -> {
+            println(result.version)
+            exitProcess(0)
+        }
+
+        is CliParseResult.Success -> {
+            val options = result.options
+            when {
+                options.scriptPath != null -> runScript(options.scriptPath)
+                options.forceStdin -> runStdinOnly()
+                options.forceRepl -> runRepl()
+                else -> runStdinOrRepl()
+            }
+        }
+    }
+}
+
+private suspend fun runScript(filePath: String) {
+    if (!fileExists(filePath)) {
+        stderrPrintln("エラー: ファイルが見つかりません: $filePath")
+        exitProcess(1)
+    }
+    val sourceCode = readFileText(filePath)
+    executeSourceCode(sourceCode)
+}
+
+private suspend fun runStdinOnly() {
+    val sourceCode = readAllStdin()
+    if (sourceCode.isBlank()) {
+        stderrPrintln("エラー: 標準入力にコードがありません (--stdin)")
+        exitProcess(1)
+    }
+    executeSourceCode(sourceCode)
+}
+
+private suspend fun runStdinOrRepl() {
+    if (stdinHasData()) {
+        val sourceCode = readAllStdin()
         executeSourceCode(sourceCode)
+    } else {
+        runRepl()
     }
 }
 
@@ -94,7 +128,7 @@ suspend fun executeSourceCode(sourceCode: String) = coroutineScope {
 }
 
 suspend fun runRepl(): Nothing = coroutineScope {
-    println("DNCL REPL (終了するには 'exit' または 'quit' と入力してください)")
+    println("DNCL REPL v${BuildConfig.DNCL_VERSION} (終了するには 'exit' または 'quit' と入力してください)")
     val inputChannel = Channel<String>()
 
     val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
@@ -193,3 +227,102 @@ object StdoutImpl : Stdout {
         print(text)
     }
 }
+
+private data class CliOptions(
+    val scriptPath: String?,
+    val forceRepl: Boolean,
+    val forceStdin: Boolean
+)
+
+private sealed interface CliParseResult {
+    data class Success(val options: CliOptions) : CliParseResult
+    data class Help(val message: String) : CliParseResult
+    data class Error(val message: String, val exitCode: Int = 1) : CliParseResult
+    data class Version(val version: String) : CliParseResult
+}
+
+private fun parseCliOptions(args: Array<String>): CliParseResult {
+    if (args.isEmpty()) return CliParseResult.Success(
+        CliOptions(
+            scriptPath = null,
+            forceRepl = false,
+            forceStdin = false
+        )
+    )
+
+    var forceRepl = false
+    var forceStdin = false
+    var scriptPath: String? = null
+    var parsingOptions = true
+    var showVersion = false
+
+    for (arg in args) {
+        if (parsingOptions) {
+            when (arg) {
+                "-h", "--help" -> return CliParseResult.Help(helpMessage())
+                "-v", "--version" -> {
+                    showVersion = true
+                    continue
+                }
+
+                "-r", "--repl" -> {
+                    forceRepl = true
+                    continue
+                }
+
+                "-s", "--stdin" -> {
+                    forceStdin = true
+                    continue
+                }
+
+                "--" -> {
+                    parsingOptions = false
+                    continue
+                }
+            }
+            if (arg.startsWith("-")) {
+                return CliParseResult.Error("不明なオプション: $arg\n${helpMessage()}")
+            }
+        }
+
+        if (scriptPath == null) {
+            scriptPath = arg
+        } else {
+            return CliParseResult.Error("複数のスクリプトは指定できません: $arg\n${helpMessage()}")
+        }
+        parsingOptions = false
+    }
+
+    if (showVersion) {
+        if (scriptPath != null || forceRepl || forceStdin) {
+            return CliParseResult.Error("バージョン表示オプションは他の引数と併用できません\n${helpMessage()}")
+        }
+        return CliParseResult.Version(BuildConfig.DNCL_VERSION)
+    }
+
+    if (forceStdin && (scriptPath != null || forceRepl)) {
+        return CliParseResult.Error("--stdinはスクリプト指定や--replと併用できません\n${helpMessage()}")
+    }
+
+    return CliParseResult.Success(
+        CliOptions(
+            scriptPath = scriptPath,
+            forceRepl = forceRepl,
+            forceStdin = forceStdin
+        )
+    )
+}
+
+private fun helpMessage(): String = """
+DNCL CLI v${BuildConfig.DNCL_VERSION}
+使い方:
+  dncl [オプション] [スクリプトファイル]
+
+オプション:
+  -r, --repl    常にREPLモードを起動
+  -s, --stdin   標準入力から常にコードを読み取る
+  -v, --version バージョンを表示
+  -h, --help    このヘルプを表示
+
+引数なしの場合は、標準入力にデータがあればそれを実行し、なければREPLを起動します。
+""".trimIndent()

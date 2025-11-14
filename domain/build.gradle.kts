@@ -9,6 +9,11 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     alias(libs.plugins.kotlinxSerialization)
+    alias(libs.plugins.buildconfig)
+}
+
+buildConfig {
+    buildConfigField("DNCL_VERSION", providers.gradleProperty("dncl.version"))
 }
 
 kotlin {
