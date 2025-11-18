@@ -56,6 +56,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageBitmapConfig
+import androidx.compose.ui.graphics.decodeToImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -412,7 +415,7 @@ fun App() {
                     SelectFileScreen(
                         viewModel = selectFileViewModel,
                         navigateToCodeScreen = {
-                        navController.navigate(Destination.CodingScreen)
+                            navController.navigate(Destination.CodingScreen)
                         }
                     )
                 }
@@ -421,7 +424,7 @@ fun App() {
                     SelectNotebookScreen(
                         viewModel = selectNotebookViewModel,
                         navigateToCodeScreen = {
-                        navController.navigate(Destination.CodingScreen)
+                            navController.navigate(Destination.CodingScreen)
                         }
                     )
                 }

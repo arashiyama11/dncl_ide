@@ -28,7 +28,10 @@ enum class AllBuiltInFunction(val identifier: String) {
     GET_STDOUT("標準出力ハンドル"), GET_STDERR("標準エラーハンドル"), GET_STDIN("標準入力ハンドル"),
     FILE_OPEN("ファイルを開く"), FILE_WRITE("ファイルへ書く"), FILE_READ("ファイルを読む"),
     FILE_CLEAR("ファイルをクリア"), FILE_FLUSH("ファイルをフラッシュ"), FILE_COMMIT("ファイルをコミット"),
-    FILE_CLOSE("ファイルを閉じる");
+    FILE_CLOSE("ファイルを閉じる"),
+
+    GET_CANVAS("キャンバスハンドル"), CANVAS_WRITE("キャンバス書き込み"),
+    CANVAS_CLEAR("キャンバスクリア"), CANVAS_COMMIT("キャンバスコミット");
 
     companion object {
         fun from(identifier: String): AllBuiltInFunction? =

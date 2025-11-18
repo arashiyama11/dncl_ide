@@ -581,6 +581,29 @@ class HoverService(
                     `ファイルを閉じる(file)`  
                     ファイルオブジェクトをクローズします。  
             """.trimIndent()
+
+            AllBuiltInFunction.GET_CANVAS -> """
+                    `キャンバスハンドル(index = 0)`  
+                    `/dev/canvas<index>` を指す仮想ファイルハンドルを取得します。指定しない場合は `/dev/canvas0` が対象です。  
+                    描画バッファを書き込む際のエントリーポイントになります。
+            """.trimIndent()
+
+            AllBuiltInFunction.CANVAS_WRITE -> """
+                    `キャンバス書き込み(file, data)`  
+                    ヘッダー＋ビットマップなどのバイナリをキャンバスファイルへ書き込みます。`data` は文字列または 0〜255 の整数配列を指定します。  
+                    書き込み後は `キャンバスコミット` でフレームを確定させてください。
+            """.trimIndent()
+
+            AllBuiltInFunction.CANVAS_CLEAR -> """
+                    `キャンバスクリア(file)`  
+                    指定したキャンバスファイルのバッファを初期化し、背景色のみの状態に戻します。  
+                    新しいフレームを描画する準備として利用します。
+            """.trimIndent()
+
+            AllBuiltInFunction.CANVAS_COMMIT -> """
+                    `キャンバスコミット(file)`  
+                    直前に書き込んだバッファを 1 フレームとして IDE/Notebook に送信します。アニメーションの場合はフレームごとに呼び出します。
+            """.trimIndent()
         }
     }
 }

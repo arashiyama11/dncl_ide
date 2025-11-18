@@ -16,6 +16,13 @@ interface VirtualFile {
     suspend fun write(text: String)
 
     /**
+     * バイト列を書き込む。未対応の場合は例外を投げる。
+     */
+    suspend fun write(bytes: ByteArray) {
+        throw UnsupportedOperationException("write(bytes) is not supported for $path")
+    }
+
+    /**
      * ファイル内容を文字列として取得する。対応しない場合は例外を投げる。
      */
     suspend fun read(): String = throw UnsupportedOperationException("read is not supported for $path")
@@ -60,6 +67,7 @@ class VirtualFileHandle internal constructor(
     val path: String get() = file.path
 
     suspend fun write(text: String) = file.write(text)
+    suspend fun write(bytes: ByteArray) = file.write(bytes)
     suspend fun read(): String = file.read()
     suspend fun flush() = file.flush()
     suspend fun clear() = file.clear()
@@ -124,10 +132,15 @@ fun Stdout.asVirtualFile(path: String = StandardVirtualFile.Stdout.path): Virtua
  * 仮想ファイルを収容・管理するファイルシステム。必要に応じて新規ファイルを生成する。
  */
 class VirtualFileSystem(
-    private val defaultFileFactory: (String) -> VirtualFile = { path -> InMemoryVirtualFile(path) }
+    private val defaultFileFactory: (String) -> VirtualFile = { path -> InMemoryVirtualFile(path) },
+    private val onCanvasFrame: suspend (CanvasFrame) -> Unit = {}
 ) {
     private val files = mutableMapOf<String, VirtualFile>()
     private var handleCounter = 0
+
+    init {
+        files[DEFAULT_CANVAS_PATH] = CanvasVirtualFile(DEFAULT_CANVAS_PATH, onCanvasFrame)
+    }
 
     fun register(file: VirtualFile) {
         files[file.path] = file
@@ -139,7 +152,7 @@ class VirtualFileSystem(
 
     fun open(path: String, createIfMissing: Boolean = false): VirtualFileHandle? {
         val file = files[path] ?: if (createIfMissing) {
-            defaultFileFactory(path).also { files[path] = it }
+            createFile(path).also { files[path] = it }
         } else {
             null
         }
@@ -155,9 +168,21 @@ class VirtualFileSystem(
 
     fun listFiles(): Set<String> = files.keys.toSet()
 
+    private fun createFile(path: String): VirtualFile =
+        if (path.startsWith(CANVAS_PREFIX)) {
+            CanvasVirtualFile(path, onCanvasFrame)
+        } else {
+            defaultFileFactory(path)
+        }
+
     private fun nextHandleId(): Int {
         handleCounter += 1
         return handleCounter
+    }
+
+    companion object {
+        const val DEFAULT_CANVAS_PATH = "/dev/canvas0"
+        const val CANVAS_PREFIX = "/dev/canvas"
     }
 }
 

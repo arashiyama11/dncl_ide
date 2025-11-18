@@ -1036,6 +1036,113 @@ object EvaluatorFactory {
                             DnclObject.Null(astNode)
                         }
                     }
+
+                    AllBuiltInFunction.GET_CANVAS -> {
+                        l@{
+                            if (args.size > 1) {
+                                return@l DnclObject.ArgumentSizeError("引数が多すぎます", astNode)
+                            }
+                            val index = if (args.isEmpty()) 0 else {
+                                (args[0] as? DnclObject.Int)?.value
+                                    ?: return@l DnclObject.TypeError(
+                                        "キャンバス番号は整数でなければなりません",
+                                        astNode
+                                    )
+                            }
+                            val normalizedIndex = index.coerceAtLeast(0)
+                            val path = "${VirtualFileSystem.CANVAS_PREFIX}$normalizedIndex"
+                            val handle = virtualFileSystem.open(path)
+                                ?: virtualFileSystem.openOrCreate(path)
+                            DnclObject.File(handle, astNode)
+                        }
+                    }
+
+                    AllBuiltInFunction.CANVAS_WRITE -> {
+                        l@{
+                            checkArgSize(2)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            val data = when (val value = args[1]) {
+                                is DnclObject.String -> value.value.encodeToByteArray()
+                                is DnclObject.Array -> {
+                                    val list = value.value
+                                    val bytes = ByteArray(list.size)
+                                    for (i in list.indices) {
+                                        val item = list[i] as? DnclObject.Int
+                                            ?: return@l DnclObject.TypeError(
+                                                "配列要素は整数でなければなりません",
+                                                astNode
+                                            )
+                                        if (item.value !in 0..255) {
+                                            return@l DnclObject.TypeError(
+                                                "配列要素は0から255の範囲である必要があります",
+                                                astNode
+                                            )
+                                        }
+                                        bytes[i] = item.value.toByte()
+                                    }
+                                    bytes
+                                }
+
+                                else -> return@l DnclObject.TypeError(
+                                    "第二引数は文字列または整数配列でなければなりません",
+                                    astNode
+                                )
+                            }
+                            return@l try {
+                                file.handle.write(data)
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルはバイナリ書き込みに対応していません",
+                                    astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.CANVAS_CLEAR -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                file.handle.clear()
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルはクリアに対応していません",
+                                    astNode
+                                )
+                            }
+                        }
+                    }
+
+                    AllBuiltInFunction.CANVAS_COMMIT -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+                            return@l try {
+                                file.handle.commitFrame()
+                                DnclObject.Null(astNode)
+                            } catch (e: UnsupportedOperationException) {
+                                DnclObject.RuntimeError(
+                                    e.message ?: "このファイルはフレームコミットに対応していません",
+                                    astNode
+                                )
+                            }
+                        }
+                    }
                 }
 
                 val builtInFunction = DnclObject.BuiltInFunction(

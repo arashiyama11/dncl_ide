@@ -191,7 +191,11 @@ class ExecuteUseCase(
                     }
                 }
 
-                val virtualFileSystem = VirtualFileSystem().apply {
+                val virtualFileSystem = VirtualFileSystem(
+                    onCanvasFrame = { frame ->
+                        send(DnclOutput.CanvasFrameOutput(frame))
+                    }
+                ).apply {
                     register(stdout.asVirtualFile(StandardVirtualFile.Stdout.path))
                     openOrCreate(StandardVirtualFile.Stderr.path)
                     openOrCreate(StandardVirtualFile.Stdin.path)

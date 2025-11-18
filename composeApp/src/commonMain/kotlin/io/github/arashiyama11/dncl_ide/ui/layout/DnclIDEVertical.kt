@@ -50,6 +50,7 @@ import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorControll
 import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
 import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
+import io.github.arashiyama11.dncl_ide.ui.components.CanvasAwareOutputField
 import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
@@ -318,14 +319,11 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
                 }
 
                 TextFieldType.OUTPUT -> {
-                    val textFieldDesc = "出力"
-                    OutlinedTextField(
-                        value = uiState.output,
-                        onValueChange = { }, // ReadOnly
-                        modifier = Modifier.weight(1f, fill = true).fillMaxSize(),
-                        textStyle = LocalCodeTypography.current.bodyLarge,
-                        label = { Text(textFieldDesc) },
-                        readOnly = true,
+                    CanvasAwareOutputField(
+                        uiState = uiState,
+                        onSelectPane = viewModel::selectOutputPane,
+                        onSelectCanvas = viewModel::selectCanvasSurface,
+                        modifier = Modifier.weight(1f, fill = true)
                     )
                 }
             }

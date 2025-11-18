@@ -89,11 +89,18 @@ data class IdeUiState(
     val customImeSnippets: List<CustomImeSnippet> = emptyList(),
     val customImeQuickKeys: List<String> = emptyList(),
     val customImeKeywords: List<CustomImeKeyword> = emptyList(),
-    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS
+    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS,
+    val canvasSurfaces: List<CanvasSurfaceState> = emptyList(),
+    val selectedCanvasPath: String? = null,
+    val outputPane: OutputPane = OutputPane.STDOUT
 )
 
 enum class TextFieldType {
     OUTPUT, DEBUG_OUTPUT
+}
+
+enum class OutputPane {
+    STDOUT, CANVAS
 }
 
 class IdeViewModel(
@@ -139,7 +146,10 @@ class IdeViewModel(
             customImeSnippets = emptyList(),
             customImeQuickKeys = emptyList(),
             customImeKeywords = emptyList(),
-            customImePanelMode = CustomImePanelMode.QUICK_KEYS
+            customImePanelMode = CustomImePanelMode.QUICK_KEYS,
+            canvasSurfaces = emptyList(),
+            selectedCanvasPath = null,
+            outputPane = OutputPane.STDOUT
         )
     )
 
@@ -238,7 +248,10 @@ class IdeViewModel(
             customImeSnippets = localState.customImeSnippets,
             customImeQuickKeys = localState.customImeQuickKeys,
             customImeKeywords = localState.customImeKeywords,
-            customImePanelMode = localState.customImePanelMode
+            customImePanelMode = localState.customImePanelMode,
+            canvasSurfaces = localState.canvasSurfaces,
+            selectedCanvasPath = localState.selectedCanvasPath,
+            outputPane = localState.outputPane
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -433,6 +446,7 @@ class IdeViewModel(
         viewModelScope.launch {
             outputHandler.stdout.clear()
         }
+        resetCanvasSurfaces()
 
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
@@ -534,6 +548,22 @@ class IdeViewModel(
                             }
                         }
                     }
+
+                    is DnclOutput.CanvasFrameOutput -> {
+                        val surfaceState = output.frame.toSurfaceState()
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update { state ->
+                                val nextMap = state.canvasSurfaces.associateBy { it.path }.toMutableMap()
+                                nextMap[surfaceState.path] = surfaceState
+                                val sorted = nextMap.values.sortedBy { it.path }
+                                val selectedPath = state.selectedCanvasPath ?: surfaceState.path
+                                state.copy(
+                                    canvasSurfaces = sorted,
+                                    selectedCanvasPath = selectedPath
+                                )
+                            }
+                        }
+                    }
                 }
             }
             outputHandler.stdout.flush()
@@ -553,6 +583,32 @@ class IdeViewModel(
         }
         _localState.update { it.copy(currentEvaluatingLine = null) }
         appStateStore.dispatch(Action.SetRunning(false))
+    }
+
+    fun selectOutputPane(pane: OutputPane) {
+        _localState.update { it.copy(outputPane = pane) }
+    }
+
+    fun selectCanvasSurface(path: String) {
+        _localState.update { state ->
+            if (state.selectedCanvasPath == path) {
+                state
+            } else {
+                state.copy(selectedCanvasPath = path)
+            }
+        }
+    }
+
+    private fun resetCanvasSurfaces() {
+        viewModelScope.launch(Dispatchers.Main) {
+            _localState.update {
+                it.copy(
+                    canvasSurfaces = emptyList(),
+                    selectedCanvasPath = null,
+                    outputPane = OutputPane.STDOUT
+                )
+            }
+        }
     }
 
     fun onStepButtonClicked() {
@@ -826,6 +882,9 @@ class IdeViewModel(
         val customImeSnippets: List<CustomImeSnippet>,
         val customImeQuickKeys: List<String>,
         val customImeKeywords: List<CustomImeKeyword>,
-        val customImePanelMode: CustomImePanelMode
+        val customImePanelMode: CustomImePanelMode,
+        val canvasSurfaces: List<CanvasSurfaceState>,
+        val selectedCanvasPath: String?,
+        val outputPane: OutputPane
     )
 }
