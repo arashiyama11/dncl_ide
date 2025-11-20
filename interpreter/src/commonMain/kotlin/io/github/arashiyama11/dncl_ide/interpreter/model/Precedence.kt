@@ -8,10 +8,13 @@ enum class Precedence {
     AND,
     EQUALS,
     LESSGREATER,
+    BITOR,
+    BITXOR,
+    BITAND,
+    SHIFT,
     SUM,
     PRODUCT,
     PREFIX,
     CALL,
     INDEX
 }
-

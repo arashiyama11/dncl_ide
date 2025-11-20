@@ -98,6 +98,33 @@ class EvaluatorTest {
     }
 
     @Test
+    fun `binary octal hex literals`() {
+        testEval(
+            """
+表示する(0b1010)
+表示する(0o17)
+表示する(0x1F)
+""".trimIndent(),
+            "10\n15\n31\n"
+        )
+    }
+
+    @Test
+    fun `bitwise operations`() {
+        testEval(
+            """
+表示する(5 & 3)
+表示する(5 | 2)
+表示する(5 ^ 1)
+表示する(~1)
+表示する(4 << 1)
+表示する(8 >> 2)
+""".trimIndent(),
+            "1\n7\n4\n-2\n8\n2\n"
+        )
+    }
+
+    @Test
     fun `variable assignment and usage`() {
         testEval("x = 10\n表示する(x)", "10\n")
     }

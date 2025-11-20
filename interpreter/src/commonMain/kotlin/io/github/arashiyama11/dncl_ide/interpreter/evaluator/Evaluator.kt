@@ -310,6 +310,14 @@ class Evaluator(
                     prefixExpression
                 )
             }
+
+            is Token.BitNot -> when (right) {
+                is DnclObject.Int -> DnclObject.Int(right.value.inv(), prefixExpression)
+                else -> DnclObject.TypeError(
+                    message = "単項演算子「~」は整数のみに適用可能です。\n~${right::class.simpleName} が実行されようとしました",
+                    prefixExpression
+                )
+            }
         }
     }
 
@@ -511,6 +519,66 @@ class Evaluator(
 
                 else -> DnclObject.TypeError(
                     message = "演算子「||」は論理値同士の演算のみ可能です。\n${left::class.simpleName} || ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
+                )
+            }
+
+            is Token.BitAnd -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
+                    left.value and right.value,
+                    infixExpression
+                )
+
+                else -> DnclObject.TypeError(
+                    message = "演算子「&」は整数同士の演算のみ可能です。\n${left::class.simpleName} & ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
+                )
+            }
+
+            is Token.BitOr -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
+                    left.value or right.value,
+                    infixExpression
+                )
+
+                else -> DnclObject.TypeError(
+                    message = "演算子「|」は整数同士の演算のみ可能です。\n${left::class.simpleName} | ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
+                )
+            }
+
+            is Token.BitXor -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
+                    left.value xor right.value,
+                    infixExpression
+                )
+
+                else -> DnclObject.TypeError(
+                    message = "演算子「^」は整数同士の演算のみ可能です。\n${left::class.simpleName} ^ ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
+                )
+            }
+
+            is Token.ShiftLeft -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
+                    left.value shl right.value,
+                    infixExpression
+                )
+
+                else -> DnclObject.TypeError(
+                    message = "演算子「<<」は整数同士の演算のみ可能です。\n${left::class.simpleName} << ${right::class.simpleName} が実行されようとしました",
+                    infixExpression
+                )
+            }
+
+            is Token.ShiftRight -> when {
+                left is DnclObject.Int && right is DnclObject.Int -> DnclObject.Int(
+                    left.value shr right.value,
+                    infixExpression
+                )
+
+                else -> DnclObject.TypeError(
+                    message = "演算子「>>」は整数同士の演算のみ可能です。\n${left::class.simpleName} >> ${right::class.simpleName} が実行されようとしました",
                     infixExpression
                 )
             }

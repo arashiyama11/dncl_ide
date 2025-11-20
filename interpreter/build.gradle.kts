@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.gradle.kotlin.dsl.buildConfig
+import org.jetbrains.compose.compose
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -13,6 +14,10 @@ plugins {
 
 buildConfig {
     buildConfigField("DNCL_VERSION", providers.gradleProperty("dncl.version"))
+    buildConfigField(
+        "CANVAS_LIB_FILE",
+        File("interpreter/src/commonMain/composeResources/files/canvas.dncl")
+    )
 }
 
 kotlin {

@@ -74,6 +74,21 @@ sealed interface Token {
     data class Modulo(override val range: IntRange, override val literal: kotlin.String = "%") :
         InfixExpressionToken
 
+    data class BitAnd(override val range: IntRange, override val literal: kotlin.String = "&") :
+        InfixExpressionToken
+
+    data class BitOr(override val range: IntRange, override val literal: kotlin.String = "|") :
+        InfixExpressionToken
+
+    data class BitXor(override val range: IntRange, override val literal: kotlin.String = "^") :
+        InfixExpressionToken
+
+    data class ShiftLeft(override val range: IntRange, override val literal: kotlin.String = "<<") :
+        InfixExpressionToken
+
+    data class ShiftRight(override val range: IntRange, override val literal: kotlin.String = ">>") :
+        InfixExpressionToken
+
     data class Assign(override val range: IntRange, override val literal: kotlin.String = "=") :
         Token
 
@@ -102,6 +117,9 @@ sealed interface Token {
     ) : InfixExpressionToken
 
     data class Bang(override val range: IntRange, override val literal: kotlin.String = "!") :
+        PrefixExpressionToken
+
+    data class BitNot(override val range: IntRange, override val literal: kotlin.String = "~") :
         PrefixExpressionToken
 
     data class And(override val range: IntRange, override val literal: kotlin.String = "AND") :

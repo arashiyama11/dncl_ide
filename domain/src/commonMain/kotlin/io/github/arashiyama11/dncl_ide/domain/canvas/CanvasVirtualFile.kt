@@ -1,5 +1,6 @@
-package io.github.arashiyama11.dncl_ide.interpreter.api
+package io.github.arashiyama11.dncl_ide.domain.canvas
 
+import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -15,16 +16,15 @@ data class CanvasHeader(
     val payloadSize: Int,
 )
 
-data class CanvasFrame(
+data class CanvasFrame @OptIn(ExperimentalUnsignedTypes::class) constructor(
     val path: String,
     val header: CanvasHeader,
     val payload: ByteArray,
 ) {
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other == null || this::class != other::class) return false
-
-        other as CanvasFrame
+        if (other !is CanvasFrame) return false
 
         if (path != other.path) return false
         if (header != other.header) return false
@@ -33,6 +33,7 @@ data class CanvasFrame(
         return true
     }
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun hashCode(): Int {
         var result = path.hashCode()
         result = 31 * result + header.hashCode()
@@ -48,6 +49,18 @@ class CanvasVirtualFile(
 ) : VirtualFile {
     private val buffer = mutableListOf<Byte>()
     private val mutex = Mutex()
+
+    override suspend fun read(): String {
+        return mutex.withLock {
+            buffer.toByteArray().also {
+                println("byte: ${it.toList()}")
+            }.decodeToString()
+        }
+    }
+
+    override suspend fun readBytes(): ByteArray {
+        return mutex.withLock { buffer.toByteArray() }
+    }
 
     override suspend fun write(text: String) {
         write(text.encodeToByteArray())
@@ -67,9 +80,9 @@ class CanvasVirtualFile(
         val frame = mutex.withLock {
             if (buffer.isEmpty()) return
             val data = buffer.toByteArray()
-            buffer.clear()
+            //buffer.clear()
             parseFrame(data)
-        } ?: return
+        }
 
         onFrameCommitted(frame)
     }
@@ -94,7 +107,8 @@ class CanvasVirtualFile(
             "Frame payload is smaller than declared size: declared=${header.payloadSize}, actual=${data.size - headerSize}"
         }
 
-        val payload = data.copyOfRange(headerSize, expectedSize)
+
+        val payload = data.copyOfRange(headerSize, expectedSize)//.toByteArray()
         return CanvasFrame(path = path, header = header, payload = payload)
     }
 
@@ -109,20 +123,18 @@ class CanvasVirtualFile(
     }
 }
 
-private fun ByteArray.readInt(offset: Int): Int {
-    require(offset + 4 <= size) { "Cannot read Int at offset=$offset" }
-    var value = 0
-    repeat(4) { index ->
-        value = (value shl 8) or (this[offset + index].toInt() and 0xFF)
-    }
-    return value
+fun ByteArray.readInt(offset: Int): Int {
+    this[0] = 12
+    val b0 = this[offset].toInt() and 0xFF
+    val b1 = this[offset + 1].toInt() and 0xFF
+    val b2 = this[offset + 2].toInt() and 0xFF
+    val b3 = this[offset + 3].toInt() and 0xFF
+    return (b0 shl 24) or (b1 shl 16) or (b2 shl 8) or b3
 }
 
-private fun ByteArray.readUShort(offset: Int): Int {
-    require(offset + 2 <= size) { "Cannot read UShort at offset=$offset" }
-    var value = 0
-    repeat(2) { index ->
-        value = (value shl 8) or (this[offset + index].toInt() and 0xFF)
-    }
-    return value
+// 16-bit unsigned short (0..65535) Big Endian
+fun ByteArray.readUShort(offset: Int): Int {
+    val b0 = this[offset].toInt() and 0xFF
+    val b1 = this[offset + 1].toInt() and 0xFF
+    return (b0 shl 8) or b1
 }

@@ -1,7 +1,7 @@
 package io.github.arashiyama11.dncl_ide.adapter
 
 import androidx.compose.ui.graphics.ImageBitmap
-import io.github.arashiyama11.dncl_ide.interpreter.api.CanvasFrame
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 
 data class CanvasSurfaceState(
     val path: String,

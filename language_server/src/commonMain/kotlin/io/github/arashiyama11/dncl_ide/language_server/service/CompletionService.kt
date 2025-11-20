@@ -276,7 +276,6 @@ private class SuggestionUseCase {
         }
 
         val query = activeTokenLiteral ?: extractActiveQuery(code, position)
-        println("query: $query")
         return sortCandidates(words, query, position, code.length)
     }
 

@@ -1,30 +1,46 @@
-
-
-# キャンバス
-関数 キャンバス作成(width, height) を:
-  ctx = キャンバスハンドル()
-
-  ### 7.1 ヘッダー案 (32 byte)
-  | オフセット | サイズ | 説明 |
-  | --- | --- | --- |
-  | 0 | 4 byte | magic: `0x44434E43` ("D C N C") |
-  | 4 | 2 byte | バージョン (例: `0x0001`) |
-  | 6 | 2 byte | 色空間 (`0=RGBA8888`, `1=RGB565` など) |
-  | 8 | 4 byte | 幅 (px) |
-  | 12 | 4 byte | 高さ (px) |
-  | 16 | 4 byte | 背景色 (RGBA) |
-  | 20 | 4 byte | フレーム番号 |
-  | 24 | 4 byte | 予約 (dpi / aspect 等) |
-  | 28 | 4 byte | ボディサイズ (byte) |
-
-
-  キャンバス書き込み([68,67,78,67,
-  0,1,
-  0,1,
-  ])
-  width
+# 4バイトの整数を読み込む
+関数 read_int(array, offset) を:
+  戻り値((array[offset] << 24) + (array[offset+1] << 16) + (array[offset+2] << 8) + array[offset+3])
 と定義する
 
-関数 キャンバス投影(ctx, data) を:
-  ctx
+# 4バイトの整数を読み込む
+関数 write_int(array, offset, data) を:
+  array[offset] = (data >> 24) & 0xff
+  array[offset+1] = (data >> 16) & 0xff
+  array[offset+2] = (data >> 8) & 0xff
+  array[offset+3] = data & 0xff
+と定義する
+
+関数 write_short(array, offset, data) を:
+  array[offset] = (data >> 8) & 0xff
+  array[offset+1] = data & 0xff
+と定義する
+
+
+関数 キャンバス作成(width, height,r,g,b,a) を:
+  ctx = get_canvas()
+  size = width * height * 4
+  data = [68,78,67,76,0,1,0,0,
+  (width >> 24) & 0xff, (width >> 16) & 0xff, (width >> 8) & 0xff, width & 0xff,
+   (height >> 24) & 0xff, (height >> 16) & 0xff, (height >> 8) & 0xff, height & 0xff,
+  r,g,b,a,
+  0,0,0,0,
+  0,0,0,0,
+  (size >> 24) & 0xff, (size >> 16) & 0xff, (size >> 8) & 0xff, size & 0xff]
+  i を 1 から size まで 1 ずつ増やしながら繰り返す:
+    末尾追加(data,0)
+  write_canvas(ctx,data)
+  戻り値(ctx)
+と定義する
+
+関数 キャンバス書き込み(ctx, data) を:
+  content = read_canvas(ctx)
+  i を 1 から 要素数(data) まで 1 ずつ増やしながら繰り返す:
+    j = i + 31
+    content[j] = data[i-1]
+
+  frame = read_int(content, 20)
+  write_int(content,20, frame + 1)
+  clear_canvas(ctx)
+  write_canvas(ctx,content)
 と定義する

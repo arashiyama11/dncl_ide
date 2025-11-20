@@ -31,6 +31,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasVirtualFile
+import io.github.arashiyama11.dncl_ide.interpreter.api.InMemoryVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileSystem
@@ -191,9 +194,17 @@ class ExecuteUseCase(
                     }
                 }
 
+                val onCanvasFrame: suspend (CanvasFrame) -> Unit = { frame ->
+                    send(DnclOutput.CanvasFrameOutput(frame))
+                }
+
                 val virtualFileSystem = VirtualFileSystem(
-                    onCanvasFrame = { frame ->
-                        send(DnclOutput.CanvasFrameOutput(frame))
+                    defaultFileFactory = { path ->
+                        if (path.startsWith(VirtualFileSystem.CANVAS_PREFIX)) {
+                            CanvasVirtualFile(path, onFrameCommitted = onCanvasFrame)
+                        } else {
+                            InMemoryVirtualFile(path)
+                        }
                     }
                 ).apply {
                     register(stdout.asVirtualFile(StandardVirtualFile.Stdout.path))

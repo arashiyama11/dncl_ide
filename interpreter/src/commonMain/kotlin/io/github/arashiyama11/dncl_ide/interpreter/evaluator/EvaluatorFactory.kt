@@ -1057,6 +1057,25 @@ object EvaluatorFactory {
                         }
                     }
 
+                    AllBuiltInFunction.CANVAS_READ -> {
+                        l@{
+                            checkArgSize(1)?.let { return@l it }
+                            val file = args[0] as? DnclObject.File
+                                ?: return@l DnclObject.TypeError(
+                                    "第一引数はファイルでなければなりません",
+                                    astNode
+                                )
+
+
+                            DnclObject.Array(
+                                file.handle.readBytes().map {
+                                    DnclObject.Int(it.toUByte().toInt(), astNode)
+                                }.toMutableList(),
+                                astNode
+                            )
+                        }
+                    }
+
                     AllBuiltInFunction.CANVAS_WRITE -> {
                         l@{
                             checkArgSize(2)?.let { return@l it }
@@ -1082,7 +1101,7 @@ object EvaluatorFactory {
                                                 astNode
                                             )
                                         }
-                                        bytes[i] = item.value.toByte()
+                                        bytes[i] = (item.value and 0xff).toByte()
                                     }
                                     bytes
                                 }

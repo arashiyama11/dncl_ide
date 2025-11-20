@@ -2,6 +2,7 @@ package io.github.arashiyama11.dncl_ide.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -20,9 +23,11 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,6 +70,7 @@ fun CanvasAwareOutputField(
                     selectedPath = uiState.selectedCanvasPath,
                     onSelectCanvas = onSelectCanvas,
                     modifier = Modifier.weight(1f).fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                 )
             }
         }
@@ -106,6 +112,7 @@ private fun CanvasPanel(
 
     val currentSurface = surfaces.firstOrNull { it.path == selectedPath } ?: surfaces.first()
 
+
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(surfaces, key = { it.path }) { surface ->
@@ -119,7 +126,7 @@ private fun CanvasPanel(
 
         Box(
             modifier = Modifier
-                .weight(1f)
+                //.weight(1f)
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -129,8 +136,9 @@ private fun CanvasPanel(
                 Image(
                     bitmap = bitmap,
                     contentDescription = currentSurface.path,
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                    contentScale = ContentScale.Fit
+                    modifier = Modifier.fillMaxSize().padding(8.dp).border(3.dp, Color.Red),
+                    contentScale = ContentScale.FillWidth,
+                    filterQuality = FilterQuality.None
                 )
             } else {
                 Text(

@@ -159,6 +159,15 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
         }
 
+    private fun parseIntLiteral(literal: String): Int? {
+        return when {
+            literal.startsWith("0x", ignoreCase = true) -> literal.drop(2).toIntOrNull(16)
+            literal.startsWith("0b", ignoreCase = true) -> literal.drop(2).toIntOrNull(2)
+            literal.startsWith("0o", ignoreCase = true) -> literal.drop(2).toIntOrNull(8)
+            else -> literal.toIntOrNull()
+        }
+    }
+
 
     @EnsuredEndOfLine
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
@@ -356,11 +365,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.BooleanLiteral(boolToken.value, boolToken.range)
             }
+
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
                 AstNode.Identifier(identifier.literal, identifier.range)
             }
+
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
@@ -370,10 +381,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.Int -> {
                 val int = (currentToken as? Token.Int)
                     ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.IntLiteral(
-                    int.literal.toIntOrNull()
-                        ?: raise(ParserError.InvalidIntLiteral(int)), int.range
-                )
+                val value = parseIntLiteral(int.literal)
+                    ?: raise(ParserError.InvalidIntLiteral(int))
+                AstNode.IntLiteral(value, int.range)
             }
 
             is Token.Float -> {
@@ -543,9 +553,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         fun Token.precedence() = when (this) {
             is Token.Plus, is Token.Minus -> Precedence.SUM
             is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo -> Precedence.PRODUCT
+            is Token.ShiftLeft, is Token.ShiftRight -> Precedence.SHIFT
+            is Token.BitAnd -> Precedence.BITAND
+            is Token.BitXor -> Precedence.BITXOR
+            is Token.BitOr -> Precedence.BITOR
             is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual -> Precedence.LESSGREATER
             is Token.Equal, is Token.NotEqual -> Precedence.EQUALS
-            is Token.Bang, is Token.LenticularOpen -> Precedence.PREFIX
+            is Token.Bang, is Token.LenticularOpen, is Token.BitNot -> Precedence.PREFIX
             is Token.BracketOpen -> Precedence.INDEX
             is Token.ParenOpen -> Precedence.CALL
             is Token.While -> Precedence.WHILE

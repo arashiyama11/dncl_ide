@@ -1,10 +1,8 @@
 package io.github.arashiyama11.dncl_ide.adapter
 
-import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import io.github.arashiyama11.dncl_ide.interpreter.api.CanvasFrame
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 import androidx.core.graphics.createBitmap
 
 actual fun CanvasFrame.toImageBitmap(): ImageBitmap? {

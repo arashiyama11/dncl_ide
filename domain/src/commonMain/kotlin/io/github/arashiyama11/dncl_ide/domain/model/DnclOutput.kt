@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.domain.model
 
-import io.github.arashiyama11.dncl_ide.interpreter.api.CanvasFrame
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import kotlin.jvm.JvmInline

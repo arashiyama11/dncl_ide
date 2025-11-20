@@ -74,6 +74,46 @@ kosu ＞12かつkosu＜27でない
     }
 
     @Test
+    fun `supports binary octal hex integers`() {
+        val input = """
+0b1010
+0o17
+0xFF
+""".trimIndent()
+        val ints = mutableListOf<String>()
+        for (token in Lexer(input)) {
+            if (token.isRight()) {
+                when (val t = token.getOrNull()!!) {
+                    is Token.Int -> ints.add(t.literal)
+                    is Token.EOF -> break
+                }
+            } else {
+                fail(token.leftOrNull()?.toString())
+            }
+        }
+        assertEquals(listOf("0b1010", "0o17", "0xFF"), ints)
+    }
+
+    @Test
+    fun `bitwise operators are tokenized`() {
+        val input = "a & b | c ^ d << 1 >> 2 ~e"
+        val tokens = mutableListOf<String>()
+        for (token in Lexer(input)) {
+            if (token.isRight()) {
+                tokens.add(token.getOrNull()!!::class.simpleName ?: "")
+                if (token.getOrNull() is Token.EOF) break
+            } else fail(token.leftOrNull()?.toString())
+        }
+        assertEquals(
+            listOf(
+                "Identifier", "BitAnd", "Identifier", "BitOr", "Identifier", "BitXor", "Identifier",
+                "ShiftLeft", "Int", "ShiftRight", "Int", "BitNot", "Identifier", "EOF"
+            ),
+            tokens
+        )
+    }
+
+    @Test
     fun testFunction() {
         val input = TestCase.MaisuFunction
         var result = ""

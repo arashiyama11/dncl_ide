@@ -30,8 +30,9 @@ enum class AllBuiltInFunction(val identifier: String) {
     FILE_CLEAR("ファイルをクリア"), FILE_FLUSH("ファイルをフラッシュ"), FILE_COMMIT("ファイルをコミット"),
     FILE_CLOSE("ファイルを閉じる"),
 
-    GET_CANVAS("キャンバスハンドル"), CANVAS_WRITE("キャンバス書き込み"),
-    CANVAS_CLEAR("キャンバスクリア"), CANVAS_COMMIT("キャンバスコミット");
+    GET_CANVAS("get_canvas"), CANVAS_WRITE("write_canvas"), CANVAS_READ("read_canvas"),
+    CANVAS_CLEAR("clear_canvas"), CANVAS_COMMIT("commit_canvas")
+    ;
 
     companion object {
         fun from(identifier: String): AllBuiltInFunction? =

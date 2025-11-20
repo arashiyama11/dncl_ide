@@ -79,7 +79,10 @@ class Lexer(private val input: String) : ILexer {
 
                 '＞', '>' -> {
                     readChar()
-                    if (ch == '=') {
+                    if (ch == '>') {
+                        readChar()
+                        Token.ShiftRight(position - 2..<position)
+                    } else if (ch == '=') {
                         readChar()
                         Token.GreaterThanOrEqual(position - 2..<position)
                     } else Token.GreaterThan(position - 1..<position)
@@ -92,7 +95,10 @@ class Lexer(private val input: String) : ILexer {
 
                 '＜', '<' -> {
                     readChar()
-                    if (ch == '=') {
+                    if (ch == '<') {
+                        readChar()
+                        Token.ShiftLeft(position - 2..<position)
+                    } else if (ch == '=') {
                         readChar()
                         Token.LessThanOrEqual(position - 2..<position)
                     } else
@@ -171,6 +177,26 @@ class Lexer(private val input: String) : ILexer {
                 '%' -> {
                     readChar()
                     Token.Modulo(position - 1..<position)
+                }
+
+                '&' -> {
+                    readChar()
+                    Token.BitAnd(position - 1..<position)
+                }
+
+                '|' -> {
+                    readChar()
+                    Token.BitOr(position - 1..<position)
+                }
+
+                '^' -> {
+                    readChar()
+                    Token.BitXor(position - 1..<position)
+                }
+
+                '~' -> {
+                    readChar()
+                    Token.BitNot(position - 1..<position)
                 }
 
                 '!' -> if (peekChar() == '=') {
@@ -271,6 +297,24 @@ class Lexer(private val input: String) : ILexer {
 
     private fun readNumber(): Either<LexerError, Token> {
         val pos = position
+
+        // プレフィックス付き整数: 0b / 0o / 0x
+        if (ch == '0' && peekChar().let { it == 'b' || it == 'B' || it == 'o' || it == 'O' || it == 'x' || it == 'X' }) {
+            val prefixChar = peekChar()
+            readChar() // consume '0'
+            readChar() // consume prefix
+            val radix = when (prefixChar) {
+                'b', 'B' -> 2
+                'o', 'O' -> 8
+                else -> 16
+            }
+            while (ch.isValidDigit(radix) && ch != END_OF_FILE) {
+                readChar()
+            }
+            return Token.Int(input.substring(pos, position), pos until position).right()
+        }
+
+        // 10進整数/浮動小数
         while (ch.isDigit() && ch != END_OF_FILE) {
             readChar()
         }
@@ -329,6 +373,16 @@ class Lexer(private val input: String) : ILexer {
 
         private fun Char.isAlphaBet(): Boolean {
             return this.code in (65..90) + (97..122)
+        }
+
+        private fun Char.isValidDigit(radix: Int): Boolean {
+            return when (radix) {
+                2 -> this == '0' || this == '1'
+                8 -> this in '0'..'7'
+                10 -> this.isDigit()
+                16 -> this.isDigit() || this in 'a'..'f' || this in 'A'..'F'
+                else -> false
+            }
         }
     }
 }

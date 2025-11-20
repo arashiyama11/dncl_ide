@@ -6,6 +6,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
+import dncl_ide.composeapp.generated.resources.Res
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -550,10 +551,13 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.CanvasFrameOutput -> {
+
+                        println("canvas output: $output")
                         val surfaceState = output.frame.toSurfaceState()
                         viewModelScope.launch(Dispatchers.Main) {
                             _localState.update { state ->
-                                val nextMap = state.canvasSurfaces.associateBy { it.path }.toMutableMap()
+                                val nextMap =
+                                    state.canvasSurfaces.associateBy { it.path }.toMutableMap()
                                 nextMap[surfaceState.path] = surfaceState
                                 val sorted = nextMap.values.sortedBy { it.path }
                                 val selectedPath = state.selectedCanvasPath ?: surfaceState.path
@@ -602,10 +606,11 @@ class IdeViewModel(
     private fun resetCanvasSurfaces() {
         viewModelScope.launch(Dispatchers.Main) {
             _localState.update {
+                Res
                 it.copy(
                     canvasSurfaces = emptyList(),
                     selectedCanvasPath = null,
-                    outputPane = OutputPane.STDOUT
+                    //outputPane = OutputPane.STDOUT
                 )
             }
         }

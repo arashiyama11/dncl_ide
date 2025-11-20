@@ -604,6 +604,8 @@ class HoverService(
                     `キャンバスコミット(file)`  
                     直前に書き込んだバッファを 1 フレームとして IDE/Notebook に送信します。アニメーションの場合はフレームごとに呼び出します。
             """.trimIndent()
+
+            AllBuiltInFunction.CANVAS_READ -> ""
         }
     }
 }
