@@ -37,11 +37,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
+import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.util.OutputHandler
-import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -115,12 +116,7 @@ class IdeViewModel(
     private val editorStateFlow = editorSession.state
     private val appState by appStateStore
 
-    private val defaultTextInputMode: TextInputMode =
-        if (currentPlatform == Platform.Desktop || currentPlatform == Platform.Web) {
-            TextInputMode.CUSTOM
-        } else {
-            TextInputMode.STANDARD
-        }
+    private val defaultTextInputMode: TextInputMode = TextInputMode.STANDARD
 
     private val _localState = MutableStateFlow(
         LocalIdeState(
@@ -376,7 +372,8 @@ class IdeViewModel(
             var parsedProgram: Either<DnclError, AstNode.Program>? = null
 
             if (tokens.all { it.isRight() }) {
-                val parser = Parser(Lexer(indentedText.text)).getOrNull()
+                val parser =
+                    Parser(preProcess(Lexer(indentedText.text)) { "" }.toList()).getOrNull()
 
                 if (parser != null) {
                     parsedProgram = parser.parseProgram()
@@ -481,7 +478,7 @@ class IdeViewModel(
                         viewModelScope.launch(Dispatchers.Main) {
                             _localState.update {
                                 it.copy(
-                                    // output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
+                                    output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
                                     isError = true,
                                     errorRange = output.value.astNode.range
                                 )
@@ -494,7 +491,7 @@ class IdeViewModel(
                         viewModelScope.launch(Dispatchers.Main) {
                             _localState.update {
                                 it.copy(
-                                    // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
+                                    output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
                                     isError = true
                                 )
                             }

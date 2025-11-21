@@ -9,7 +9,7 @@ import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 class ReferenceService(
     private val astInfoService: AstInfoService
 ) {
-    fun findReferences(
+    suspend fun findReferences(
         uri: String,
         code: String,
         offset: Int,

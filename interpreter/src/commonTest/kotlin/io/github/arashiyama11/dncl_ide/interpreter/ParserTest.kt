@@ -2,6 +2,9 @@ package io.github.arashiyama11.dncl_ide.interpreter
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -9,16 +12,16 @@ import kotlin.test.fail
 
 class ParserTest {
     @Test
-    fun test() {
+    fun test() = runTest {
         val input = """
 もし Akibi[buin] < Akibi[tantou] ならば:
     tantou = buin
 表示する("次の工芸品の担当は部員", tantou, "です")"""
-        println(Parser(Lexer(input)).getOrNull()!!.parseProgram())
+        println(Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!.parseProgram())
     }
 
     @Test
-    fun testExpression() {
+    fun testExpression() = runTest {
         val input = """
 -a+b
 !-a
@@ -39,7 +42,7 @@ a + b * c + d / e - f
 5 < 4 != 3 > 4
 3 + 4 * 5 == 3 * 1 + 4 * 5
 """
-        val parser = Parser(Lexer(input)).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         println(prog.getOrNull()!!.literal)
@@ -66,9 +69,9 @@ a + b * c + d / e - f
     }
 
     @Test
-    fun testFunction() {
+    fun testFunction() = runTest {
         val input = TestCase.MaisuFunction
-        val parser = Parser(Lexer(input)).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.explain(input))
         assertEquals(
@@ -198,8 +201,8 @@ for i in IntLiteral(value=0, range=463..463)..InfixExpression(left=Identifier(va
     }
 
 
-    private fun testParser(input: String, expected: String) {
-        val parser = Parser(Lexer(input)).getOrNull()!!
+    private fun testParser(input: String, expected: String) = runTest {
+        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         assertEquals(expected, prog.getOrNull()!!.literal)

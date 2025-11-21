@@ -5,10 +5,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
-import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.Range
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
+import kotlinx.coroutines.flow.toList
 
 data class DiagnosticResult(
     val diagnostics: List<Diagnostic>,
@@ -18,8 +19,8 @@ data class DiagnosticResult(
 class DiagnosticService {
 
     @Suppress("UNUSED_PARAMETER")
-    fun analyze(uri: String, text: String): DiagnosticResult {
-        val lexer = Lexer(text)
+    suspend fun analyze(uri: String, text: String): DiagnosticResult {
+        val lexer = preProcess(Lexer(text)) { "" }.toList()
         val parser: Parser = when (val parserResult = Parser(lexer)) {
             is Either.Left -> {
                 return DiagnosticResult(

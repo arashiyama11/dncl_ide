@@ -10,7 +10,7 @@ class RenameService(
 ) {
     private val referenceService = ReferenceService(astInfoService)
 
-    fun rename(
+    suspend fun rename(
         uri: String,
         code: String,
         offset: Int,

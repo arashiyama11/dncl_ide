@@ -86,7 +86,10 @@ sealed interface Token {
     data class ShiftLeft(override val range: IntRange, override val literal: kotlin.String = "<<") :
         InfixExpressionToken
 
-    data class ShiftRight(override val range: IntRange, override val literal: kotlin.String = ">>") :
+    data class ShiftRight(
+        override val range: IntRange,
+        override val literal: kotlin.String = ">>"
+    ) :
         InfixExpressionToken
 
     data class Assign(override val range: IntRange, override val literal: kotlin.String = "=") :
@@ -195,6 +198,8 @@ sealed interface Token {
     }
 
     data class Comment(override val literal: kotlin.String, override val range: IntRange) : Token
+
+    data class AtMark(override val literal: kotlin.String, override val range: IntRange) : Token
 
     data class Identifier(override val literal: kotlin.String, override val range: IntRange) : Token
     data class Japanese(override val literal: kotlin.String, override val range: IntRange) : Token

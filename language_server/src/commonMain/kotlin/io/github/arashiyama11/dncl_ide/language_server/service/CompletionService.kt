@@ -7,13 +7,15 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
+import kotlinx.coroutines.flow.toList
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 class CompletionService {
-    fun getCompletionItems(code: String, offset: Int): List<CompletionItem> {
+    suspend fun getCompletionItems(code: String, offset: Int): List<CompletionItem> {
         val suggestionUseCase = SuggestionUseCase()
         val suggestions = suggestionUseCase.suggestWhenFailingParse(code, offset)
         return suggestions.map { def ->
@@ -217,7 +219,7 @@ private val SUGGESTION_KIND_PRIORITY = mapOf(
 )
 
 private class SuggestionUseCase {
-    fun suggestWhenFailingParse(
+    suspend fun suggestWhenFailingParse(
         code: String,
         position: Int
     ): List<Definition> {
@@ -452,8 +454,8 @@ private class SuggestionUseCase {
         return scored.sortedWith(comparator).map { it.definition }
     }
 
-    private fun parseProgramOrNull(lexer: Lexer): AstNode.Program? {
-        return Parser(lexer).fold(
+    private suspend fun parseProgramOrNull(lexer: Lexer): AstNode.Program? {
+        return Parser(preProcess(lexer) { "" }.toList()).fold(
             ifLeft = { null },
             ifRight = { parser ->
                 parser.parseProgram().fold(

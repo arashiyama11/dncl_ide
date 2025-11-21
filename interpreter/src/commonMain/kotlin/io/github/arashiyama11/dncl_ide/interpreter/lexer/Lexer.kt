@@ -222,6 +222,15 @@ class Lexer(private val input: String) : ILexer {
                 }
 
                 END_OF_FILE -> Token.EOF(position..position)
+
+                '@' -> {
+                    val start = position
+                    do {
+                        readChar()
+                    } while (ch != ' ' && ch != '\n' && ch != END_OF_FILE)
+                    Token.AtMark(input.substring(start, position), start until position)
+                }
+
                 else -> when {
                     ch.isDigit() -> readNumber().bind()
                     ch.isLetter() || ch == '_' -> if (ch.isAlphaBet()) readIdentifier().bind() else readJapanese().bind()

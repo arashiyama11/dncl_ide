@@ -7,9 +7,12 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,7 +39,7 @@ class BuiltInFunctionTest {
             inputChannel = inputChannel,
             arrayOrigin = 0
         )
-        
+
         builtInEnv = runBlocking {
             EvaluatorFactory.createBuiltInFunctionEnvironment(
                 stdout = object : Stdout {
@@ -57,15 +60,29 @@ class BuiltInFunctionTest {
                     override suspend fun replace(text: String) {
                     }
                 },
-                onImport = { _ -> DnclObject.Null(io.github.arashiyama11.dncl_ide.interpreter.model.AstNode.Program(emptyList())) }
+                onImport = { _ ->
+                    DnclObject.Null(
+                        io.github.arashiyama11.dncl_ide.interpreter.model.AstNode.Program(
+                            emptyList()
+                        )
+                    )
+                }
             )
         }
     }
 
-    private fun String.toProgram() = Parser(Lexer(this)).getOrNull()!!.parseProgram().getOrNull()!!
+    private fun resolveLib(path: String) = ""
+
+    private suspend fun String.toProgram() =
+        Parser(preProcess(Lexer(this), ::resolveLib).toList().also {
+            println(it)
+        }).getOrNull()!!.parseProgram().also {
+            println(it.leftOrNull())
+        }
+            .getOrNull()!!
 
     private fun testEval(program: String, expected: String) {
-        runBlocking {
+        runTest {
             evaluator.evalProgram(program.toProgram(), builtInEnv).leftOrNull()
                 ?.let { fail(it.toString()) }
         }
@@ -83,7 +100,7 @@ class BuiltInFunctionTest {
     // Tests for original built-in functions
     @Test
     fun testPrint() {
-        testEval("表示する(\"Hello, World!\")", "Hello, World!\n")
+        testEval("表示する(\"Hello, World!\")\n", "Hello, World!\n")
     }
 
     @Test

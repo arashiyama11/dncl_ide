@@ -11,7 +11,7 @@ import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 class SemanticTokensService(
     private val astInfoService: AstInfoService
 ) {
-    fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
+    suspend fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
         val lexer = Lexer(code)
         val tokens = lexer.toList().mapNotNull { it.getOrNull() }
 

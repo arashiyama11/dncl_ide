@@ -12,7 +12,7 @@ import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 class HoverService(
     private val astInfoService: AstInfoService
 ) {
-    fun getHover(code: String, offset: Int, cachedAstInfo: AstInfo? = null): Hover? {
+    suspend fun getHover(code: String, offset: Int, cachedAstInfo: AstInfo? = null): Hover? {
         // First parse and analyze the code
         val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return null
 

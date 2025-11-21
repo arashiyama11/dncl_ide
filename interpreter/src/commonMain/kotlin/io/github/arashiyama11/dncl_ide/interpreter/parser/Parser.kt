@@ -17,8 +17,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Precedence
 import io.github.arashiyama11.dncl_ide.interpreter.model.PrefixExpressionToken
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.tokenToLiteral
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 
-class Parser private constructor(private val lexer: ILexer) : IParser {
+class Parser private constructor(private val lexer: Iterator<Either<LexerError, Token>>) : IParser {
     private val indentStack: MutableList<Int> = mutableListOf(0)
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
@@ -50,7 +53,10 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
         }
         AstNode.Program(statements)
-    }.mapLeft { InternalError(it.message ?: "") }
+    }.mapLeft {
+        it.printStackTrace()
+        InternalError(it.message ?: "")
+    }
 
 
     @EnsuredEndOfLine
@@ -110,12 +116,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun nextToken(): Either<LexerError, Token> = either {
         currentToken = nextToken
         nextToken = aheadToken
-        aheadToken = run {
-            var tok = lexer.nextToken().bind()
-            while (tok is Token.Comment) {
-                tok = lexer.nextToken().bind()
-            }
-            tok
+        if (lexer.hasNext()) {
+            aheadToken = lexer.next().bind()
         }
         return currentToken.right()
     }
@@ -534,20 +536,15 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
     companion object {
-        operator fun invoke(lexer: ILexer): Either<LexerError, Parser> = either {
-            val parser = Parser(lexer)
-            parser.currentToken = skipComment(lexer).bind()
-            parser.nextToken = skipComment(lexer).bind()
-            parser.aheadToken = skipComment(lexer).bind()
+        operator fun invoke(
+            tokens: List<Either<LexerError, Token>>,
+        ): Either<LexerError, Parser> = either {
+            val itr = tokens.iterator()
+            val parser = Parser(itr)
+            parser.currentToken = itr.next().bind()
+            parser.nextToken = itr.next().bind()
+            parser.aheadToken = itr.next().bind()
             return parser.right()
-        }
-
-        private fun skipComment(lexer: ILexer): Either<LexerError, Token> = either {
-            var tok = lexer.nextToken().bind()
-            while (tok is Token.Comment) {
-                tok = lexer.nextToken().bind()
-            }
-            return tok.right()
         }
 
         fun Token.precedence() = when (this) {

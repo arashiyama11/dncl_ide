@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
+import io.arashiyama11.dncl_ide.generated.DnclLibs
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
@@ -33,14 +34,17 @@ import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasVirtualFile
+import io.github.arashiyama11.dncl_ide.domain.model.EntryName
 import io.github.arashiyama11.dncl_ide.interpreter.api.InMemoryVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.VirtualFileSystem
 import io.github.arashiyama11.dncl_ide.interpreter.api.asVirtualFile
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.toList
 
 private enum class DebugStepRunMode {
     STEP, LINE
@@ -92,22 +96,31 @@ class ExecuteUseCase(
         inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int
     ): Flow<DnclOutput> {
-        val parser = Parser(Lexer(program)).getOrElse { err ->
-            return flowOf(
-                DnclOutput.Error(
-                    err.explain(program)
-                )
-            )
-        }
 
-        val ast = parser.parseProgram().getOrElse { err ->
-            return flowOf(
-                DnclOutput.Error(
-                    err.explain(program)
-                )
-            )
-        }
         return channelFlow {
+            val tokens = preProcess(Lexer(program), ::resolveLib).toList()
+            println("====")
+            println(tokens.joinToString(" ") { it.fold(ifLeft = { "" }) { it.literal } })
+            val parser = Parser(tokens).getOrElse { err ->
+                send(
+                    DnclOutput.Error(
+                        err.explain(program)
+                    )
+                )
+                close()
+                return@channelFlow
+            }
+
+            val ast = parser.parseProgram().getOrElse { err ->
+                send(
+                    DnclOutput.Error(
+                        err.explain(program)
+                    )
+                )
+                close()
+                return@channelFlow
+            }
+
             outputChannel = channel
             withContext(Dispatchers.Default) {
                 val delayDuration = settingsRepository.onEvalDelay.value.toLong()
@@ -248,54 +261,67 @@ class ExecuteUseCase(
     }
 
     private suspend fun CallBuiltInFunctionScope.onImport(it: String): DnclObject {
-        val str = it.split("/")
-        val file = withTimeoutOrNull(100) {
-            fileRepository.getEntryByPath(
-                EntryPath(
-                    str.dropLast(1).map { FolderName(it) } + FileName(
-                        str.last()
-                    )
-                )).apply { if (this != null) return@withTimeoutOrNull this }
+        val content = if (DnclLibs.texts.containsKey(it)) {
+            DnclLibs.texts[it]!!
+        } else {
+            val str = it.split("/")
+            val file = withTimeoutOrNull(100) {
+                fileRepository.getEntryByPath(
+                    EntryPath(
+                        str.dropLast(1).map { FolderName(it) } + FileName(
+                            str.last()
+                        )
+                    )).apply { if (this != null) return@withTimeoutOrNull this }
 
-            fileRepository.getEntryByPath(
-                fileRepository.rootPath + EntryPath(
-                    str.dropLast(1).map { FolderName(it) } + FileName(
-                        str.last()
+                fileRepository.getEntryByPath(
+                    fileRepository.rootPath + EntryPath(
+                        str.dropLast(1).map { FolderName(it) } + FileName(
+                            str.last()
+                        )
                     )
                 )
-            )
+            }
+
+            if (file is ProgramFile) {
+                fileRepository.getFileContent(file).value
+            } else {
+                return DnclObject.RuntimeError(
+                    "ファイル:$str が見つかりません",
+                    args[0].astNode
+                )
+            }
         }
 
-        return if (file is ProgramFile) {
-            val content = fileRepository.getFileContent(file).value
-            val parser =
-                Parser(Lexer(content)).getOrElse { err ->
-                    return DnclObject.RuntimeError(
-                        err.explain(content),
-                        args[0].astNode
-                    )
-                }
-
-            val prog = parser.parseProgram().getOrElse { err ->
+        val tokens = preProcess(Lexer(content), ::resolveLib).toList()
+        val parser =
+            Parser(tokens).getOrElse { err ->
                 return DnclObject.RuntimeError(
                     err.explain(content),
                     args[0].astNode
                 )
             }
-            evaluator.evalProgram(prog, env).fold(ifLeft = {
-                DnclObject.RuntimeError(
-                    it.message.orEmpty(),
-                    args[0].astNode
-                )
-            }, ifRight = {
-                DnclObject.Null(args[0].astNode)
-            })
-        } else {
-            DnclObject.RuntimeError(
-                "ファイル:$str が見つかりません",
+
+        val prog = parser.parseProgram().getOrElse { err ->
+            return DnclObject.RuntimeError(
+                err.explain(content),
                 args[0].astNode
             )
         }
+        return evaluator.evalProgram(prog, env).fold(ifLeft = {
+            DnclObject.RuntimeError(
+                it.message.orEmpty(),
+                args[0].astNode
+            )
+        }, ifRight = {
+            DnclObject.Null(args[0].astNode)
+        })
+    }
+
+    private suspend fun resolveLib(path: String): String {
+        val entry = fileRepository.getEntryByPath(fileRepository.rootPath + FileName(path))
+        println("entry: $entry")
+        require(entry is ProgramFile)
+        return fileRepository.getFileContent(entry).value
     }
 
     private fun getEvaluator(

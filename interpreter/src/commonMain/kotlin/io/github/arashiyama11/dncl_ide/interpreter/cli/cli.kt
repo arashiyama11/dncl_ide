@@ -7,10 +7,17 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.toList
 
 suspend fun mainEntry(args: Array<String>) = runCli(args)
+
+
+fun resolveLib(path: String): String {
+    TODO()
+}
 
 suspend fun runCli(args: Array<String>) {
     when (val result = parseCliOptions(args)) {
@@ -69,9 +76,8 @@ private suspend fun runStdinOrRepl() {
 }
 
 suspend fun executeSourceCode(sourceCode: String) = coroutineScope {
-    // ここは元の処理に合わせて調整してください
-    val lexer = Lexer(sourceCode)
-    val parser = Parser(lexer).fold(
+    val tokens = preProcess(Lexer(sourceCode), ::resolveLib).toList()
+    val parser = Parser(tokens).fold(
         { error ->
             stderrPrintln("構文解析エラー: ${error.explain(sourceCode)}")
             exitProcess(1)
@@ -158,8 +164,8 @@ suspend fun runRepl(): Nothing = coroutineScope {
         val isBlankLine = line.trim().isEmpty()
         if (!isBlankLine) currentInput += line + "\n"
 
-        val lexer = Lexer(currentInput)
-        val parserResult = Parser(lexer)
+        val tokens = preProcess(Lexer(currentInput), ::resolveLib).toList()
+        val parserResult = Parser(tokens)
 
         parserResult.fold(
             { error ->

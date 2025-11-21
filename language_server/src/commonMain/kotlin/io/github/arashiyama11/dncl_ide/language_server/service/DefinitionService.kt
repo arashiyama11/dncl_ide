@@ -8,7 +8,7 @@ import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 class DefinitionService(
     private val astInfoService: AstInfoService
 ) {
-    fun getDefinitionLocation(
+    suspend fun getDefinitionLocation(
         uri: String,
         code: String,
         offset: Int,

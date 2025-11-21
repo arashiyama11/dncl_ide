@@ -1,13 +1,16 @@
 package io.github.arashiyama11.dncl_ide.language_server.service
 
 import arrow.core.Either
+import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolTable
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.ast.AstVisitor
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
+import kotlinx.coroutines.flow.toList
 
 data class AstInfo(
     val ast: AstNode.Program,
@@ -15,17 +18,12 @@ data class AstInfo(
 )
 
 class AstInfoService {
-    fun parseAndAnalyze(code: String): AstInfo? {
+    suspend fun parseAndAnalyze(code: String): AstInfo? {
         return try {
-            val lexer = Lexer(code)
-            val parserResult = Parser(lexer)
-            val parser = when (parserResult) {
-                is Either.Left -> return null
-                is Either.Right -> parserResult.value
-            }
+            val lexer = preProcess(Lexer(code)) { "" }.toList()
+            val parser = Parser(lexer).getOrElse { return null }
 
-            val programResult = parser.parseProgram()
-            val program = when (programResult) {
+            val program = when (val programResult = parser.parseProgram()) {
                 is Either.Left -> return null
                 is Either.Right -> programResult.value
             }

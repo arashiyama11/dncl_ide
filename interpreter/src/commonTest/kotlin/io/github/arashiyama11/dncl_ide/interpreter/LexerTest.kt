@@ -86,6 +86,7 @@ kosu ＞12かつkosu＜27でない
                 when (val t = token.getOrNull()!!) {
                     is Token.Int -> ints.add(t.literal)
                     is Token.EOF -> break
+                    else -> continue
                 }
             } else {
                 fail(token.leftOrNull()?.toString())
@@ -106,8 +107,21 @@ kosu ＞12かつkosu＜27でない
         }
         assertEquals(
             listOf(
-                "Identifier", "BitAnd", "Identifier", "BitOr", "Identifier", "BitXor", "Identifier",
-                "ShiftLeft", "Int", "ShiftRight", "Int", "BitNot", "Identifier", "EOF"
+                "Indent",
+                "Identifier",
+                "BitAnd",
+                "Identifier",
+                "BitOr",
+                "Identifier",
+                "BitXor",
+                "Identifier",
+                "ShiftLeft",
+                "Int",
+                "ShiftRight",
+                "Int",
+                "BitNot",
+                "Identifier",
+                "EOF"
             ),
             tokens
         )

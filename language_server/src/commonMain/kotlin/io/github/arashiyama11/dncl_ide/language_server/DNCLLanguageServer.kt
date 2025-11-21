@@ -228,7 +228,7 @@ class DNCLLanguageServer(
     // 共���処理のヘルパ関数を追加
     private suspend inline fun <reified T, R> handleWithDocument(
         request: JsonRpcRequest,
-        crossinline handler: (snapshot: DocumentSnapshot, offset: Int, params: T) -> R?
+        handler: (snapshot: DocumentSnapshot, offset: Int, params: T) -> R?
     ) {
         val params = request.params?.let { json.decodeFromJsonElement<T>(it) }
         params?.let {
