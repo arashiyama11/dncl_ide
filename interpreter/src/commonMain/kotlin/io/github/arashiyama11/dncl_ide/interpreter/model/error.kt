@@ -5,6 +5,7 @@ import kotlin.math.max
 sealed interface DnclError {
     val message: String?
     val errorRange: IntRange?
+    val filePath: String?
     fun explain(program: String): String
 }
 
@@ -16,8 +17,9 @@ private fun isHalfWidth(char: Char): Boolean {
 
 sealed class LexerError(override val message: String, open val index: Int) :
     DnclError {
+    override val filePath: String? = null
     override fun explain(program: String): String {
-        return explainError(program, message, index until index)
+        return explainError(program, message, index until index, filePath)
     }
 
     data class UnExpectedCharacter(
@@ -36,8 +38,9 @@ sealed class ParserError(
     override val message: String, open val failToken: Token,
     override val errorRange: IntRange = failToken.range
 ) : DnclError {
+    override val filePath: String? = failToken.filePath
     override fun explain(program: String): String {
-        return explainError(program, message, errorRange)
+        return explainError(program, message, errorRange, filePath)
     }
 
     data class ParseError(
@@ -81,6 +84,7 @@ sealed class ParserError(
 
 data class InternalError(override val message: String, override val errorRange: IntRange? = null) :
     DnclError {
+    override val filePath: String? = null
     override fun explain(program: String): String {
         return message
     }
@@ -141,7 +145,8 @@ inline fun <reified T : Token> tokenToLiteral(): String? {
 private fun explainError(
     program: String,
     message: String,
-    errorRange: IntRange
+    errorRange: IntRange,
+    filePath: String? = null
 ): String {
     val programLines = program.split("\n")
     val (column, line, spaces) = run {
@@ -162,7 +167,8 @@ private fun explainError(
     val hats = program.safeSubstring(errorRange.first, errorRange.last + 1)
         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
         .let { if (it <= 0) 1 else it }
-    return """${line}行${column}文字目でエラーが発生しました
+    val fileInfo = filePath?.let { "ファイル: $it\n" } ?: ""
+    return """${fileInfo}${line}行${column}文字目でエラーが発生しました
 $message
 ${"=".repeat(15)}
 ${

@@ -7,11 +7,11 @@ import arrow.core.right
 import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 
-class Lexer(private val input: String) : ILexer {
+class Lexer(private val input: String, private val filePath: String? = null) : ILexer {
     private var position: Int = 0
     private var readPosition: Int = 0
     private var ch: Char = END_OF_FILE
-    private var preToken: Token = Token.NewLine(0..0)
+    private var preToken: Token = Token.NewLine(0..0, filePath = filePath)
     private val whiteSpace = setOf(' ', '\t', '\r', '　')
 
     init {
@@ -21,14 +21,19 @@ class Lexer(private val input: String) : ILexer {
     override fun nextToken(): Either<LexerError, Token> {
         return either {
             if (preToken is Token.NewLine && ch !in whiteSpace) {
-                Token.Indent(0, position - 1..<position)
+                Token.Indent(0, position - 1..<position, filePath = filePath)
             } else when (ch) {
                 '\n' -> {
                     do {
                         readChar()
                     } while (ch == '\n')
-                    if (ch == END_OF_FILE) Token.EOF(position - 1..<position) else Token.NewLine(
+                    if (ch == END_OF_FILE) Token.EOF(
+                        position - 1..<position,
+                        filePath = filePath
+                    ) else Token.NewLine(
                         position - 1..<position
+                        ,
+                        filePath = filePath
                     )
                 }
 
@@ -38,7 +43,7 @@ class Lexer(private val input: String) : ILexer {
                         readChar()
                         depth++
                     } while (ch in whiteSpace)
-                    Token.Indent(depth, position - depth..<position)
+                    Token.Indent(depth, position - depth..<position, filePath = filePath)
                 } else {
                     do {
                         readChar()
@@ -50,167 +55,167 @@ class Lexer(private val input: String) : ILexer {
                 '"' -> readString('"').bind()
                 '(' -> {
                     readChar()
-                    Token.ParenOpen(position - 1..<position)
+                    Token.ParenOpen(position - 1..<position, filePath = filePath)
                 }
 
                 ')' -> {
                     readChar()
-                    Token.ParenClose(position - 1..<position)
+                    Token.ParenClose(position - 1..<position, filePath = filePath)
                 }
 
                 '←' -> {
                     readChar()
-                    Token.Assign(position - 1..<position)
+                    Token.Assign(position - 1..<position, filePath = filePath)
                 }
 
                 '=' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.Equal(position - 2..<position)
+                    Token.Equal(position - 2..<position, filePath = filePath)
                 } else {
                     readChar()
-                    Token.Assign(position - 1..<position)
+                    Token.Assign(position - 1..<position, filePath = filePath)
                 }
 
                 '≠' -> {
                     readChar()
-                    Token.NotEqual(position - 1..<position)
+                    Token.NotEqual(position - 1..<position, filePath = filePath)
                 }
 
                 '＞', '>' -> {
                     readChar()
                     if (ch == '>') {
                         readChar()
-                        Token.ShiftRight(position - 2..<position)
+                        Token.ShiftRight(position - 2..<position, filePath = filePath)
                     } else if (ch == '=') {
                         readChar()
-                        Token.GreaterThanOrEqual(position - 2..<position)
-                    } else Token.GreaterThan(position - 1..<position)
+                        Token.GreaterThanOrEqual(position - 2..<position, filePath = filePath)
+                    } else Token.GreaterThan(position - 1..<position, filePath = filePath)
                 }
 
                 '≧' -> {
                     readChar()
-                    Token.GreaterThanOrEqual(position - 1..<position)
+                    Token.GreaterThanOrEqual(position - 1..<position, filePath = filePath)
                 }
 
                 '＜', '<' -> {
                     readChar()
                     if (ch == '<') {
                         readChar()
-                        Token.ShiftLeft(position - 2..<position)
+                        Token.ShiftLeft(position - 2..<position, filePath = filePath)
                     } else if (ch == '=') {
                         readChar()
-                        Token.LessThanOrEqual(position - 2..<position)
+                        Token.LessThanOrEqual(position - 2..<position, filePath = filePath)
                     } else
-                        Token.LessThan(position - 1..<position)
+                        Token.LessThan(position - 1..<position, filePath = filePath)
                 }
 
                 '≦' -> {
                     readChar()
-                    Token.LessThanOrEqual(position - 1..<position)
+                    Token.LessThanOrEqual(position - 1..<position, filePath = filePath)
                 }
 
                 '[' -> {
                     readChar()
-                    Token.BracketOpen(position - 1..<position)
+                    Token.BracketOpen(position - 1..<position, filePath = filePath)
                 }
 
                 ']' -> {
                     readChar()
-                    Token.BracketClose(position - 1..<position)
+                    Token.BracketClose(position - 1..<position, filePath = filePath)
                 }
 
                 '{' -> {
                     readChar()
-                    Token.BraceOpen(position - 1..<position)
+                    Token.BraceOpen(position - 1..<position, filePath = filePath)
                 }
 
                 '}' -> {
                     readChar()
-                    Token.BraceClose(position - 1..<position)
+                    Token.BraceClose(position - 1..<position, filePath = filePath)
                 }
 
                 '【' -> {
                     readChar()
-                    Token.LenticularOpen(position - 1..<position)
+                    Token.LenticularOpen(position - 1..<position, filePath = filePath)
                 }
 
                 '】' -> {
                     readChar()
-                    Token.LenticularClose(position - 1..<position)
+                    Token.LenticularClose(position - 1..<position, filePath = filePath)
                 }
 
                 ',' -> {
                     readChar()
-                    Token.Comma(position - 1..<position)
+                    Token.Comma(position - 1..<position, filePath = filePath)
                 }
 
                 '+', '＋' -> {
                     readChar()
-                    Token.Plus(position - 1..<position)
+                    Token.Plus(position - 1..<position, filePath = filePath)
                 }
 
                 '-' -> {
                     readChar()
-                    Token.Minus(position - 1..<position)
+                    Token.Minus(position - 1..<position, filePath = filePath)
                 }
 
                 '*', '×' -> {
                     readChar()
-                    Token.Times(position - 1..<position)
+                    Token.Times(position - 1..<position, filePath = filePath)
                 }
 
                 '/' -> if (peekChar() == '/') {
                     readChar()
                     readChar()
-                    Token.DivideInt(position - 2..<position)
+                    Token.DivideInt(position - 2..<position, filePath = filePath)
                 } else {
                     readChar()
-                    Token.Divide(position - 1..<position)
+                    Token.Divide(position - 1..<position, filePath = filePath)
                 }
 
                 '÷' -> {
                     readChar()
-                    Token.DivideInt(position - 1..<position)
+                    Token.DivideInt(position - 1..<position, filePath = filePath)
                 }
 
                 '%' -> {
                     readChar()
-                    Token.Modulo(position - 1..<position)
+                    Token.Modulo(position - 1..<position, filePath = filePath)
                 }
 
                 '&' -> {
                     readChar()
-                    Token.BitAnd(position - 1..<position)
+                    Token.BitAnd(position - 1..<position, filePath = filePath)
                 }
 
                 '|' -> {
                     readChar()
-                    Token.BitOr(position - 1..<position)
+                    Token.BitOr(position - 1..<position, filePath = filePath)
                 }
 
                 '^' -> {
                     readChar()
-                    Token.BitXor(position - 1..<position)
+                    Token.BitXor(position - 1..<position, filePath = filePath)
                 }
 
                 '~' -> {
                     readChar()
-                    Token.BitNot(position - 1..<position)
+                    Token.BitNot(position - 1..<position, filePath = filePath)
                 }
 
                 '!' -> if (peekChar() == '=') {
                     readChar()
                     readChar()
-                    Token.NotEqual(position - 2..<position)
+                    Token.NotEqual(position - 2..<position, filePath = filePath)
                 } else {
                     readChar()
-                    Token.Bang(position - 1..<position)
+                    Token.Bang(position - 1..<position, filePath = filePath)
                 }
 
                 ':', '：' -> {
                     readChar()
-                    Token.Colon(position - 1..<position)
+                    Token.Colon(position - 1..<position, filePath = filePath)
                 }
 
                 '#' -> {
@@ -218,17 +223,17 @@ class Lexer(private val input: String) : ILexer {
                     do {
                         readChar()
                     } while (ch != '\n' && ch != END_OF_FILE)
-                    Token.Comment(input.substring(start, position), start until position)
+                    Token.Comment(input.substring(start, position), start until position, filePath = filePath)
                 }
 
-                END_OF_FILE -> Token.EOF(position..position)
+                END_OF_FILE -> Token.EOF(position..position, filePath = filePath)
 
                 '@' -> {
                     val start = position
                     do {
                         readChar()
                     } while (ch != ' ' && ch != '\n' && ch != END_OF_FILE)
-                    Token.AtMark(input.substring(start, position), start until position)
+                    Token.AtMark(input.substring(start, position), start until position, filePath = filePath)
                 }
 
                 else -> when {
@@ -238,7 +243,7 @@ class Lexer(private val input: String) : ILexer {
                 }
             }
         }
-            .onLeft { preToken = Token.EOF(it.index..it.index) }
+            .onLeft { preToken = Token.EOF(it.index..it.index, filePath = filePath) }
             .onRight { preToken = it }
     }
 
@@ -267,11 +272,11 @@ class Lexer(private val input: String) : ILexer {
             if (ch == END_OF_FILE) break
         } while (ch.isLetterOrDigit() || ch == '_')
         return when (val literal = input.substring(pos, position)) {
-            "and" -> Token.And(pos until position).right()
-            "or" -> Token.Or(pos until position).right()
-            "true" -> Token.Boolean(true, pos until position).right()
-            "false" -> Token.Boolean(false, pos until position).right()
-            else -> Token.Identifier(literal, pos until position).right()
+            "and" -> Token.And(pos until position, filePath = filePath).right()
+            "or" -> Token.Or(pos until position, filePath = filePath).right()
+            "true" -> Token.Boolean(true, pos until position, filePath = filePath).right()
+            "false" -> Token.Boolean(false, pos until position, filePath = filePath).right()
+            else -> Token.Identifier(literal, pos until position, filePath = filePath).right()
         }
     }
 
@@ -282,25 +287,25 @@ class Lexer(private val input: String) : ILexer {
             if (ch == END_OF_FILE) return break
         } while (ch.isLetterOrDigit() || ch == '_')
         return when (val literal = input.substring(pos, position)) {
-            "もし" -> Token.If(pos until position).right()
-            "ならば" -> Token.Then(pos until position).right()
-            "そうでなくもし" -> Token.Elif(pos until position).right()
-            "そうでなければ" -> Token.Else(pos until position).right()
-            "を" -> Token.Wo(pos until position).right()
-            "から" -> Token.Kara(pos until position).right()
-            "まで" -> Token.Made(pos until position).right()
-            "の間繰り返す" -> Token.While(pos until position).right()
-            "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo(pos until position).right()
-            "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo(pos until position)
+            "もし" -> Token.If(pos until position, filePath = filePath).right()
+            "ならば" -> Token.Then(pos until position, filePath = filePath).right()
+            "そうでなくもし" -> Token.Elif(pos until position, filePath = filePath).right()
+            "そうでなければ" -> Token.Else(pos until position, filePath = filePath).right()
+            "を" -> Token.Wo(pos until position, filePath = filePath).right()
+            "から" -> Token.Kara(pos until position, filePath = filePath).right()
+            "まで" -> Token.Made(pos until position, filePath = filePath).right()
+            "の間繰り返す" -> Token.While(pos until position, filePath = filePath).right()
+            "ずつ増やしながら繰り返す", "ずつ増やしながら" -> Token.UpTo(pos until position, filePath = filePath).right()
+            "ずつ減らしながら繰り返す", "ずつ減らしながら" -> Token.DownTo(pos until position, filePath = filePath)
                 .right()
 
-            "かつ" -> Token.And(pos until position).right()
-            "または" -> Token.Or(pos until position).right()
-            "関数" -> Token.Function(pos until position).right()
-            "と定義する" -> Token.Define(pos until position).right()
-            "真" -> Token.Boolean(true, pos until position).right()
-            "偽" -> Token.Boolean(false, pos until position).right()
-            else -> Token.Japanese(literal, pos until position).right()
+            "かつ" -> Token.And(pos until position, filePath = filePath).right()
+            "または" -> Token.Or(pos until position, filePath = filePath).right()
+            "関数" -> Token.Function(pos until position, filePath = filePath).right()
+            "と定義する" -> Token.Define(pos until position, filePath = filePath).right()
+            "真" -> Token.Boolean(true, pos until position, filePath = filePath).right()
+            "偽" -> Token.Boolean(false, pos until position, filePath = filePath).right()
+            else -> Token.Japanese(literal, pos until position, filePath = filePath).right()
         }
     }
 
@@ -320,7 +325,11 @@ class Lexer(private val input: String) : ILexer {
             while (ch.isValidDigit(radix) && ch != END_OF_FILE) {
                 readChar()
             }
-            return Token.Int(input.substring(pos, position), pos until position).right()
+            return Token.Int(
+                input.substring(pos, position),
+                pos until position,
+                filePath = filePath
+            ).right()
         }
 
         // 10進整数/浮動小数
@@ -332,8 +341,16 @@ class Lexer(private val input: String) : ILexer {
             while (ch.isDigit() && ch != END_OF_FILE) {
                 readChar()
             }
-            Token.Float(input.substring(pos, position), pos until position).right()
-        } else Token.Int(input.substring(pos, position), pos until position).right()
+            Token.Float(
+                input.substring(pos, position),
+                pos until position,
+                filePath = filePath
+            ).right()
+        } else Token.Int(
+            input.substring(pos, position),
+            pos until position,
+            filePath = filePath
+        ).right()
     }
 
     private fun readString(end: Char): Either<LexerError, Token> {
@@ -367,7 +384,11 @@ class Lexer(private val input: String) : ILexer {
             }
         } while (ch != end || inEscape) // エスケープシーケンスの途中で終わらないように修正
         readChar()
-        return Token.String(stringBuilder.toString(), pos - 1 until position).right()
+        return Token.String(
+            stringBuilder.toString(),
+            pos - 1 until position,
+            filePath = filePath
+        ).right()
     }
 
     override fun iterator(): Iterator<Either<LexerError, Token>> =

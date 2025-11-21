@@ -487,11 +487,12 @@ class IdeViewModel(
                         appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
                     }
 
-                    is DnclOutput.Error -> {
+                    is DnclOutput.SyntaxError -> {
                         viewModelScope.launch(Dispatchers.Main) {
                             _localState.update {
                                 it.copy(
-                                    output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
+                                    // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
+                                    dnclError = output.value,
                                     isError = true
                                 )
                             }

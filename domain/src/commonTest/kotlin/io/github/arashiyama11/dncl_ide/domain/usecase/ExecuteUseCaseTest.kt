@@ -68,9 +68,9 @@ class ExecuteUseCaseTest {
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // エラー出力の検証
-        val errorOutput = outputs.filterIsInstance<DnclOutput.Error>().first()
+        val syntaxErrorOutput = outputs.filterIsInstance<DnclOutput.SyntaxError>().first()
         // エラーメッセージには "@" が含まれているはず
-        assertTrue(errorOutput.value.contains("@"))
+        assertTrue(syntaxErrorOutput.value.contains("@"))
     }
 
     @Test
@@ -86,8 +86,8 @@ class ExecuteUseCaseTest {
         val outputs = executeUseCase(program, inputChannel, 0).toList()
 
         // エラー出力の検証
-        val errorOutput = outputs.filterIsInstance<DnclOutput.Error>().first()
-        assertTrue(errorOutput.value.contains("予期しないトークン"))
+        val syntaxErrorOutput = outputs.filterIsInstance<DnclOutput.SyntaxError>().first()
+        assertTrue(syntaxErrorOutput.value.contains("予期しないトークン"))
     }
 
     @Test

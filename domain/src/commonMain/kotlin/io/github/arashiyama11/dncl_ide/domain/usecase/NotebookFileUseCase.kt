@@ -68,9 +68,9 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
                 val tokens = preProcess(Lexer(code), ::resolveLib).toList()
                 val program =
-                    Parser(tokens).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                    Parser(tokens).getOrElse { return@run DnclOutput.SyntaxError(it) }
                         .parseProgram()
-                        .getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                        .getOrElse { return@run DnclOutput.SyntaxError(it) }
                 var i = 0
                 val evaluator = EvaluatorFactory.create(
                     Channel(), 0, null, { _, _ ->
@@ -82,7 +82,7 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 )
                 evaluator.evalProgram(program, env).fold(
                     ifLeft = {
-                        DnclOutput.Error(it.explain(code))
+                        DnclOutput.SyntaxError(it)
                     }
                 ) {
                     when (it) {
@@ -110,11 +110,12 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
                     )
                 }
 
-                is DnclOutput.Error -> {
+                is DnclOutput.SyntaxError -> {
+                    val e = output.value.explain(code)
                     Output(
                         outputType = "error",
-                        text = persistentListOf(output.value),
-                        evalue = output.value,
+                        text = persistentListOf(e),
+                        evalue = e,
                         ename = output::class.simpleName,
                     )
                 }

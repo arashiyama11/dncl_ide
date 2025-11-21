@@ -23,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
@@ -34,7 +33,6 @@ import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasVirtualFile
-import io.github.arashiyama11.dncl_ide.domain.model.EntryName
 import io.github.arashiyama11.dncl_ide.interpreter.api.InMemoryVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
@@ -99,24 +97,14 @@ class ExecuteUseCase(
 
         return channelFlow {
             val tokens = preProcess(Lexer(program), ::resolveLib).toList()
-            println("====")
-            println(tokens.joinToString(" ") { it.fold(ifLeft = { "" }) { it.literal } })
             val parser = Parser(tokens).getOrElse { err ->
-                send(
-                    DnclOutput.Error(
-                        err.explain(program)
-                    )
-                )
+                send(DnclOutput.SyntaxError(err))
                 close()
                 return@channelFlow
             }
 
             val ast = parser.parseProgram().getOrElse { err ->
-                send(
-                    DnclOutput.Error(
-                        err.explain(program)
-                    )
-                )
+                send(DnclOutput.SyntaxError(err))
                 close()
                 return@channelFlow
             }
@@ -234,7 +222,7 @@ class ExecuteUseCase(
 
                 evaluator.evalProgram(ast, globalEnv).let { err ->
                     if (err.isLeft()) {
-                        send(DnclOutput.Error(err.leftOrNull()!!.explain(program)))
+                        send(DnclOutput.SyntaxError(err.leftOrNull()!!))
                     } else if (err.getOrNull() is DnclObject.Error) {
                         val e = err.getOrNull()!! as DnclObject.Error
                         send(DnclOutput.RuntimeError(e))
