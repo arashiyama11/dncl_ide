@@ -298,7 +298,8 @@ fun Editor(
             fontSize = uiState.fontSize,
             textStyle = LocalCodeTypography.current.bodyMedium,
             verticalScrollEnabled = true,
-            keyboardOptions = codeEditorKeyboardOptions
+            keyboardOptions = codeEditorKeyboardOptions,
+            readOnly = (isMobilePlatform && isCustomMode) || uiState.isReadOnly
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle

@@ -220,7 +220,7 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
             textStyle = LocalCodeTypography.current.bodyMedium,
             verticalScrollEnabled = true,
             keyboardOptions = codeEditorKeyboardOptions,
-            readOnly = shouldDisableSystemKeyboard
+            readOnly = shouldDisableSystemKeyboard || uiState.isReadOnly
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle

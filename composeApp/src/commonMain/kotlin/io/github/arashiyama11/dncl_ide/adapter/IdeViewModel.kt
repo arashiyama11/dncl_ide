@@ -21,6 +21,7 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
+import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
@@ -81,6 +82,7 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
+    val isReadOnly: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
     val isFocused: Boolean = false,
     val showInlineSuggestions: Boolean = false,
@@ -239,6 +241,7 @@ class IdeViewModel(
             debugMode = appState.dnclConfig.debugModeEnabled,
             debugRunningMode = appState.dnclConfig.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
+            isReadOnly = isStdlibPath(appState.selectedEntryPath, appState.rootFolder?.path),
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
             showInlineSuggestions = localState.showInlineSuggestions,
@@ -956,4 +959,11 @@ class IdeViewModel(
         val selectedCanvasPath: String?,
         val outputPane: OutputPane
     )
+
+    private fun isStdlibPath(path: EntryPath?, rootPath: EntryPath?): Boolean {
+        if (path == null || rootPath == null) return false
+        val stdlibPrefix = rootPath.value + FolderName("stdlib")
+        if (path.value.size < stdlibPrefix.size) return false
+        return path.value.take(stdlibPrefix.size) == stdlibPrefix
+    }
 }
