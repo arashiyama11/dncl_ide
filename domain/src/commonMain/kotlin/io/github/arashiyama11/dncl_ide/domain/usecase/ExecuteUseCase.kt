@@ -307,9 +307,20 @@ class ExecuteUseCase(
     }
 
     private suspend fun resolveLib(path: String): String {
-        val entry = fileRepository.getEntryByPath(fileRepository.rootPath + FileName(path))
-        println("entry: $entry")
-        require(entry is ProgramFile)
+        val normalized = path.removePrefix("./")
+        val entryPath = if (normalized.startsWith("/")) {
+            EntryPath.fromString(normalized)
+        } else {
+            val parts = normalized.split('/')
+            val folderParts = parts.dropLast(1).filter { it.isNotBlank() }.map { FolderName(it) }
+            val fileName = FileName(parts.last())
+            fileRepository.rootPath + EntryPath(folderParts + fileName)
+        }
+
+        val entry = fileRepository.getEntryByPath(entryPath)
+            ?: error("ファイル:$path が見つかりません")
+
+        require(entry is ProgramFile) { "ファイル:$path はプログラムファイルではありません" }
         return fileRepository.getFileContent(entry).value
     }
 

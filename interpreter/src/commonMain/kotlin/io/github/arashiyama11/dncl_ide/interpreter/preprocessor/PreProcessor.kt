@@ -30,11 +30,7 @@ fun preProcess(
                 is Token.AtMark -> {
                     val at = t as Token.AtMark
                     val target = at.literal.substring(8, at.literal.length - 2)
-                    val targetText = if (DnclLibs.texts.containsKey(target)) {
-                        DnclLibs.texts[target]!!
-                    } else {
-                        resolveLib(target)
-                    }
+                    val targetText = resolveLib(target)
 
                     emitAll(
                         preProcess(

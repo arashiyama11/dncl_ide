@@ -16,6 +16,8 @@ import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import io.github.arashiyama11.dncl_ide.language_server.FileResolverImpl
 import io.github.arashiyama11.dncl_ide.repository.FileRepositoryImpl
 import io.github.arashiyama11.dncl_ide.repository.SettingsRepositoryImpl
 import io.github.arashiyama11.dncl_ide.util.Platform
@@ -51,6 +53,7 @@ val commonMainModule = module {
     singleOf(::DefaultLanguageFeatureProvider) { binds(listOf(LanguageFeatureProvider::class)) }
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }
+    singleOf(::FileResolverImpl) { binds(listOf(FileResolver::class)) }
 
     if (currentPlatform != Platform.Web) {
         single<FileSystem> { SystemFileSystem }
