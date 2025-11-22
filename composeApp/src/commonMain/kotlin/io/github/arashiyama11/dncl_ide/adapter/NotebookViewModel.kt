@@ -349,7 +349,7 @@ class NotebookViewModel(
                             errorChannel.send("ノートブックファイルが読み込まれていません。インポートできません。")
                             DnclObject.RuntimeError(
                                 "ノートブックファイルが読み込まれていません。インポートできません。",
-                                AstNode.Identifier("", 0..0)
+                                AstNode.Identifier("", 0..0, "error")
                             )
                         }
                     }
@@ -578,7 +578,8 @@ class NotebookViewModel(
                             oldCell.copy(source = newText.split('\n').toImmutableList())
                         }
 
-                        val previousRevision = currentState.codeCellStateMap[action.cellId]?.highlightRevision ?: 0L
+                        val previousRevision =
+                            currentState.codeCellStateMap[action.cellId]?.highlightRevision ?: 0L
                         val newCodeMap = currentState.codeCellStateMap.toMutableMap().apply {
                             this[action.cellId] = CodeCellState(
                                 textFieldValue = newTextFieldValue,
@@ -610,9 +611,10 @@ class NotebookViewModel(
                                 if (!currentState.codeCellStateMap.containsKey(action.cellId)) {
                                     return@update currentState
                                 }
-                                val newSugMap = currentState.cellSuggestionsMap.toMutableMap().apply {
-                                    this[action.cellId] = suggestions.toImmutableList()
-                                }.toImmutableMap()
+                                val newSugMap =
+                                    currentState.cellSuggestionsMap.toMutableMap().apply {
+                                        this[action.cellId] = suggestions.toImmutableList()
+                                    }.toImmutableMap()
                                 currentState.copy(cellSuggestionsMap = newSugMap)
                             }
                         }

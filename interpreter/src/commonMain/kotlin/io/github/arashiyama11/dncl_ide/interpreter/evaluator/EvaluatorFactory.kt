@@ -1165,7 +1165,8 @@ object EvaluatorFactory {
                 }
 
                 val builtInFunction = DnclObject.BuiltInFunction(
-                    it, astNode = AstNode.Identifier(it.identifier, 0..0)
+                    it, astNode = AstNode.Identifier(it.identifier, 0..0, "builtin")
+                    // TODO
                 ) {
                     func() ?: DnclObject.Null(astNode)
                 }

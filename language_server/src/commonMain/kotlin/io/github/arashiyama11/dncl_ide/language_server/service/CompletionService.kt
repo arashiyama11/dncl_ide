@@ -224,7 +224,7 @@ private class SuggestionUseCase {
         position: Int
     ): List<Definition> {
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
-        val lexer = Lexer(fixedCode)
+        val lexer = Lexer(fixedCode, "todo")
         val program = parseProgramOrNull(lexer)
             ?: run {
                 val fallback = BASE_SUGGESTIONS + BUILTIN_FUNCTION_SUGGESTIONS

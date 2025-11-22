@@ -91,12 +91,13 @@ class ExecuteUseCase(
 
     operator fun invoke(
         program: String,
+        filePath: String?,
         inputChannel: ReceiveChannel<String>,
         arrayOrigin: Int
     ): Flow<DnclOutput> {
 
         return channelFlow {
-            val tokens = preProcess(Lexer(program), ::resolveLib).toList()
+            val tokens = preProcess(Lexer(program, filePath), ::resolveLib).toList()
             val parser = Parser(tokens).getOrElse { err ->
                 send(DnclOutput.SyntaxError(err))
                 close()

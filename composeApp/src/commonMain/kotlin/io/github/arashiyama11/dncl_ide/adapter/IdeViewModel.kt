@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
 import dncl_ide.composeapp.generated.resources.Res
+import io.arashiyama11.dncl_ide.generated.DnclLibs
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -37,7 +38,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
-import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.util.OutputHandler
@@ -64,6 +64,7 @@ import kotlin.math.min
 data class IdeUiState(
     val codeTextFieldValue: TextFieldValue = TextFieldValue(""),
     val dnclError: DnclError? = null,
+    val errorOutput: String = "",
     val annotatedString: AnnotatedString? = null,
     val highlightRevision: Long = 0L,
     val output: String = "",
@@ -102,7 +103,9 @@ enum class TextFieldType {
 }
 
 enum class OutputPane {
-    STDOUT, CANVAS
+    STDOUT,
+    CANVAS,
+    ERROR
 }
 
 class IdeViewModel(
@@ -122,6 +125,7 @@ class IdeViewModel(
         LocalIdeState(
             codeTextFieldValue = TextFieldValue(""),
             dnclError = null,
+            errorOutput = "",
             annotatedString = null,
             highlightRevision = 0L,
             output = "",
@@ -218,6 +222,7 @@ class IdeViewModel(
         IdeUiState(
             codeTextFieldValue = localState.codeTextFieldValue,
             dnclError = localState.dnclError,
+            errorOutput = localState.errorOutput,
             annotatedString = localState.annotatedString,
             highlightRevision = localState.highlightRevision,
             output = localState.output,
@@ -395,12 +400,18 @@ class IdeViewModel(
             val finalError = error ?: highlightError
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
+                    val nextPane = when {
+                        finalError != null -> OutputPane.ERROR
+                        it.outputPane == OutputPane.ERROR -> OutputPane.STDOUT
+                        else -> it.outputPane
+                    }
+                    val nextErrorOutput = finalError?.explain(uiState.value.codeTextFieldValue.text)
                     it.copy(
-                        dnclError = finalError,
-                        output = finalError?.explain(uiState.value.codeTextFieldValue.text)
-                            ?: if (it.dnclError == null) it.output else "",
-                        errorRange = finalError?.errorRange
-                            ?: if (it.dnclError == null) it.errorRange else null,
+                        //dnclError = finalError,
+                        //errorOutput = nextErrorOutput ?: "",
+                        //errorRange = finalError?.errorRange
+                        //   ?: if (it.dnclError == null) it.errorRange else null,
+                        outputPane = nextPane
                     )
                 }
             }
@@ -463,37 +474,89 @@ class IdeViewModel(
                     errorRange = null,
                     currentEvaluatingLine = null,
                     dnclError = null,
-                    isWaitingForInput = false
+                    errorOutput = "",
+                    isWaitingForInput = false,
                 )
             }
             onTextChanged(uiState.value.codeTextFieldValue, userTriggeredTyping = false)
 
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
+                appState.selectedEntryPath?.toString(),
                 inputChannel!!,
                 appState.dnclConfig.arrayOriginIndex,
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
                         viewModelScope.launch(Dispatchers.Main) {
+
+
+                            val isSameFile: Boolean
+
+                            val content =
+                                if (DnclLibs.texts.containsKey(output.value.filePath)) {
+                                    isSameFile = false
+                                    DnclLibs.texts[output.value.filePath]!!
+                                } else {
+                                    val p =
+                                        EntryPath.fromString(
+                                            output.value.filePath!!
+                                        ).let {
+                                            if (it.isAbsolute) it else appState.rootFolder!!.path + it
+                                        }
+                                    val entry = fileUseCase.getEntryByPath(p)!! as ProgramFile
+                                    isSameFile = appState.selectedEntryPath == p
+                                    fileUseCase.getFileContent(
+                                        entry
+                                    ).value
+                                }
+
+
                             _localState.update {
+                                val runtimeErrorText =
+                                    output.value.explain(content)
                                 it.copy(
-                                    output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
+                                    errorOutput = runtimeErrorText,
                                     isError = true,
-                                    errorRange = output.value.astNode.range
+                                    errorRange = if (isSameFile) output.value.astNode.range else it.errorRange,
+                                    dnclError = output.value,
+                                    outputPane = OutputPane.ERROR
                                 )
                             }
                         }
-                        appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
+                        appStateStore.dispatch(Action.SetRunning(false))
                     }
 
                     is DnclOutput.SyntaxError -> {
                         viewModelScope.launch(Dispatchers.Main) {
+                            val isSameFile: Boolean
+
+                            val content =
+                                if (DnclLibs.texts.containsKey(output.value.filePath)) {
+                                    isSameFile = false
+                                    DnclLibs.texts[output.value.filePath]!!
+                                } else {
+                                    val p =
+                                        EntryPath.fromString(
+                                            output.value.filePath!!
+                                        ).let {
+                                            if (it.isAbsolute) it else appState.rootFolder!!.path + it
+                                        }
+                                    val entry = fileUseCase.getEntryByPath(p)!! as ProgramFile
+                                    isSameFile = appState.selectedEntryPath == p
+                                    fileUseCase.getFileContent(
+                                        entry
+                                    ).value
+                                }
+
                             _localState.update {
                                 it.copy(
                                     // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
                                     dnclError = output.value,
-                                    isError = true
+                                    errorOutput = output.value.explain(content),
+                                    isError = true,
+                                    outputPane = OutputPane.ERROR,
+                                    errorRange = if (isSameFile) output.value.errorRange else it.errorRange,
                                 )
                             }
                         }
@@ -549,8 +612,6 @@ class IdeViewModel(
                     }
 
                     is DnclOutput.CanvasFrameOutput -> {
-
-                        println("canvas output: $output")
                         val surfaceState = output.frame.toSurfaceState()
                         viewModelScope.launch(Dispatchers.Main) {
                             _localState.update { state ->
@@ -608,7 +669,11 @@ class IdeViewModel(
                 it.copy(
                     canvasSurfaces = emptyList(),
                     selectedCanvasPath = null,
-                    //outputPane = OutputPane.STDOUT
+                    outputPane = if (it.outputPane == OutputPane.CANVAS) {
+                        OutputPane.STDOUT
+                    } else {
+                        it.outputPane
+                    }
                 )
             }
         }
@@ -864,6 +929,7 @@ class IdeViewModel(
     private data class LocalIdeState(
         val codeTextFieldValue: TextFieldValue,
         val dnclError: DnclError?,
+        val errorOutput: String,
         val annotatedString: AnnotatedString?,
         val highlightRevision: Long,
         val output: String,

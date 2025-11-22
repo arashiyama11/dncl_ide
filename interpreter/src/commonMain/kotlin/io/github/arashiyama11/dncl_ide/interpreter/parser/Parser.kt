@@ -103,9 +103,10 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         either {
             val expression = parseExpression(Precedence.LOWEST).bind()
             requireEndOfLine {
+                println("currentToken: $currentToken")
                 ParserError.ParseError(
-                    "一行に複数の式を書けません",
                     currentToken,
+                    "一行に複数の式を書けません",
                 )
             }.bind()
             if (expression is AstNode.WhileExpression) {
@@ -126,7 +127,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         if (currentToken is Token.EOF) return@either
         if (currentToken is Token.NewLine && nextToken is Token.Indent) return@either
         raise(
-            ParserError.UnExpectedToken(
+            ParserError.UnexpectedToken(
                 currentToken,
                 "改行とインデントが必要です"
             )
@@ -145,7 +146,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         nextToken()
         if (currentToken !is T) {
             raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken,
                     expectedToken = tokenToLiteral<T>()
                 )
@@ -177,7 +178,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         expectNextToken<Token.NewLine>().bind()
         val startDepth = if (nextToken is Token.Indent) {
             (nextToken as Token.Indent).depth
-        } else raise(ParserError.UnExpectedToken(nextToken))
+        } else raise(ParserError.UnexpectedToken(nextToken))
         if ((indentStack.lastOrNull() ?: raise(
                 ParserError.IndentError(
                     nextToken,
@@ -193,7 +194,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         indentStack.add(startDepth)
         while (currentToken !is Token.EOF) {
             if (currentToken !is Token.NewLine) raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken
                 )
             )
@@ -204,7 +205,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
             }
 
             val depth = (nextToken as? Token.Indent)?.depth ?: raise(
-                ParserError.UnExpectedToken(currentToken)
+                ParserError.UnexpectedToken(currentToken)
             )
 
 
@@ -264,9 +265,9 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
     @EnsuredEndOfLine
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
         val counter = when (val token = currentToken) {
-            is Token.Identifier -> AstNode.Identifier(token.literal, token.range)
-            is Token.Japanese -> AstNode.Identifier(token.literal, token.range)
-            else -> return ParserError.UnExpectedToken(currentToken).left()
+            is Token.Identifier -> AstNode.Identifier(token.literal, token.range, token.filePath)
+            is Token.Japanese -> AstNode.Identifier(token.literal, token.range, token.filePath)
+            else -> return ParserError.UnexpectedToken(currentToken).left()
         }
         expectNextToken<Token.Wo>().bind()
         nextToken().bind()
@@ -281,7 +282,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         val type = when (currentToken) {
             is Token.UpTo -> AstNode.ForStatement.Companion.StepType.INCREMENT
             is Token.DownTo -> AstNode.ForStatement.Companion.StepType.DECREMENT
-            else -> raise(ParserError.UnExpectedToken(currentToken))
+            else -> raise(ParserError.UnexpectedToken(currentToken))
         }
         expectNextToken<Token.Colon>().bind()
         val block = parseBlockStatement().bind()
@@ -293,13 +294,13 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         val start = currentToken
         nextToken().bind()
         val nameToken = (currentToken as? Token.Identifier)
-            ?: currentToken as? Token.Japanese ?: raise(ParserError.UnExpectedToken(currentToken))
+            ?: currentToken as? Token.Japanese ?: raise(ParserError.UnexpectedToken(currentToken))
         expectNextToken<Token.ParenOpen>().bind()
         nextToken().bind()
         val paramsTokens = mutableListOf<Token>()
         val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
         params.any { it !is AstNode.Identifier }.let {
-            if (it) raise(ParserError.UnExpectedToken(currentToken))
+            if (it) raise(ParserError.UnexpectedToken(currentToken))
         }
         expectNextToken<Token.Wo>().bind()
         expectNextToken<Token.Colon>().bind()
@@ -329,7 +330,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         while (currentToken !is Token.NewLine && currentToken !is Token.EOF) {
             val identifierToken = currentToken
             if (identifierToken !is Token.Identifier && identifierToken !is Token.Japanese) raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken,
                     expectedToken = "識別子"
                 )
@@ -338,12 +339,20 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
-                    AstNode.Identifier(identifierToken.literal, identifierToken.range),
+                    AstNode.Identifier(
+                        identifierToken.literal,
+                        identifierToken.range,
+                        identifierToken.filePath
+                    ),
                     parseExpressionList<Token.BracketClose>().bind()
-                        .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
+                        .firstOrNull() ?: raise(ParserError.UnexpectedToken(currentToken)),
                 )
             } else {
-                AstNode.Identifier(identifierToken.literal, identifierToken.range)
+                AstNode.Identifier(
+                    identifierToken.literal,
+                    identifierToken.range,
+                    identifierToken.filePath
+                )
             }
 
             expectNextToken<Token.Assign>().bind()
@@ -364,43 +373,45 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         when (token) {
             is Token.Boolean -> {
                 val boolToken = (currentToken as? Token.Boolean)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.BooleanLiteral(boolToken.value, boolToken.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.BooleanLiteral(boolToken.value, boolToken.range, boolToken.filePath)
             }
 
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal, identifier.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.Identifier(identifier.literal, identifier.range, identifier.filePath)
             }
 
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal, identifier.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.Identifier(identifier.literal, identifier.range, identifier.filePath)
             }
 
             is Token.Int -> {
                 val int = (currentToken as? Token.Int)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
                 val value = parseIntLiteral(int.literal)
                     ?: raise(ParserError.InvalidIntLiteral(int))
-                AstNode.IntLiteral(value, int.range)
+                AstNode.IntLiteral(value, int.range, int.filePath)
             }
 
             is Token.Float -> {
                 val float = (currentToken as? Token.Float)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
                 AstNode.FloatLiteral(
                     float.literal.toFloatOrNull()
-                        ?: raise(ParserError.InvalidFloatLiteral(float)), float.range
+                        ?: raise(ParserError.InvalidFloatLiteral(float)),
+                    float.range,
+                    float.filePath
                 )
             }
 
             is Token.String -> {
                 val string = (currentToken as? Token.String)
-                    ?: return ParserError.UnExpectedToken(currentToken).left()
-                AstNode.StringLiteral(string.literal, string.range)
+                    ?: return ParserError.UnexpectedToken(currentToken).left()
+                AstNode.StringLiteral(string.literal, string.range, string.filePath)
             }
 
             is PrefixExpressionToken -> {
@@ -414,7 +425,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
                 nextToken().bind()
                 val expression = parseExpression(Precedence.LOWEST).bind()
                 expectNextToken<Token.ParenClose> {
-                    ParserError.ParseError("カッコが閉じていません", token)
+                    ParserError.ParseError(token, "カッコが閉じていません")
                 }.bind()
                 expression
             }
@@ -429,12 +440,16 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
             is Token.LenticularOpen -> {
                 expectNextToken<Token.Japanese>().bind()
                 val string = (currentToken as? Token.Japanese) ?: raise(
-                    ParserError.UnExpectedToken(
+                    ParserError.UnexpectedToken(
                         currentToken
                     )
                 )
                 expectNextToken<Token.LenticularClose>().bind()
-                AstNode.SystemLiteral(string.literal, token.range.first..currentToken.range.last)
+                AstNode.SystemLiteral(
+                    string.literal,
+                    token.range.first..currentToken.range.last,
+                    token.filePath
+                )
             }
 
             is Token.Function -> {
@@ -443,7 +458,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
                 val paramsTokens = mutableListOf<Token>()
                 val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
                 params.any { it !is AstNode.Identifier }.let {
-                    if (it) raise(ParserError.UnExpectedToken(currentToken))
+                    if (it) raise(ParserError.UnexpectedToken(currentToken))
                 }
                 expectNextToken<Token.Wo>().bind()
                 expectNextToken<Token.Colon>().bind()
@@ -458,7 +473,8 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
 
             is Token.EOF -> raise(
                 ParserError.ParseError(
-                    "期待せず式が終了しました", token
+                    token,
+                    "期待せず式が終了しました"
                 )
             )
 
@@ -494,7 +510,7 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
             }
 
             expectNextToken<T> {
-                ParserError.ParseError("式が閉じていません", currentToken)
+                ParserError.ParseError(currentToken, "式が閉じていません")
             }.bind()
             return list.toList().right()
         }

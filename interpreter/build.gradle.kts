@@ -1,8 +1,8 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.gradle.kotlin.dsl.buildConfig
-import org.jetbrains.compose.compose
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -246,4 +246,8 @@ val generateTextMap by tasks.registering {
             appendLine("}")
         })
     }
+}
+
+tasks.filterIsInstance<KotlinCompile>().forEach {
+    it.dependsOn(generateTextMap)
 }

@@ -92,7 +92,8 @@ sealed interface AstNode {
         val condition: Expression,
         val consequence: BlockStatement,
         val alternative: BlockStatement?,
-        override val filePath: String? = condition.filePath ?: consequence.filePath ?: alternative?.filePath
+        override val filePath: String? = condition.filePath ?: consequence.filePath
+        ?: alternative?.filePath
     ) : Statement {
         override val literal: String
             get() = "if ${condition.literal} ${consequence.literal}${alternative?.literal?.let { " else $it" } ?: ""}"
@@ -181,7 +182,7 @@ sealed interface AstNode {
     data class Identifier(
         val value: String,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression,
         Assignable {
         override val literal: String
@@ -191,7 +192,7 @@ sealed interface AstNode {
     data class IntLiteral(
         val value: Int,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression {
         override val literal: String
             get() = value.toString()
@@ -200,7 +201,7 @@ sealed interface AstNode {
     data class FloatLiteral(
         val value: Float,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression {
         override val literal: String
             get() = value.toString()
@@ -209,7 +210,7 @@ sealed interface AstNode {
     data class StringLiteral(
         val value: String,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression {
         override val literal: String
             get() = "\"$value\""
@@ -228,7 +229,7 @@ sealed interface AstNode {
     data class SystemLiteral(
         val value: String,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression {
         override val literal: String
             get() = value
@@ -262,7 +263,7 @@ sealed interface AstNode {
     data class BooleanLiteral(
         val value: Boolean,
         override val range: IntRange,
-        override val filePath: String? = null
+        override val filePath: String?
     ) : Expression {
         override val literal: String
             get() = if (value) "真" else "偽"

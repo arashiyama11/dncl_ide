@@ -345,14 +345,16 @@ class AstInfoService {
                 // 関数名がオフセットに含まれるかチェック
                 if (offset in node.name.range) return AstNode.Identifier(
                     node.name.literal,
-                    node.name.range
+                    node.name.range,
+                    node.filePath
                 )
 
                 // パラメータがオフセットに含まれるかチェック
                 node.parameters.firstNotNullOfOrNull { paramToken ->
                     if (offset in paramToken.range) return AstNode.Identifier(
                         paramToken.literal,
-                        paramToken.range
+                        paramToken.range,
+                        paramToken.filePath
                     )
                     null
                 } ?: findNodeRecursive(node.block, offset) ?: node
@@ -375,7 +377,8 @@ class AstInfoService {
                 // ループカウンタがオフセットに含まれるかチェック
                 if (offset in node.loopCounter.range) return AstNode.Identifier(
                     node.loopCounter.literal,
-                    node.loopCounter.range
+                    node.loopCounter.range,
+                    node.filePath
                 )
 
                 findNodeRecursive(node.start, offset)

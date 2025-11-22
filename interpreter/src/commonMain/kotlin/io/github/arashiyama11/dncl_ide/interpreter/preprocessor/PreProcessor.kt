@@ -38,7 +38,7 @@ fun preProcess(
 
                     emitAll(
                         preProcess(
-                            Lexer(targetText),
+                            Lexer(targetText, target),
                             resolveLib
                         ).takeWhile { it.getOrNull() !is Token.EOF }
                     )

@@ -43,19 +43,40 @@ fun CanvasAwareOutputField(
     onSelectCanvas: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val availablePanes = buildList {
+        add(OutputPane.STDOUT)
+        if (uiState.dnclError != null) add(OutputPane.ERROR)
+        if (uiState.canvasSurfaces.isNotEmpty()) add(OutputPane.CANVAS)
+    }
+    val selectedPane = uiState.outputPane.takeIf { it in availablePanes } ?: OutputPane.STDOUT
+
     Column(modifier = modifier.fillMaxHeight()) {
-        if (uiState.canvasSurfaces.isNotEmpty()) {
+        if (availablePanes.size > 1) {
             CanvasOutputTabs(
-                selectedPane = uiState.outputPane,
+                panes = availablePanes,
+                selectedPane = selectedPane,
                 onSelectPane = onSelectPane
             )
             Spacer(Modifier.height(8.dp))
         }
-        when (uiState.outputPane) {
+        when (selectedPane) {
             OutputPane.STDOUT -> {
                 val textFieldDesc = "出力"
                 OutlinedTextField(
                     value = uiState.output,
+                    onValueChange = {},
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    textStyle = LocalCodeTypography.current.bodyLarge,
+                    label = { Text(textFieldDesc) },
+                    readOnly = true,
+                )
+            }
+
+            OutputPane.ERROR -> {
+                val textFieldDesc = "エラー"
+                val errorText = uiState.errorOutput
+                OutlinedTextField(
+                    value = errorText,
                     onValueChange = {},
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     textStyle = LocalCodeTypography.current.bodyLarge,
@@ -79,21 +100,26 @@ fun CanvasAwareOutputField(
 
 @Composable
 private fun CanvasOutputTabs(
+    panes: List<OutputPane>,
     selectedPane: OutputPane,
     onSelectPane: (OutputPane) -> Unit
 ) {
-    TabRow(selectedTabIndex = selectedPane.ordinal, containerColor = Color.Transparent) {
-        Tab(
-            selected = selectedPane == OutputPane.STDOUT,
-            onClick = { onSelectPane(OutputPane.STDOUT) },
-            text = { Text("出力") }
-        )
-        Tab(
-            selected = selectedPane == OutputPane.CANVAS,
-            onClick = { onSelectPane(OutputPane.CANVAS) },
-            text = { Text("キャンバス") }
-        )
+    val selectedIndex = panes.indexOf(selectedPane).coerceAtLeast(0)
+    TabRow(selectedTabIndex = selectedIndex, containerColor = Color.Transparent) {
+        panes.forEach { pane ->
+            Tab(
+                selected = pane == selectedPane,
+                onClick = { onSelectPane(pane) },
+                text = { Text(pane.label()) }
+            )
+        }
     }
+}
+
+private fun OutputPane.label(): String = when (this) {
+    OutputPane.STDOUT -> "出力"
+    OutputPane.CANVAS -> "キャンバス"
+    OutputPane.ERROR -> "エラー"
 }
 
 @Composable
