@@ -21,7 +21,7 @@ class TypeInferenceVisitorTest {
         val typeVisitor = TypeInferenceVisitor(astInfo.symbolTable)
         typeVisitor.visit(astInfo.ast)
 
-        val symbol = astInfo.symbolTable.resolve("a", code.indexOf("a"))
+        val symbol = astInfo.symbolTable.resolve("a", code.indexOf("a"), null)
         println("Resolved symbol: $symbol")
         assertNotNull(symbol, "シンボル 'a' が見つかりません")
         assertEquals("Int", symbol.type, "型の推論が正しくありません")

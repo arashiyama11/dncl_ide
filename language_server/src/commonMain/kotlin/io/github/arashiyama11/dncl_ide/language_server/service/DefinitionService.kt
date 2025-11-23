@@ -15,10 +15,10 @@ class DefinitionService(
         cachedAstInfo: AstInfo? = null
     ): Location? {
         // Parse and analyze the code
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return null
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, uri) ?: return null
 
         // カーソル位置のシンボルを取得
-        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
+        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset, uri)
             ?: return null
 
         // シンボルの定義位置を取得

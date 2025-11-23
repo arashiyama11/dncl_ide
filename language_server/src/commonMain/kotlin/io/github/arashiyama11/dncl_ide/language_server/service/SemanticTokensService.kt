@@ -3,26 +3,40 @@ package io.github.arashiyama11.dncl_ide.language_server.service
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
+import kotlinx.coroutines.flow.toList
 
 class SemanticTokensService(
-    private val astInfoService: AstInfoService
+    private val astInfoService: AstInfoService,
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver()
 ) {
     suspend fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
-        val lexer = Lexer(code)
-        val tokens = lexer.toList().mapNotNull { it.getOrNull() }
+        val tokens = preProcess(
+            Lexer(code, cachedAstInfo?.filePath),
+            resolveLib = { path -> resolveLibText(fileResolver, path) }
+        )
+            .toList()
+            .mapNotNull { it.getOrNull() }
 
         // ASTとシンボルテーブルを取得
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code)
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, cachedAstInfo?.filePath)
+        val targetFilePath = astInfo?.filePath ?: cachedAstInfo?.filePath
+        val filteredTokens = tokens.filter { token ->
+            targetFilePath == null || token.filePath == targetFilePath
+        }
 
         val data = mutableListOf<Int>()
         var lastLine = 0
         var lastChar = 0
 
-        tokens.forEach { token ->
+        filteredTokens.forEach { token ->
             if (token is Token.Indent || token is Token.NewLine) {
                 return@forEach
             }
@@ -116,7 +130,8 @@ class SemanticTokensService(
         // 識別子の場合のみ修飾子を計算
         if (token is Token.Identifier || token is Token.Japanese) {
             astInfo?.let { info ->
-                val symbol = info.symbolTable.resolve(token.literal, offset)
+                val symbol =
+                    info.symbolTable.resolve(token.literal, offset)
                 symbol?.let {
                     // 定義箇所かどうかチェック
                     if (isDefinitionSite(info, offset, it)) {

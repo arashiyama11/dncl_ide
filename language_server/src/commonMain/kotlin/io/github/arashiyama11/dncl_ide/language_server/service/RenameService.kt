@@ -17,10 +17,10 @@ class RenameService(
         newName: String,
         cachedAstInfo: AstInfo? = null
     ): WorkspaceEdit? {
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return null
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, uri) ?: return null
 
         // カーソル位置のシンボルを取得
-        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset) ?: return null
+        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset, uri) ?: return null
 
         // 参照箇所を取得（宣言も含む）
         val references = referenceService.findReferences(

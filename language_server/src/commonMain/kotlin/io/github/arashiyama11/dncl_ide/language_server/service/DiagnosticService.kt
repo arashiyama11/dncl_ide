@@ -8,6 +8,9 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Range
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import kotlinx.coroutines.flow.toList
 
@@ -16,11 +19,16 @@ data class DiagnosticResult(
     val program: AstNode.Program?
 )
 
-class DiagnosticService {
+class DiagnosticService(
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver()
+) {
 
     @Suppress("UNUSED_PARAMETER")
     suspend fun analyze(uri: String, text: String): DiagnosticResult {
-        val lexer = preProcess(Lexer(text)) { "" }.toList()
+        val lexer = preProcess(
+            Lexer(text, uri),
+            resolveLib = { path -> resolveLibText(fileResolver, path) }
+        ).toList()
         val parser: Parser = when (val parserResult = Parser(lexer)) {
             is Either.Left -> {
                 return DiagnosticResult(

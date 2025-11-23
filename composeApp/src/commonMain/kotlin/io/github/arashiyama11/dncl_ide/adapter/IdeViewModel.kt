@@ -97,7 +97,9 @@ data class IdeUiState(
     val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS,
     val canvasSurfaces: List<CanvasSurfaceState> = emptyList(),
     val selectedCanvasPath: String? = null,
-    val outputPane: OutputPane = OutputPane.STDOUT
+    val outputPane: OutputPane = OutputPane.STDOUT,
+    val hoverHintText: String = "",
+    val showHoverHintInOutput: Boolean = false
 )
 
 enum class TextFieldType {
@@ -152,7 +154,9 @@ class IdeViewModel(
             customImePanelMode = CustomImePanelMode.QUICK_KEYS,
             canvasSurfaces = emptyList(),
             selectedCanvasPath = null,
-            outputPane = OutputPane.STDOUT
+            outputPane = OutputPane.STDOUT,
+            hoverHintText = "",
+            showHoverHintInOutput = false
         )
     )
 
@@ -256,7 +260,9 @@ class IdeViewModel(
             customImePanelMode = localState.customImePanelMode,
             canvasSurfaces = localState.canvasSurfaces,
             selectedCanvasPath = localState.selectedCanvasPath,
-            outputPane = localState.outputPane
+            outputPane = localState.outputPane,
+            hoverHintText = localState.hoverHintText,
+            showHoverHintInOutput = localState.showHoverHintInOutput
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -266,6 +272,7 @@ class IdeViewModel(
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
     private var completionTriggerJob: Job? = null
+    private var hoverTriggerJob: Job? = null
 
     fun onPause() {
         viewModelScope.launch {
@@ -381,7 +388,7 @@ class IdeViewModel(
 
             if (tokens.all { it.isRight() }) {
                 val parser =
-                    Parser(preProcess(Lexer(indentedText.text)) { "" }.toList()).getOrNull()
+                    Parser(preProcess(Lexer(indentedText.text), resolveLib = { "" }).toList()).getOrNull()
 
                 if (parser != null) {
                     parsedProgram = parser.parseProgram()
@@ -436,6 +443,9 @@ class IdeViewModel(
                 val position: Position =
                     calculatePosition(indentedText.text, indentedText.selection.end)
                 triggerCompletionDebounced(position)
+                if (_localState.value.showHoverHintInOutput) {
+                    triggerHoverHint(position)
+                }
             }
         }
     }
@@ -445,6 +455,21 @@ class IdeViewModel(
         completionTriggerJob = viewModelScope.launch {
             delay(COMPLETION_DEBOUNCE_MS)
             editorSession.dispatch(EditorIntent.TriggerCompletion(position))
+        }
+    }
+
+    private fun triggerHoverHint(position: Position) {
+        hoverTriggerJob?.cancel()
+        hoverTriggerJob = viewModelScope.launch {
+            delay(HOVER_DEBOUNCE_MS)
+            val documentUri = editorStateFlow.value.document?.uri ?: return@launch
+            val hover = runCatching {
+                languageFeatureProvider.requestHover(documentUri, position)
+            }.getOrNull()
+            val content = hover?.contents?.value ?: ""
+            _localState.update { state ->
+                if (!state.showHoverHintInOutput) state else state.copy(hoverHintText = content)
+            }
         }
     }
 
@@ -816,6 +841,29 @@ class IdeViewModel(
         }
     }
 
+    fun toggleHoverHintMode() {
+        val next = !_localState.value.showHoverHintInOutput
+        _localState.update { state ->
+            state.copy(
+                showHoverHintInOutput = next,
+                hoverHintText = if (next) state.hoverHintText else state.hoverHintText
+            )
+        }
+        if (next) {
+            refreshHoverHint()
+        }
+    }
+
+    fun refreshHoverHint() {
+        val document = editorStateFlow.value.document ?: run {
+            _localState.update { it.copy(hoverHintText = "Hover情報を取得できません") }
+            return
+        }
+        val textValue = uiState.value.codeTextFieldValue
+        val position = calculatePosition(textValue.text, textValue.selection.end)
+        triggerHoverHint(position)
+    }
+
     fun onCurrentInputChanged(text: String) {
         _localState.update {
             it.copy(currentInput = text)
@@ -927,6 +975,7 @@ class IdeViewModel(
 
     companion object {
         private const val COMPLETION_DEBOUNCE_MS = 100L
+        private const val HOVER_DEBOUNCE_MS = 80L
     }
 
     private data class LocalIdeState(
@@ -957,7 +1006,9 @@ class IdeViewModel(
         val customImePanelMode: CustomImePanelMode,
         val canvasSurfaces: List<CanvasSurfaceState>,
         val selectedCanvasPath: String?,
-        val outputPane: OutputPane
+        val outputPane: OutputPane,
+        val hoverHintText: String,
+        val showHoverHintInOutput: Boolean
     )
 
     private fun isStdlibPath(path: EntryPath?, rootPath: EntryPath?): Boolean {

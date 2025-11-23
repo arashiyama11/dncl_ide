@@ -15,7 +15,7 @@ class IntegrationErrorTest {
     private suspend fun runEvalTest(program: String, expectedOutput: String) {
         // Try to create Parser instance using the companion object invoke operator
         val output = run {
-            val lexer = preProcess(Lexer(program)) { "" }.toList()
+            val lexer = preProcess(Lexer(program), resolveLib = { "" }).toList()
 
             val parser = Parser(lexer).fold(ifLeft = { return@run it.explain(program) }) { it }
             val ast =

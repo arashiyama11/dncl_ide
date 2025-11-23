@@ -11,7 +11,8 @@ class CompletionServiceTest {
         val code = "表示"
         val result = completionService.getCompletionItems(
             code = code,
-            offset = code.length
+            offset = code.length,
+            filePath = "file:///test.dncl"
         )
         assertEquals("表示する", result.first().label)
     }
@@ -19,14 +20,14 @@ class CompletionServiceTest {
     @Test
     fun `keyword appears first when no prefix`() {
         val code = ""
-        val result = completionService.getCompletionItems(code = code, offset = 0)
+        val result = completionService.getCompletionItems(code = code, offset = 0, filePath = "file:///test.dncl")
         assertEquals("もし", result.first().label)
     }
 
     @Test
     fun `keyword exact match outranks others`() {
         val code = "関数"
-        val result = completionService.getCompletionItems(code = code, offset = code.length)
+        val result = completionService.getCompletionItems(code = code, offset = code.length, filePath = "file:///test.dncl")
         println(result.take(5).map { it.label })
         assertEquals("関数", result.first().label)
     }
@@ -42,7 +43,8 @@ class CompletionServiceTest {
         """.trimIndent()
         val result = completionService.getCompletionItems(
             code = code,
-            offset = code.length
+            offset = code.length,
+            filePath = "file:///test.dncl"
         )
         assertEquals("表示用", result.first().label)
     }

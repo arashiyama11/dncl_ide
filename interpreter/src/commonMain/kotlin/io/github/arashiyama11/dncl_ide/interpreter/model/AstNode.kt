@@ -49,7 +49,7 @@ sealed interface AstNode {
 
     data class Program(
         val statements: List<Statement>,
-        override val filePath: String? = statements.firstOrNull()?.filePath
+        override val filePath: String? = statements.lastOrNull()?.filePath
     ) : AstNode {
         override val literal: String
             get() = statements.joinToString(separator = "\n") { it.literal }

@@ -5,27 +5,35 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
 import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.MarkupContent
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
 class HoverService(
-    private val astInfoService: AstInfoService
+    private val astInfoService: AstInfoService,
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver()
 ) {
     suspend fun getHover(code: String, offset: Int, cachedAstInfo: AstInfo? = null): Hover? {
         // First parse and analyze the code
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return null
+        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, cachedAstInfo?.filePath)
+        ?: return null
 
-        val lexer = Lexer(code)
-        val tokens = lexer.toList().mapNotNull { it.getOrNull() }
+        val tokens = Lexer(code, astInfo.filePath)
+            .toList()
+            .mapNotNull { it.getOrNull() }
+
+        val originalFilePath = astInfo.filePath ?: tokens.firstOrNull()?.filePath
 
         val hoveredToken = tokens.firstOrNull { token ->
-            offset in token.range
+            offset in token.range && token.filePath == originalFilePath
         }
+
 
         val hoverContent: String? = when (hoveredToken) {
             is Token.Japanese, is Token.Identifier -> {
-                val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
+                val symbol = astInfoService.findSymbolAtOffset(astInfo, offset, astInfo.filePath)
+                println("symbol: $symbol")
                 when (symbol?.kind) {
                     SymbolKind.VARIABLE -> {
                         val start = calculatePosition(code, symbol.range.first)
@@ -39,15 +47,30 @@ class HoverService(
                         val params =
                             functionNode?.parameters?.joinToString(", ") { it.literal } ?: ""
                         val start = calculatePosition(code, symbol.range.first)
-                        """**関数**: `${symbol.name}($params)`  
-                           定義位置: ${start.line + 1}行${start.character + 1}文字目  
-                        """.trimIndent()
+                        val funcImpl = run {
+                            val c =
+                                if (symbol.filePath == originalFilePath) code else resolveLibText(
+                                    fileResolver,
+                                    symbol.filePath!!
+                                )
+                            c.substring(expandWithLeadingComments(c, functionNode!!.range).also {
+                                println("range: ${functionNode.range} to $it")
+                            })
+                        }
+                        """関数: `${symbol.name}($params)`  
+定義位置: ${start.line + 1}行${start.character + 1}文字目 
+ファイル: ${symbol.filePath}
+
+実装:
+$funcImpl
+""".trimIndent()
                     }
 
                     SymbolKind.PARAMETER -> {
                         val start = calculatePosition(code, symbol.range.first)
                         """**パラメータ**: `${symbol.name}`  
-                           定義位置: ${start.line + 1}行${start.character + 1}文字目  
+                           定義位置: ${start.line + 1}行${start.character + 1}文字目 
+                           ファイル: ${symbol.filePath}
                            関数のパラメータとして定義されています""".trimIndent()
                     }
 
@@ -93,6 +116,8 @@ class HoverService(
             else -> null
         }
 
+
+
         return hoverContent?.let { content ->
             Hover(
                 contents = MarkupContent(
@@ -103,6 +128,38 @@ class HoverService(
             )
         }
     }
+
+
+    /**
+     * 関数定義の前に連続している # コメント行を含めるように
+     * Range の開始位置を上に広げる。
+     */
+    fun expandWithLeadingComments(src: String, original: IntRange): IntRange {
+        var start = original.first
+        var pos = start - 2
+
+        while (pos >= 0) {
+            val lineStart = src.lastIndexOf('\n', pos).let { if (it == -1) 0 else it + 1 }
+            val lineEnd = src.indexOf('\n', lineStart).let { if (it == -1) src.length else it }
+
+            if (lineEnd <= lineStart || lineEnd <= 0) break
+            if (lineEnd > start) {
+                break
+            }
+
+            val line = src.substring(lineStart, lineEnd)
+            val trimmed = line.trimStart()
+
+            if (trimmed.isEmpty()) break
+            if (!trimmed.startsWith("#")) break
+
+            start = lineStart
+            pos = lineStart - 1
+        }
+
+        return start..original.last
+    }
+
 
     private fun descriptionOfBuiltInFunction(fn: AllBuiltInFunction): String {
         return when (fn) {

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -126,6 +127,18 @@ fun IdeViewModel.IdeSideButtons(
                     },
                     contentDescription = "Change IO",
                     tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            IconButton(
+                onClick = { toggleHoverHintMode() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val alpha = if (uiState.showHoverHintInOutput) 1f else 0.4f
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Hoverヒント切替",
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
                 )
             }
 

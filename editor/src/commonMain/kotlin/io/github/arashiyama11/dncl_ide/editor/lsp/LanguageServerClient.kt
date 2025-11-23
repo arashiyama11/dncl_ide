@@ -3,6 +3,7 @@ package io.github.arashiyama11.dncl_ide.editor.lsp
 import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.ServerCapabilities
@@ -16,6 +17,7 @@ interface LanguageServerClient {
     fun observeDiagnostics(uri: String): Flow<List<Diagnostic>>
     suspend fun requestCompletion(uri: String, position: Position): CompletionList
     suspend fun requestSemanticTokens(uri: String): SemanticTokens
+    suspend fun requestHover(uri: String, position: Position): Hover?
     fun capabilities(): Flow<ServerCapabilities?>
     suspend fun shutdown()
 }

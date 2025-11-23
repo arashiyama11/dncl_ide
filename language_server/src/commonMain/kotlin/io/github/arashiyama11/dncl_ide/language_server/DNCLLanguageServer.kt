@@ -190,7 +190,7 @@ class DNCLLanguageServer(
 
     private suspend fun publishDiagnostics(uri: String, text: String) {
         val diagnosticResult = diagnosticService.analyze(uri, text)
-        val astInfo = diagnosticResult.program?.let { astInfoService.buildAstInfo(it) }
+        val astInfo = diagnosticResult.program?.let { astInfoService.buildAstInfo(it, uri) }
 
         documentManager = documentManager.updateAnalysis(
             uri,
@@ -296,8 +296,12 @@ class DNCLLanguageServer(
     }
 
     private suspend fun handleCompletion(request: JsonRpcRequest) {
-        handleWithDocument<CompletionParams, CompletionList>(request) { snapshot, offset, _ ->
-            val completionItems = completionService.getCompletionItems(snapshot.text, offset)
+        handleWithDocument<CompletionParams, CompletionList>(request) { snapshot, offset, params ->
+            val completionItems = completionService.getCompletionItems(
+                code = snapshot.text,
+                offset = offset,
+                filePath = params?.textDocument?.uri
+            )
             CompletionList(isIncomplete = false, items = completionItems)
         }
     }

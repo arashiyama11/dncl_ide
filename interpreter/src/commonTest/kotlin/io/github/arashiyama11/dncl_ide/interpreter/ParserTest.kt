@@ -17,7 +17,7 @@ class ParserTest {
 もし Akibi[buin] < Akibi[tantou] ならば:
     tantou = buin
 表示する("次の工芸品の担当は部員", tantou, "です")"""
-        println(Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!.parseProgram())
+        println(Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!.parseProgram())
     }
 
     @Test
@@ -42,7 +42,7 @@ a + b * c + d / e - f
 5 < 4 != 3 > 4
 3 + 4 * 5 == 3 * 1 + 4 * 5
 """
-        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         println(prog.getOrNull()!!.literal)
@@ -71,7 +71,7 @@ a + b * c + d / e - f
     @Test
     fun testFunction() = runTest {
         val input = TestCase.MaisuFunction
-        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.explain(input))
         assertEquals(
@@ -202,7 +202,7 @@ for i in IntLiteral(value=0, range=463..463)..InfixExpression(left=Identifier(va
 
 
     private fun testParser(input: String, expected: String) = runTest {
-        val parser = Parser(preProcess(Lexer(input)) { "" }.toList()).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         assertEquals(expected, prog.getOrNull()!!.literal)

@@ -49,7 +49,7 @@ val commonMainModule = module {
     singleOf(::AppScope) { binds(listOf(CoroutineScope::class)) }
     singleOf(::NotebookViewModel)
     singleOf(::SyntaxHighLighter)
-    single<LanguageServerClient> { LanguageServerSession(get()) }
+    single<LanguageServerClient> { LanguageServerSession(get(), get()) }
     singleOf(::DefaultLanguageFeatureProvider) { binds(listOf(LanguageFeatureProvider::class)) }
     singleOf(::FileRepositoryImpl) { binds(listOf(FileRepository::class)) }
     singleOf(::SettingsRepositoryImpl) { binds(listOf(SettingsRepository::class)) }

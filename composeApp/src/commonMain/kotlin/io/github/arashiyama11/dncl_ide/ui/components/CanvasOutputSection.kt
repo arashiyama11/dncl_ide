@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,14 +17,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +42,7 @@ fun CanvasAwareOutputField(
     uiState: IdeUiState,
     onSelectPane: (OutputPane) -> Unit,
     onSelectCanvas: (String) -> Unit,
+    onRefreshHoverHint: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val availablePanes = buildList {
@@ -61,15 +63,40 @@ fun CanvasAwareOutputField(
         }
         when (selectedPane) {
             OutputPane.STDOUT -> {
-                val textFieldDesc = "出力"
-                OutlinedTextField(
-                    value = uiState.output,
-                    onValueChange = {},
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    textStyle = LocalCodeTypography.current.bodyLarge,
-                    label = { Text(textFieldDesc) },
-                    readOnly = true,
-                )
+                val textFieldDesc = if (uiState.showHoverHintInOutput) "Hoverヒント" else "出力"
+                val outputText = if (uiState.showHoverHintInOutput) {
+                    uiState.hoverHintText.ifBlank { "Hover情報がありません" }
+                } else {
+                    uiState.output
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(textFieldDesc, style = MaterialTheme.typography.labelLarge)
+                        if (uiState.showHoverHintInOutput) {
+                            TextButton(onClick = onRefreshHoverHint) {
+                                Text("再取得")
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = outputText,
+                        onValueChange = {},
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        textStyle = LocalCodeTypography.current.bodyLarge,
+                        label = { Text(textFieldDesc) },
+                        readOnly = true,
+                    )
+                }
             }
 
             OutputPane.ERROR -> {

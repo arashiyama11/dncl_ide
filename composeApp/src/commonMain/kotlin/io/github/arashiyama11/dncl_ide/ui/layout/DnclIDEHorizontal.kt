@@ -174,6 +174,7 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
                             uiState = uiState,
                             onSelectPane = viewModel::selectOutputPane,
                             onSelectCanvas = viewModel::selectCanvasSurface,
+                            onRefreshHoverHint = viewModel::refreshHoverHint,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                     }

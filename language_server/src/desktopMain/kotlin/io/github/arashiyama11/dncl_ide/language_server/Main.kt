@@ -10,6 +10,7 @@ import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
 import io.github.arashiyama11.dncl_ide.language_server.service.RenameService
 import io.github.arashiyama11.dncl_ide.language_server.service.SemanticTokensService
+import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.serialization.json.Json
@@ -21,18 +22,19 @@ import java.io.File
 fun main() = runBlocking {
     logging("Starting DNCL Language Server")
     val json = Json { ignoreUnknownKeys = true }
-    val astInfoService = AstInfoService()
+    val fileResolver = StdlibOnlyFileResolver()
+    val astInfoService = AstInfoService(fileResolver)
     val server = DNCLLanguageServer(
         DocumentManager(),
-        DiagnosticService(),
-        CompletionService(),
+        DiagnosticService(fileResolver),
+        CompletionService(fileResolver),
         HoverService(astInfoService),
         DefinitionService(astInfoService),
         ReferenceService(astInfoService),
         RenameService(astInfoService),
         FormattingService(),
         CodeActionService(),
-        SemanticTokensService(astInfoService),
+        SemanticTokensService(astInfoService, fileResolver),
         astInfoService
     )
 

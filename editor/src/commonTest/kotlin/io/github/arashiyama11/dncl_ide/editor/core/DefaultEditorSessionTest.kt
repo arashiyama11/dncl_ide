@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Position
+import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.Range
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.ServerCapabilities
@@ -173,6 +174,7 @@ class DefaultEditorSessionTest {
         var closeDocumentResult: Result<Unit> = Result.success(Unit)
         var completionResult: Result<CompletionList> = Result.success(CompletionList(false, emptyList()))
         var semanticTokensResult: Result<SemanticTokens> = Result.success(SemanticTokens(data = emptyList()))
+        var hoverResult: Result<Hover?> = Result.success(null)
 
         val openedDocuments = mutableListOf<LanguageServerDocument>()
         val applyChangesRequests = mutableListOf<Pair<String, String>>()
@@ -211,6 +213,9 @@ class DefaultEditorSessionTest {
 
         override suspend fun requestSemanticTokens(uri: String): SemanticTokens =
             semanticTokensResult.getOrThrow()
+
+        override suspend fun requestHover(uri: String, position: Position): Hover? =
+            hoverResult.getOrThrow()
 
         override val capabilities: Flow<ServerCapabilities?>
             get() = capabilitiesFlow
