@@ -17,13 +17,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,10 +32,14 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownTypography
+import com.mikepenz.markdown.compose.Markdown
 import io.github.arashiyama11.dncl_ide.adapter.CanvasSurfaceState
 import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.OutputPane
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
+import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
 
 @Composable
 fun CanvasAwareOutputField(
@@ -47,6 +51,8 @@ fun CanvasAwareOutputField(
 ) {
     val availablePanes = buildList {
         add(OutputPane.STDOUT)
+        if (uiState.debugMode) add(OutputPane.DEBUG)
+        if (uiState.showHoverHintInOutput) add(OutputPane.HOVER)
         if (uiState.dnclError != null) add(OutputPane.ERROR)
         if (uiState.canvasSurfaces.isNotEmpty()) add(OutputPane.CANVAS)
     }
@@ -63,35 +69,73 @@ fun CanvasAwareOutputField(
         }
         when (selectedPane) {
             OutputPane.STDOUT -> {
-                val textFieldDesc = if (uiState.showHoverHintInOutput) "Hoverヒント" else "出力"
-                val outputText = if (uiState.showHoverHintInOutput) {
-                    uiState.hoverHintText.ifBlank { "Hover情報がありません" }
-                } else {
-                    uiState.output
-                }
+                val textFieldDesc = "出力"
+                val outputText = uiState.output
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(textFieldDesc, style = MaterialTheme.typography.labelLarge)
-                        if (uiState.showHoverHintInOutput) {
-                            TextButton(onClick = onRefreshHoverHint) {
-                                Text("再取得")
-                            }
-                        }
-                    }
+                    Text(textFieldDesc, style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
                         value = outputText,
                         onValueChange = {},
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
+                        textStyle = LocalCodeTypography.current.bodyLarge,
+                        label = { Text(textFieldDesc) },
+                        readOnly = true,
+                    )
+                }
+            }
+
+            OutputPane.HOVER -> {
+                val hoverText = uiState.hoverHintText.ifBlank { "Hover情報がありません" }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                shape = MaterialTheme.shapes.small
+                            )
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Markdown(
+                            content = hoverText,
+                            colors = LocalMarkdownColors.current,
+                            typography = LocalMarkdownTypography.current
+                        )
+                    }
+                }
+            }
+
+            OutputPane.DEBUG -> {
+                val environment = uiState.currentEnvironment
+                val textFieldDesc = "デバッグ出力"
+                if (environment != null) {
+                    EnvironmentDebugView(
+                        environment = environment,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = uiState.output,
+                        onValueChange = {},
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                         textStyle = LocalCodeTypography.current.bodyLarge,
                         label = { Text(textFieldDesc) },
                         readOnly = true,
@@ -145,6 +189,8 @@ private fun CanvasOutputTabs(
 
 private fun OutputPane.label(): String = when (this) {
     OutputPane.STDOUT -> "出力"
+    OutputPane.DEBUG -> "デバッグ"
+    OutputPane.HOVER -> "Hover"
     OutputPane.CANVAS -> "キャンバス"
     OutputPane.ERROR -> "エラー"
 }

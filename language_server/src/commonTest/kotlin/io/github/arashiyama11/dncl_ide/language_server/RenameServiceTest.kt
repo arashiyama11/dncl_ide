@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class RenameServiceTest {
 
@@ -19,7 +20,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_variable() {
+    fun test_rename_variable() = runTest {
         // Red: 変数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -43,7 +44,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_function() {
+    fun test_rename_function() = runTest {
         // Red: 関数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -68,7 +69,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_scoped_variables_correctly() {
+    fun test_rename_scoped_variables_correctly() = runTest {
         // Red: スコープを考慮した変数リネームのテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -111,7 +112,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_parameter() {
+    fun test_rename_parameter() = runTest {
         // Red: 関数パラメータのリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -139,7 +140,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_invalid_position() {
+    fun test_rename_invalid_position() = runTest {
         // Green: 無効な位置でのリネーム試行テスト
         val (renameService, _, astInfoService) = createServices()
         val code = """

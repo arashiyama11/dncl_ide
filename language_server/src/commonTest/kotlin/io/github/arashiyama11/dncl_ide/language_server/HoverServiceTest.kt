@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlinx.coroutines.test.runTest
 
 class HoverServiceTest {
 
@@ -18,7 +19,7 @@ class HoverServiceTest {
     }
 
     @Test
-    fun test_hover_on_builtin_function() {
+    fun test_hover_on_builtin_function() = runTest {
         val (hoverService, diagnosticService, astInfoService) = createServices()
 
         val code = "表示する(x)"
@@ -30,7 +31,7 @@ class HoverServiceTest {
     }
 
     @Test
-    fun test_hover_on_user_defined_variable() {
+    fun test_hover_on_user_defined_variable() = runTest {
         // Red: ユーザー定義変数に対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
@@ -47,7 +48,7 @@ class HoverServiceTest {
     }
 
     @Test
-    fun test_hover_on_function_definition() {
+    fun test_hover_on_function_definition() = runTest {
         // Red: 関数定義に対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
@@ -69,7 +70,7 @@ class HoverServiceTest {
     }
 
     @Test
-    fun test_hover_on_empty_space_returns_null() {
+    fun test_hover_on_empty_space_returns_null() = runTest {
         // Green: 空白部分では何も返さないことをテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = "表示(\"Hello World\")"
@@ -80,7 +81,7 @@ class HoverServiceTest {
     }
 
     @Test
-    fun test_hover_on_parameter() {
+    fun test_hover_on_parameter() = runTest {
         // Red: 関数パラメータに対するホバー情報をテスト
         val (hoverService, _, astInfoService) = createServices()
         val code = """
@@ -96,5 +97,49 @@ class HoverServiceTest {
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
         // パラメータparam1の情報が含まれることを期待
+    }
+
+    @Test
+    fun expandWithLeadingComments_includes_consecutive_hash_lines() = runTest {
+        val (hoverService, _, _) = createServices()
+        val src = """
+            # コメント1
+            # コメント2
+            関数 foo() を:
+                戻り値(1)
+            と定義する
+        """.trimIndent()
+        val defStart = src.indexOf("関数")
+        val defEnd = src.indexOf("定義する") + "定義する".length
+        val original = defStart..defEnd
+
+        val expanded = hoverService.expandWithLeadingComments(src, original)
+
+        // コメント行を含んで開始位置が前に広がることを確認
+        kotlin.test.assertTrue(expanded.first < original.first, "コメント分だけ開始が前に広がるはず")
+        val prefix = src.substring(expanded.first, original.first)
+        kotlin.test.assertTrue(prefix.contains("# コメント1"), "コメント1を含むはず")
+        kotlin.test.assertTrue(prefix.contains("# コメント2"), "コメント2を含むはず")
+        assertEquals(original.last, expanded.last)
+    }
+
+    @Test
+    fun expandWithLeadingComments_stops_at_blank_line() = runTest {
+        val (hoverService, _, _) = createServices()
+        val src = """
+            # コメント1
+
+            関数 bar() を:
+                戻り値(1)
+            と定義する
+        """.trimIndent()
+        val defStart = src.indexOf("関数")
+        val defEnd = src.indexOf("定義する") + "定義する".length
+        val original = defStart..defEnd
+
+        val expanded = hoverService.expandWithLeadingComments(src, original)
+
+        assertEquals(original.first, expanded.first)
+        assertEquals(original.last, expanded.last)
     }
 }

@@ -6,6 +6,7 @@ import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class ReferenceServiceTest {
 
@@ -17,7 +18,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_find_variable_references() {
+    fun test_find_variable_references() = runTest {
         // Red: 変数の全参照箇所を検索するテスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
@@ -37,7 +38,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_find_function_references() {
+    fun test_find_function_references() = runTest {
         // Red: 関数の全参照箇所を検索するテスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
@@ -59,7 +60,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_scoped_variable_references() {
+    fun test_scoped_variable_references() = runTest {
         // Red: スコープを考慮した変数参照の検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
@@ -88,7 +89,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_parameter_references() {
+    fun test_parameter_references() = runTest {
         // Red: 関数パラメータの参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
@@ -109,7 +110,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_no_references_for_undefined_symbol() {
+    fun test_no_references_for_undefined_symbol() = runTest {
         // Green: 未定義シンボルに対する参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = """
@@ -125,7 +126,7 @@ class ReferenceServiceTest {
     }
 
     @Test
-    fun test_complex_code_structure() {
+    fun test_complex_code_structure() = runTest {
         // Red: 複雑なコード構造に対する参照検索テスト
         val (referenceService, _, astInfoService) = createServices()
         val code = TestCase.lifeGame

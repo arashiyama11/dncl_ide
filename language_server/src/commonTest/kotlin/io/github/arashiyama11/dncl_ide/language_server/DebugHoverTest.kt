@@ -4,11 +4,12 @@ import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import kotlin.test.Test
+import kotlinx.coroutines.test.runTest
 
 class DebugHoverTest {
 
     @Test
-    fun debug_hover_function() {
+    fun debug_hover_function() = runTest {
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
         val hoverService = HoverService(astInfoService)

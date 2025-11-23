@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
@@ -121,10 +122,7 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    when (uiState.textFieldType) {
-                        TextFieldType.OUTPUT -> Icons.Outlined.FileUpload
-                        TextFieldType.DEBUG_OUTPUT -> Icons.Outlined.FileDownload
-                    },
+                    Icons.Outlined.BugReport,
                     contentDescription = "Change IO",
                     tint = MaterialTheme.colorScheme.onBackground
                 )
@@ -134,11 +132,10 @@ fun IdeViewModel.IdeSideButtons(
                 onClick = { toggleHoverHintMode() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val alpha = if (uiState.showHoverHintInOutput) 1f else 0.4f
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = "Hoverヒント切替",
-                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = alpha)
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
 

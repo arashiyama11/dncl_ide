@@ -558,8 +558,10 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
             val itr = tokens.iterator()
             val parser = Parser(itr)
             parser.currentToken = itr.next().bind()
-            parser.nextToken = itr.next().bind()
-            parser.aheadToken = itr.next().bind()
+            parser.nextToken =
+                if (parser.currentToken is Token.EOF) parser.currentToken else itr.next().bind()
+            parser.aheadToken =
+                if (parser.nextToken is Token.EOF) parser.nextToken else itr.next().bind()
             return parser.right()
         }
 

@@ -108,6 +108,8 @@ enum class TextFieldType {
 
 enum class OutputPane {
     STDOUT,
+    DEBUG,
+    HOVER,
     CANVAS,
     ERROR
 }
@@ -302,6 +304,14 @@ class IdeViewModel(
         viewModelScope.launch {
             var prePath: EntryPath? = null
             appStateStore.state.collect { appState ->
+                if (!appState.dnclConfig.debugModeEnabled && _localState.value.outputPane == OutputPane.DEBUG) {
+                    _localState.update { state ->
+                        state.copy(
+                            outputPane = OutputPane.STDOUT,
+                            textFieldType = TextFieldType.OUTPUT
+                        )
+                    }
+                }
                 val entryPath = appState.selectedEntryPath
                 if (entryPath != null && entryPath != prePath) {
                     val programFile = fileUseCase.getEntryByPath(entryPath)
@@ -410,7 +420,7 @@ class IdeViewModel(
             val finalError = error ?: highlightError
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
-                    val nextPane = when {
+            val nextPane = when {
                         finalError != null -> OutputPane.ERROR
                         it.outputPane == OutputPane.ERROR -> OutputPane.STDOUT
                         else -> it.outputPane
@@ -421,7 +431,8 @@ class IdeViewModel(
                         //errorOutput = nextErrorOutput ?: "",
                         //errorRange = finalError?.errorRange
                         //   ?: if (it.dnclError == null) it.errorRange else null,
-                        outputPane = nextPane
+                        outputPane = nextPane,
+                        textFieldType = nextPane.toTextFieldType()
                     )
                 }
             }
@@ -548,7 +559,8 @@ class IdeViewModel(
                                     isError = true,
                                     errorRange = if (isSameFile) output.value.astNode.range else it.errorRange,
                                     dnclError = output.value,
-                                    outputPane = OutputPane.ERROR
+                                    outputPane = OutputPane.ERROR,
+                                    textFieldType = TextFieldType.OUTPUT
                                 )
                             }
                         }
@@ -584,6 +596,7 @@ class IdeViewModel(
                                     errorOutput = output.value.explain(content),
                                     isError = true,
                                     outputPane = OutputPane.ERROR,
+                                    textFieldType = TextFieldType.OUTPUT,
                                     errorRange = if (isSameFile) output.value.errorRange else it.errorRange,
                                 )
                             }
@@ -677,7 +690,19 @@ class IdeViewModel(
     }
 
     fun selectOutputPane(pane: OutputPane) {
-        _localState.update { it.copy(outputPane = pane) }
+        val resolvedPane = when (pane) {
+            OutputPane.DEBUG -> if (uiState.value.debugMode) OutputPane.DEBUG else OutputPane.STDOUT
+            OutputPane.CANVAS -> if (_localState.value.canvasSurfaces.isNotEmpty()) OutputPane.CANVAS else OutputPane.STDOUT
+            OutputPane.HOVER -> if (_localState.value.showHoverHintInOutput) OutputPane.HOVER else OutputPane.STDOUT
+            OutputPane.ERROR -> if (_localState.value.dnclError != null) OutputPane.ERROR else OutputPane.STDOUT
+            else -> pane
+        }
+        _localState.update { state ->
+            state.copy(
+                outputPane = resolvedPane,
+                textFieldType = resolvedPane.toTextFieldType()
+            )
+        }
     }
 
     fun selectCanvasSurface(path: String) {
@@ -701,7 +726,8 @@ class IdeViewModel(
                         OutputPane.STDOUT
                     } else {
                         it.outputPane
-                    }
+                    },
+                    textFieldType = if (it.outputPane == OutputPane.CANVAS) TextFieldType.OUTPUT else it.textFieldType
                 )
             }
         }
@@ -832,13 +858,12 @@ class IdeViewModel(
     }
 
     fun onChangeIOButtonClicked() {
-        val next = when (uiState.value.textFieldType) {
-            TextFieldType.OUTPUT -> if (uiState.value.debugMode) TextFieldType.DEBUG_OUTPUT else TextFieldType.OUTPUT
-            TextFieldType.DEBUG_OUTPUT -> TextFieldType.OUTPUT
+        if (!uiState.value.debugMode) {
+            selectOutputPane(OutputPane.STDOUT)
+            return
         }
-        _localState.update {
-            it.copy(textFieldType = next)
-        }
+        val nextPane = if (uiState.value.outputPane == OutputPane.DEBUG) OutputPane.STDOUT else OutputPane.DEBUG
+        selectOutputPane(nextPane)
     }
 
     fun toggleHoverHintMode() {
@@ -846,7 +871,17 @@ class IdeViewModel(
         _localState.update { state ->
             state.copy(
                 showHoverHintInOutput = next,
-                hoverHintText = if (next) state.hoverHintText else state.hoverHintText
+                hoverHintText = if (next) state.hoverHintText else state.hoverHintText,
+                outputPane = when {
+                    next -> OutputPane.HOVER
+                    state.outputPane == OutputPane.HOVER -> OutputPane.STDOUT
+                    else -> state.outputPane
+                },
+                textFieldType = when {
+                    next -> TextFieldType.OUTPUT
+                    state.outputPane == OutputPane.HOVER -> TextFieldType.OUTPUT
+                    else -> state.textFieldType
+                }
             )
         }
         if (next) {
@@ -1017,4 +1052,7 @@ class IdeViewModel(
         if (path.value.size < stdlibPrefix.size) return false
         return path.value.take(stdlibPrefix.size) == stdlibPrefix
     }
+
+    private fun OutputPane.toTextFieldType(): TextFieldType =
+        if (this == OutputPane.DEBUG) TextFieldType.DEBUG_OUTPUT else TextFieldType.OUTPUT
 }

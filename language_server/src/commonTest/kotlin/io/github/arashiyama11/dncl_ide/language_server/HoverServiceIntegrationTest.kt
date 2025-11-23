@@ -6,11 +6,12 @@ import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class HoverServiceIntegrationTest {
 
     @Test
-    fun test_hover_integration_user_variable() {
+    fun test_hover_integration_user_variable() = runTest {
         // 統合テスト: ユーザー定義変数のホバー情報
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
@@ -33,7 +34,7 @@ class HoverServiceIntegrationTest {
     }
 
     @Test
-    fun test_hover_integration_user_function() {
+    fun test_hover_integration_user_function() = runTest {
         // 統合テスト: ユーザー定義関数のホバー情報
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()
@@ -68,7 +69,7 @@ class HoverServiceIntegrationTest {
     }
 
     @Test
-    fun test_hover_integration_builtin_function() {
+    fun test_hover_integration_builtin_function() = runTest {
         // 統合テスト: 組み込み関数のホバー情報（既存機能の確認）
         val diagnosticService = DiagnosticService()
         val astInfoService = AstInfoService()

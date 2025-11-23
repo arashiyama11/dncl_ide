@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignature
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolTable
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
@@ -18,7 +19,8 @@ import kotlinx.coroutines.flow.toList
 data class AstInfo(
     val ast: AstNode.Program,
     val symbolTable: SymbolTable,
-    val filePath: String?
+    val filePath: String?,
+    val builtInSignatures: List<BuiltInFunctionSignature> = emptyList()
 )
 
 class AstInfoService(
@@ -26,10 +28,12 @@ class AstInfoService(
 ) {
     suspend fun parseAndAnalyze(code: String, filePath: String? = null): AstInfo? {
         return try {
+            val builtIns = mutableListOf<BuiltInFunctionSignature>()
             val lexer = preProcess(
                 Lexer(code, filePath),
-                resolveLib = { path -> resolveLibText(fileResolver, path) }
-            ).toList() // TODO onBuiltInSignを使う
+                resolveLib = { path -> resolveLibText(fileResolver, path) },
+                onBuiltInSignature = { builtIns += it }
+            ).toList()
             val parser = Parser(lexer).getOrElse { return null }
 
             val program = when (val programResult = parser.parseProgram()) {
@@ -37,17 +41,20 @@ class AstInfoService(
                 is Either.Right -> programResult.value
             }
 
-            buildAstInfo(program, filePath)
+            buildAstInfo(program, filePath, builtIns)
         } catch (e: Exception) {
             null
         }
     }
 
-    fun buildAstInfo(program: AstNode.Program, filePath: String? = null): AstInfo {
+    fun buildAstInfo(
+        program: AstNode.Program,
+        filePath: String? = null,
+        builtInSignatures: List<BuiltInFunctionSignature> = emptyList()
+    ): AstInfo {
         val visitor = AstVisitor()
         val symbolTable = visitor.visit(program)
-        println("buildAstInfo filePath: $filePath, program: ${program.filePath}")
-        return AstInfo(program, symbolTable, filePath)
+        return AstInfo(program, symbolTable, filePath, builtInSignatures)
     }
 
     fun findNodeAtOffset(
@@ -65,7 +72,6 @@ class AstInfoService(
     ): Symbol? {
         // First, find the node at the offset to understand the context
         val node = findNodeAtOffset(astInfo, offset, filePath)
-        println("findNodeAtOffset :$node")
 
         // If it's an identifier, try to resolve it from the appropriate scope
         if (node is AstNode.Identifier) {
@@ -386,7 +392,6 @@ class AstInfoService(
             return null
         }
 
-        println("targetFilePath: $targetFilePath")
         if (targetFilePath != null && node.filePath != null && node.filePath != targetFilePath) {
             return null
         }

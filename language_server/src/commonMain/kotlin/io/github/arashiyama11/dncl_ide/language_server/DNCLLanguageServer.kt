@@ -190,7 +190,13 @@ class DNCLLanguageServer(
 
     private suspend fun publishDiagnostics(uri: String, text: String) {
         val diagnosticResult = diagnosticService.analyze(uri, text)
-        val astInfo = diagnosticResult.program?.let { astInfoService.buildAstInfo(it, uri) }
+        val astInfo = diagnosticResult.program?.let {
+            astInfoService.buildAstInfo(
+                it,
+                uri,
+                diagnosticResult.builtInSignatures
+            )
+        }
 
         documentManager = documentManager.updateAnalysis(
             uri,

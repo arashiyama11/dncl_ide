@@ -18,12 +18,12 @@ class SemanticTokensService(
     private val fileResolver: FileResolver = StdlibOnlyFileResolver()
 ) {
     suspend fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
-        val tokens = preProcess(
-            Lexer(code, cachedAstInfo?.filePath),
-            resolveLib = { path -> resolveLibText(fileResolver, path) }
-        )
-            .toList()
-            .mapNotNull { it.getOrNull() }
+        val tokens =
+            Lexer(code, cachedAstInfo?.filePath)//,
+                ///resolveLib = { path -> resolveLibText(fileResolver, path) }
+
+                .toList()
+                .mapNotNull { it.getOrNull() }
 
         // ASTとシンボルテーブルを取得
         val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, cachedAstInfo?.filePath)
@@ -74,7 +74,8 @@ class SemanticTokensService(
         val basicType = when (token) {
             is Token.If, is Token.Function, is Token.Wo, is Token.Kara, is Token.Made,
             is Token.While, is Token.UpTo, is Token.DownTo, is Token.Define, is Token.Then,
-            is Token.Else, is Token.Elif, is Token.And, is Token.Or -> 0 // keyword
+            is Token.Else, is Token.Elif, is Token.And, is Token.Or, is Token.AtMark,
+                -> 0 // keyword
             is Token.Int, is Token.Float -> 3 // number
             is Token.String -> 4 // string
             is Token.Comment -> 5 // comment
@@ -178,7 +179,7 @@ class SemanticTokensService(
     }
 
     private fun isDefinitionSite(astInfo: AstInfo, offset: Int, symbol: Symbol): Boolean {
-        // シンボルの定義位置と現在の位置が一致するか���ェック
+        // シンボルの定義位置と現在の位置が一致するか
         return offset in symbol.range
     }
 }

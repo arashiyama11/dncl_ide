@@ -19,7 +19,8 @@ fun preProcess(
 ): Flow<Either<LexerError, Token>> {
     return flow {
         // builtin.dncl を暗黙的に読み込み、シグネチャだけ収集する
-        processBuiltinSignatures(onBuiltInSignature)
+        if (tokens.first().getOrNull()?.filePath?.endsWith("builtin.dncl") == false)
+            processBuiltinSignatures(onBuiltInSignature)
 
         val iterator = tokens.iterator()
         while (iterator.hasNext()) {
