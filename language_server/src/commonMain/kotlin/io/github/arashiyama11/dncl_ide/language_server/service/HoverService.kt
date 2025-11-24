@@ -16,8 +16,7 @@ class HoverService(
 ) {
     suspend fun getHover(code: String, offset: Int, cachedAstInfo: AstInfo? = null): Hover? {
         // First parse and analyze the code
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, cachedAstInfo?.filePath)
-        ?: return null
+        val astInfo = cachedAstInfo ?: return null
 
         val tokens = Lexer(code, astInfo.filePath)
             .toList()

@@ -11,6 +11,7 @@ import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 import io.github.arashiyama11.dncl_ide.language_server.FileResolver
 import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
 import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
+import io.github.arashiyama11.dncl_ide.language_server.traced
 import kotlinx.coroutines.flow.toList
 
 class SemanticTokensService(
@@ -19,14 +20,16 @@ class SemanticTokensService(
 ) {
     suspend fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
         val tokens =
-            Lexer(code, cachedAstInfo?.filePath)//,
-                ///resolveLib = { path -> resolveLibText(fileResolver, path) }
+            traced("Semantic Token lex") {
+                Lexer(code, cachedAstInfo?.filePath)//,
+                    ///resolveLib = { path -> resolveLibText(fileResolver, path) }
 
-                .toList()
-                .mapNotNull { it.getOrNull() }
+                    .toList()
+                    .mapNotNull { it.getOrNull() }
+            }
 
-        // ASTとシンボルテーブルを取得
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code, cachedAstInfo?.filePath)
+        // ASTとシンボルテーブルを取得（パースはスケジューラ経由に統一）
+        val astInfo = cachedAstInfo
         val targetFilePath = astInfo?.filePath ?: cachedAstInfo?.filePath
         val filteredTokens = tokens.filter { token ->
             targetFilePath == null || token.filePath == targetFilePath

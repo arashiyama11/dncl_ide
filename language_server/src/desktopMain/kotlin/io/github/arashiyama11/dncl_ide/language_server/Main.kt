@@ -18,41 +18,56 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.EOFException
 import java.io.File
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-fun main() = runBlocking {
+private val LimitedDefault = Dispatchers.Default.limitedParallelism(2)
+private val limitedScope = CoroutineScope(SupervisorJob() + LimitedDefault)
+
+
+suspend fun main() {
     logging("Starting DNCL Language Server")
-    val json = Json { ignoreUnknownKeys = true }
-    val fileResolver = StdlibOnlyFileResolver()
-    val astInfoService = AstInfoService(fileResolver)
-    val server = DNCLLanguageServer(
-        DocumentManager(),
-        DiagnosticService(fileResolver),
-        CompletionService(fileResolver),
-        HoverService(astInfoService),
-        DefinitionService(astInfoService),
-        ReferenceService(astInfoService),
-        RenameService(astInfoService),
-        FormattingService(),
-        CodeActionService(),
-        SemanticTokensService(astInfoService, fileResolver),
-        astInfoService
-    )
 
-    // 出力ループを起動
-    val outputJob = launchOutputLoop(server)
-    // 入力ループを起動
-    val inputJob = launchInputLoop(server, json)
-    logging("Language Server started")
+    try {
+        limitedScope.launch {
+            val json = Json { ignoreUnknownKeys = true }
+            val fileResolver = StdlibOnlyFileResolver()
+            val astInfoService = AstInfoService(fileResolver)
+            val server = DNCLLanguageServer(
+                DocumentManager(),
+                DiagnosticService(fileResolver),
+                CompletionService(fileResolver),
+                HoverService(astInfoService),
+                DefinitionService(astInfoService),
+                ReferenceService(astInfoService),
+                RenameService(astInfoService),
+                FormattingService(),
+                CodeActionService(),
+                SemanticTokensService(astInfoService, fileResolver),
+                astInfoService,
+                scheduler = DefaultDocumentScheduler(limitedScope),
+                debounceMillis = 100
+            )
 
-    // シャットダウン等が必要ならここで待機
-    joinAll(outputJob, inputJob)
+            // 出力ループを起動
+            val outputJob = launchOutputLoop(server)
+            // 入力ループを起動
+            val inputJob = launchInputLoop(server, json)
+            logging("Language Server started")
+
+            // シャットダウン等が必要ならここで待機
+            joinAll(outputJob, inputJob)
+        }.join()
+    } catch (e: Throwable) {
+        logging("fatal error\n$e")
+    }
 }
 
 fun CoroutineScope.launchOutputLoop(server: DNCLLanguageServer) = launch(Dispatchers.IO) {
     server.output.consumeEach { it ->
         val bytes = it.encodeToByteArray()
         val length = "Content-Length: ${bytes.size}\r\n\r\n"
-        logging("output: $length${String(bytes, Charsets.UTF_8)}")
+        logging("<-- ${String(bytes, Charsets.UTF_8)}")
         System.out.write(length.toByteArray())
         System.out.write(bytes)
         System.out.flush()
@@ -67,8 +82,10 @@ val logFile by lazy {
     }
 }
 
-fun logging(message: String) {
-    logFile.appendText("$message\n")
+@OptIn(ExperimentalTime::class)
+internal actual fun logging(message: String) {
+    val time = Clock.System.now()
+    logFile.appendText("$time $message\n")
 }
 
 fun CoroutineScope.launchInputLoop(
@@ -108,7 +125,7 @@ fun CoroutineScope.launchInputLoop(
                 .firstOrNull()
                 ?: return@withTimeoutOrNull null
 
-            logging("Received headers, Content-Length=$length")
+            //logging("Received headers, Content-Length=$length")
 
             // ── 本文取得 ───────────────────────────────────────────────
             val body = ByteArray(length)
@@ -127,7 +144,7 @@ fun CoroutineScope.launchInputLoop(
             continue
         }
 
-        logging("Received message: $message")
+        logging("--> $message")
         runCatching { json.decodeFromString<JsonRpcRequest>(message) }
             .onSuccess { launch { server.handleMessage(it) } }
             .onFailure { logging("Error processing message: ${it.message}") }

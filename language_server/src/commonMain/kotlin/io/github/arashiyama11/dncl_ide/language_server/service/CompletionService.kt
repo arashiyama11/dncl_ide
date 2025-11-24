@@ -24,10 +24,11 @@ class CompletionService(
     suspend fun getCompletionItems(
         code: String,
         offset: Int,
-        filePath: String? = null
+        filePath: String? = null,
+        astInfo: AstInfo? = null
     ): List<CompletionItem> {
         val suggestionUseCase = SuggestionUseCase(fileResolver, filePath)
-        val suggestions = suggestionUseCase.suggestWhenFailingParse(code, offset)
+        val suggestions = suggestionUseCase.suggestWithAstOrFallback(code, offset, astInfo)
         return suggestions.map { def ->
             CompletionItem(
                 label = def.literal,
@@ -251,10 +252,23 @@ private class SuggestionUseCase(
     private val fileResolver: FileResolver,
     private val filePath: String?
 ) {
-    suspend fun suggestWhenFailingParse(
+    suspend fun suggestWithAstOrFallback(
         code: String,
-        position: Int
+        position: Int,
+        astInfo: AstInfo?
     ): List<Definition> {
+        if (astInfo != null) {
+            val tokens = Lexer(code, filePath).toList()
+            return suggestWithParsedProgram(
+                code = code,
+                position = position,
+                tokens = tokens,
+                program = astInfo.ast,
+                builtInSignatures = astInfo.builtInSignatures
+            )
+        }
+
+        // AST が無い場合は従来のフォールバック（軽量パース付き）
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
         val lexer = Lexer(fixedCode, filePath)
         val parseResult = parseProgramWithBuiltIns(lexer, filePath)
