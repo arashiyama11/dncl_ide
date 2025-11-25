@@ -1,4 +1,4 @@
-package io.github.arashiyama11.dncl_ide.language_server.service
+package io.github.arashiyama11.dncl_ide.language_server
 
 import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
@@ -7,9 +7,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignatur
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
-import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
-import io.github.arashiyama11.dncl_ide.language_server.Range
-import io.github.arashiyama11.dncl_ide.language_server.FileResolver
 import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
 import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
@@ -21,12 +18,11 @@ data class DiagnosticResult(
     val builtInSignatures: List<BuiltInFunctionSignature> = emptyList()
 )
 
-class DiagnosticService(
+class DocumentAnalyzerImpl(
     private val fileResolver: FileResolver = StdlibOnlyFileResolver()
-) {
-
+) : DocumentAnalyzer {
     @Suppress("UNUSED_PARAMETER")
-    suspend fun analyze(uri: String, text: String): DiagnosticResult {
+    override suspend fun analyze(uri: String, text: String): DiagnosticResult {
         val builtIns = mutableListOf<BuiltInFunctionSignature>()
         val lexer = preProcess(
             Lexer(text, uri),
@@ -74,4 +70,8 @@ class DiagnosticService(
             source = "dncl-ls"
         )
     }
+}
+
+interface DocumentAnalyzer {
+    suspend fun analyze(uri: String, text: String): DiagnosticResult
 }

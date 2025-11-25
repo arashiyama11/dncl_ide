@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import io.github.arashiyama11.dncl_ide.language_server.service.CodeActionService
 import io.github.arashiyama11.dncl_ide.language_server.service.CompletionService
 import io.github.arashiyama11.dncl_ide.language_server.service.DefinitionService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.FormattingService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
@@ -14,10 +13,11 @@ import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileRes
 
 fun createLanguageServer(
     fileResolver: FileResolver = StdlibOnlyFileResolver(),
-    documentManager: DocumentManager = DocumentManager()
+    documentManager: DocumentManager = DocumentManager(),
+    config: LanguageServerConfig = LanguageServerConfig()
 ): DNCLLanguageServer {
     val astInfoService = AstInfoService(fileResolver)
-    val diagnosticService = DiagnosticService(fileResolver)
+    val documentAnalyzer = DocumentAnalyzerImpl(fileResolver)
     val completionService = CompletionService(fileResolver)
     val hoverService = HoverService(astInfoService, fileResolver)
     val definitionService = DefinitionService(astInfoService)
@@ -29,7 +29,6 @@ fun createLanguageServer(
 
     return DNCLLanguageServer(
         documentManager = documentManager,
-        diagnosticService = diagnosticService,
         completionService = completionService,
         hoverService = hoverService,
         definitionService = definitionService,
@@ -38,6 +37,8 @@ fun createLanguageServer(
         formattingService = formattingService,
         codeActionService = codeActionService,
         semanticTokensService = semanticTokensService,
-        astInfoService = astInfoService
+        astInfoService = astInfoService,
+        scheduler = DefaultDocumentScheduler(analyzer = documentAnalyzer),
+        config = config
     )
 }

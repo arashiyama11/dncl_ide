@@ -9,6 +9,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.takeWhile
 
 
@@ -37,21 +38,23 @@ fun preProcess(
 
                 is Token.AtMark -> {
                     val at = t as Token.AtMark
-                    val target = at.literal.substring(8, at.literal.length - 2)
-                    val targetText = resolveLib(target)
+                    if (at.literal.startsWith("@インポート(\"")) {
+                        val target = at.literal.substring(8, at.literal.length - 2) //
+                        val targetText = resolveLib(target)
 
-                    emitAll(
-                        preProcess(
-                            Lexer(targetText, target),
-                            resolveLib,
-                            onBuiltInSignature
-                        ).takeWhile { it.getOrNull() !is Token.EOF }
-                    )
+                        emitAll(
+                            preProcess(
+                                Lexer(targetText, target),
+                                resolveLib,
+                                onBuiltInSignature
+                            ).takeWhile { it.getOrNull() !is Token.EOF }
+                        )
+                    }
                 }
 
                 is Token.Japanese -> {
                     if (t.literal == "組み込み関数") {
-                        consumeBuiltInSignature(t, iterator, onBuiltInSignature)
+                        emitAll(consumeBuiltInSignature(t, iterator, onBuiltInSignature))
                         continue
                     }
                     emit(tok)
@@ -63,6 +66,8 @@ fun preProcess(
     }
 }
 
+
+@Suppress("FLOW_CONST")
 private suspend fun processBuiltinSignatures(
     onBuiltInSignature: ((BuiltInFunctionSignature) -> Unit)?
 ) {
@@ -84,8 +89,8 @@ private fun consumeBuiltInSignature(
     headToken: Token.Japanese,
     iterator: Iterator<Either<LexerError, Token>>,
     onBuiltInSignature: ((BuiltInFunctionSignature) -> Unit)?
-) {
-    if (onBuiltInSignature == null) return
+): Flow<Either<LexerError, Token>> {
+    if (onBuiltInSignature == null) return flowOf()
 
     var name: String? = null
     val params = mutableListOf<String>()
@@ -94,7 +99,7 @@ private fun consumeBuiltInSignature(
 
     while (iterator.hasNext()) {
         val next = iterator.next()
-        val token = next.getOrNull() ?: return
+        val token = next.getOrNull() ?: return flowOf()
         lastRange = token.range
         when (token) {
             is Token.Identifier, is Token.Japanese -> {
@@ -116,8 +121,7 @@ private fun consumeBuiltInSignature(
                     )
                 }
                 signature?.let(onBuiltInSignature)
-                skipUntilLineEnd(iterator)
-                return
+                return flowOf()
             }
 
             is Token.NewLine, is Token.EOF -> {
@@ -130,7 +134,7 @@ private fun consumeBuiltInSignature(
                     )
                 }
                 signature?.let(onBuiltInSignature)
-                return
+                return flowOf(next)
             }
 
             else -> {}
@@ -146,6 +150,7 @@ private fun consumeBuiltInSignature(
         )
     }
     signature?.let(onBuiltInSignature)
+    return flowOf()
 }
 
 private fun skipUntilLineEnd(iterator: Iterator<Either<LexerError, Token>>) {

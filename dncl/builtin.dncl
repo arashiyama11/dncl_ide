@@ -1,0 +1,132 @@
+# メッセージを表示します
+# 表示する(message1, message2, ... , messageN) のように任意の数引数を受け取り、カンマ区切りで表示します
+組み込み関数 表示する(messages)
+
+# arrayの長さを返します よよよ
+# 要素数([1,2,3]) = 3
+組み込み関数 要素数(array)
+
+# hogehoge
+組み込み関数 差分(text)
+
+# 関数の戻り値を表すキーワード関数です
+組み込み関数 戻り値(value)
+
+# 2つのarrayを連結してできるarrayを返します
+組み込み関数 連結(array1, array2)
+
+# arrayの末尾にvalueを追加します
+組み込み関数 末尾追加(array, value)
+
+# arrayの末尾を削除してその値を返します
+組み込み関数 先頭削除(array)
+
+# arrayの先頭にvalueを追加します
+組み込み関数 先頭追加(array, value)
+
+# arrayの末尾を削除してその値を返します
+組み込み関数 末尾削除(array)
+
+# value を整数に変換します
+組み込み関数 整数変換(value)
+
+# valueを浮動小数点に変換します
+組み込み関数 浮動小数点変換(value)
+
+# valueを文字列に変換します
+組み込み関数 文字列変換(value)
+
+# textの文字コードを返します
+# textは1文字である必要があります
+組み込み関数 文字コード(text)
+
+# 整数のcodeを文字に変換します
+組み込み関数 コードから文字(code)
+
+# arrayのstartからendまでの部分配列を返します
+組み込み関数 部分配列(array, start, end)
+
+# arrayの要素をseparatorで結合してできる文字列を返します
+組み込み関数 配列結合(array, separator)
+
+# arrayをソートします
+組み込み関数 並べ替え(array)
+
+# arrayを逆順にします
+組み込み関数 逆順(array)
+
+# arrayにtargetが存在したらtrueを返します
+組み込み関数 検索(array, target)
+
+# textのstart文字目からend文字目までの部分文字列を返します
+組み込み関数 部分文字列(text, start, end)
+
+# textをdelimiterで分割してできる文字列の配列を返します
+組み込み関数 分割(text, delimiter)
+
+# textの前後にある空白を除去します
+組み込み関数 空白除去(text)
+
+# textのoldの部分をnewに置換します
+組み込み関数 置換(text, old, new)
+
+# numberを四捨五入して得られる整数値を返します
+組み込み関数 四捨五入(number)
+
+# numberを切り捨てして得られる整数値を返します
+組み込み関数 切り捨て(number)
+
+# numberを切り上げして得られる整数値を返します
+組み込み関数 切り上げ(number)
+
+# 0~1 の範囲で浮動小数点の乱数を返します
+組み込み関数 乱数()
+
+# 与えられた数値配列の最大値を返します
+組み込み関数 最大値(values)
+
+# 与えられた数値配列の最小値を返します
+組み込み関数 最小値(values)
+
+# valueが整数か判定します
+組み込み関数 整数判定(value)
+
+# valueが浮動小数点か判定します
+組み込み関数 浮動小数点判定(value)
+
+# valueが文字列か判定します
+組み込み関数 文字列判定(value)
+
+# valueが配列か判定します
+組み込み関数 配列判定(value)
+
+# valueが真偽値か判定します
+組み込み関数 真偽値判定(value)
+
+# 出力を消去します
+組み込み関数 出力消去(target)
+
+# 与えられた時間だけミリ秒単位で待機します
+組み込み関数 待機(milliseconds)
+
+
+組み込み関数 stdout_append(target, value)
+組み込み関数 stdout_flash(target)
+組み込み関数 stdout_commit(target)
+組み込み関数 stdout_replace(target, value)
+組み込み関数 標準出力ハンドル()
+組み込み関数 標準エラーハンドル()
+組み込み関数 標準入力ハンドル()
+組み込み関数 ファイルを開く(path)
+組み込み関数 ファイルへ書く(file, text)
+組み込み関数 ファイルを読む(file)
+組み込み関数 ファイルをクリア(file)
+組み込み関数 ファイルをフラッシュ(file)
+組み込み関数 ファイルをコミット(file)
+組み込み関数 ファイルを閉じる(file)
+組み込み関数 get_canvas(index)
+組み込み関数 write_canvas(file, data)
+組み込み関数 read_canvas(file)
+組み込み関数 clear_canvas(file)
+組み込み関数 commit_canvas(file)
+

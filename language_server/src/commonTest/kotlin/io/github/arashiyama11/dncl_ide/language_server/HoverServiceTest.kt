@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,11 +10,11 @@ import kotlinx.coroutines.test.runTest
 
 class HoverServiceTest {
 
-    private fun createServices(): Triple<HoverService, DiagnosticService, AstInfoService> {
-        val diagnosticService = DiagnosticService()
+    private fun createServices(): Triple<HoverService, DocumentAnalyzerImpl, AstInfoService> {
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val hoverService = HoverService(astInfoService)
-        return Triple(hoverService, diagnosticService, astInfoService)
+        return Triple(hoverService, documentAnalyzerService, astInfoService)
     }
 
     @Test
@@ -23,7 +22,8 @@ class HoverServiceTest {
         val (hoverService, diagnosticService, astInfoService) = createServices()
 
         val code = "表示する(x)"
-        val hover = hoverService.getHover(code, 1) // 「表示」の位置
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
+        val hover = hoverService.getHover(code, 1, astInfo) // 「表示」の位置
 
         assertNotNull(hover)
         assertNotNull(hover.contents)
@@ -39,8 +39,13 @@ class HoverServiceTest {
             表示する(x)
         """.trimIndent()
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         val hover =
-            hoverService.getHover(code, code.indexOf("x)", code.indexOf("表示する"))) // 2行目のxの位置
+            hoverService.getHover(
+                code,
+                code.indexOf("x)", code.indexOf("表示する")),
+                astInfo
+            ) // 2行目のxの位置
 
         assertNotNull(hover)
         assertEquals("markdown", hover.contents.kind)
@@ -59,9 +64,11 @@ class HoverServiceTest {
             res = myFunc(1, 2)
         """.trimIndent()
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         val hover = hoverService.getHover(
             code,
-            code.indexOf("myFunc", code.indexOf("res"))
+            code.indexOf("myFunc", code.indexOf("res")),
+            astInfo
         ) // 関数呼び出しのmyFunc
 
         assertNotNull(hover)
@@ -75,7 +82,8 @@ class HoverServiceTest {
         val (hoverService, _, astInfoService) = createServices()
         val code = "表示(\"Hello World\")"
 
-        val hover = hoverService.getHover(code, code.length - 1) // 文字列の最後の空白部分
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
+        val hover = hoverService.getHover(code, code.length - 1, astInfo) // 文字列の最後の空白部分
 
         assertNull(hover)
     }
@@ -90,8 +98,13 @@ class HoverServiceTest {
             と定義する
         """.trimIndent()
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         val hover =
-            hoverService.getHover(code, code.indexOf("param1", code.indexOf("表示"))) // 関数内のparam1
+            hoverService.getHover(
+                code,
+                code.indexOf("param1", code.indexOf("表示")),
+                astInfo
+            ) // 関数内のparam1
 
         println("Hover result: $hover")
         assertNotNull(hover)
@@ -116,7 +129,10 @@ class HoverServiceTest {
         val expanded = hoverService.expandWithLeadingComments(src, original)
 
         // コメント行を含んで開始位置が前に広がることを確認
-        kotlin.test.assertTrue(expanded.first < original.first, "コメント分だけ開始が前に広がるはず")
+        kotlin.test.assertTrue(
+            expanded.first < original.first,
+            "コメント分だけ開始が前に広がるはず"
+        )
         val prefix = src.substring(expanded.first, original.first)
         kotlin.test.assertTrue(prefix.contains("# コメント1"), "コメント1を含むはず")
         kotlin.test.assertTrue(prefix.contains("# コメント2"), "コメント2を含むはず")

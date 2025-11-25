@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,11 +9,11 @@ import kotlinx.coroutines.test.runTest
 
 class ReferenceServiceTest {
 
-    private fun createServices(): Triple<ReferenceService, DiagnosticService, AstInfoService> {
-        val diagnosticService = DiagnosticService()
+    private fun createServices(): Triple<ReferenceService, DocumentAnalyzerImpl, AstInfoService> {
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val referenceService = ReferenceService(astInfoService)
-        return Triple(referenceService, diagnosticService, astInfoService)
+        return Triple(referenceService, documentAnalyzerService, astInfoService)
     }
 
     @Test
@@ -29,8 +28,9 @@ class ReferenceServiceTest {
         """.trimIndent()
 
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val references =
-            referenceService.findReferences(uri, code, code.indexOf("x"), true) // 最初のxの位置
+            referenceService.findReferences(uri, code, code.indexOf("x"), true, astInfo) // 最初のxの位置
 
         assertTrue(references.isNotEmpty())
         // 実際の参照数に基づいて期待値を設定（デバッグで確認した結果に基づく）
@@ -52,8 +52,10 @@ class ReferenceServiceTest {
 
         // 関数定義のaddから全参照を検索
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val addDefinitionPosition = code.indexOf("add")
-        val references = referenceService.findReferences(uri, code, addDefinitionPosition, true)
+        val references =
+            referenceService.findReferences(uri, code, addDefinitionPosition, true, astInfo)
 
         // 関数が正しく見つかることを確認（具体的な数値は実装に依存）
         assertTrue(references.isNotEmpty(), "関数addの参照が見つかるはずです")
@@ -74,15 +76,18 @@ class ReferenceServiceTest {
 
         // グローバルのxの参照を検索
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val globalXPosition = code.indexOf("x")
-        val globalReferences = referenceService.findReferences(uri, code, globalXPosition, true)
+        val globalReferences =
+            referenceService.findReferences(uri, code, globalXPosition, true, astInfo)
 
         // 参照が見つかることを確認
         assertTrue(globalReferences.isNotEmpty(), "グローバル変数xの参照が見つかるはずです")
 
         // 関数内のxの参照を検索
         val localXPosition = code.indexOf("x = 20")
-        val localReferences = referenceService.findReferences(uri, code, localXPosition, true)
+        val localReferences =
+            referenceService.findReferences(uri, code, localXPosition, true, astInfo)
 
         // 参照が見つかることを確認
         assertTrue(localReferences.isNotEmpty(), "ローカル変数xの参照が見つかるはずです")
@@ -102,8 +107,9 @@ class ReferenceServiceTest {
 
         // パラメータnum1の参照を検索
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val param1Position = code.indexOf("num1")
-        val references = referenceService.findReferences(uri, code, param1Position, true)
+        val references = referenceService.findReferences(uri, code, param1Position, true, astInfo)
 
         // パラメータの参照が見つかることを確認
         assertTrue(references.isNotEmpty(), "パラメータnum1の参照が見つかるはずです")
@@ -120,7 +126,7 @@ class ReferenceServiceTest {
         // 存在しない位置での参照検索
         val uri = "file:///test.dncl"
         val invalidPosition = code.length + 10
-        val references = referenceService.findReferences(uri, code, invalidPosition, true)
+        val references = referenceService.findReferences(uri, code, invalidPosition, true, null)
 
         assertTrue(references.isEmpty(), "無効な位置では参照が見つからないはずです")
     }
@@ -134,7 +140,8 @@ class ReferenceServiceTest {
         // outerFuncのxの参照を検索
         val uri = "file:///test.dncl"
         val position = code.indexOf("board", code.indexOf("進化(board)を"))
-        val references = referenceService.findReferences(uri, code, position, true)
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val references = referenceService.findReferences(uri, code, position, true, astInfo)
         //関数 進化内のboardの参照の数は定義を含めて4つ
         assertEquals(4, references.size)
     }

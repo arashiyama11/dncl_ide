@@ -2,7 +2,6 @@ package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import io.github.arashiyama11.dncl_ide.language_server.service.DefinitionService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -11,11 +10,11 @@ import kotlinx.coroutines.test.runTest
 
 class DefinitionServiceTest {
 
-    private fun createServices(): Triple<DefinitionService, DiagnosticService, AstInfoService> {
-        val diagnosticService = DiagnosticService()
+    private fun createServices(): Triple<DefinitionService, DocumentAnalyzerImpl, AstInfoService> {
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val definitionService = DefinitionService(astInfoService)
-        return Triple(definitionService, diagnosticService, astInfoService)
+        return Triple(definitionService, documentAnalyzerService, astInfoService)
     }
 
     @Test
@@ -29,9 +28,15 @@ class DefinitionServiceTest {
         """.trimIndent()
 
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         // 2行目のxの位置から定義へジャンプ
         val definition =
-            definitionService.getDefinitionLocation(uri, code, code.indexOf("x", code.indexOf("y")))
+            definitionService.getDefinitionLocation(
+                uri,
+                code,
+                code.indexOf("x", code.indexOf("y")),
+                astInfo
+            )
 
         assertNotNull(definition)
         assertEquals(uri, definition.uri)
@@ -55,8 +60,9 @@ class DefinitionServiceTest {
 
         // 関数呼び出し部分のmyFuncから関数定義へのジャンプをテスト
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val funcCallPosition = code.indexOf("myFunc", code.indexOf("res"))
-        val location = definitionService.getDefinitionLocation(uri, code, funcCallPosition)
+        val location = definitionService.getDefinitionLocation(uri, code, funcCallPosition, astInfo)
 
         assertNotNull(location)
         // 1行目の関数定義位置を期待
@@ -77,8 +83,10 @@ class DefinitionServiceTest {
 
         // 関数内でのnum1使用から関数パラメータ定義へのジャンプをテスト
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
         val paramUsagePosition = code.indexOf("num1", code.indexOf("res ="))
-        val location = definitionService.getDefinitionLocation(uri, code, paramUsagePosition)
+        val location =
+            definitionService.getDefinitionLocation(uri, code, paramUsagePosition, astInfo)
 
         assertNotNull(location)
         // 1行目のパラメータ定義位置を期待
@@ -102,17 +110,20 @@ class DefinitionServiceTest {
         """.trimIndent()
 
         val uri = "file:///test.dncl"
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
 
         // 関数内のxは関数内の定義へジャンプす���き
         val innerXPosition = code.indexOf("x", code.indexOf("表示する", code.indexOf("関数 test")))
-        val innerLocation = definitionService.getDefinitionLocation(uri, code, innerXPosition)
+        val innerLocation =
+            definitionService.getDefinitionLocation(uri, code, innerXPosition, astInfo)
 
         // 定義が見つかることを確認（具体的な位置は実装に依存）
         assertNotNull(innerLocation, "関数内の変数xの定義が見つかるはずです")
 
         // 関数外のxはグローバルの定義へジャンプすべき
         val outerXPosition = code.lastIndexOf("x)")
-        val outerLocation = definitionService.getDefinitionLocation(uri, code, outerXPosition)
+        val outerLocation =
+            definitionService.getDefinitionLocation(uri, code, outerXPosition, astInfo)
 
         // 定義が見つかることを確認
         assertNotNull(outerLocation, "グローバル変数xの定義が見つかるはずです")

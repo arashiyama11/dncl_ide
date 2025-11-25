@@ -103,7 +103,6 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
         either {
             val expression = parseExpression(Precedence.LOWEST).bind()
             requireEndOfLine {
-                println("currentToken: $currentToken")
                 ParserError.ParseError(
                     currentToken,
                     "一行に複数の式を書けません",
@@ -559,9 +558,10 @@ class Parser private constructor(private val lexer: Iterator<Either<LexerError, 
             val parser = Parser(itr)
             parser.currentToken = itr.next().bind()
             parser.nextToken =
-                if (parser.currentToken is Token.EOF) parser.currentToken else itr.next().bind()
+                if (!itr.hasNext()) parser.currentToken else itr.next().bind()
             parser.aheadToken =
-                if (parser.nextToken is Token.EOF) parser.nextToken else itr.next().bind()
+                if (!itr.hasNext()) parser.nextToken else itr.next().bind()
+
             return parser.right()
         }
 

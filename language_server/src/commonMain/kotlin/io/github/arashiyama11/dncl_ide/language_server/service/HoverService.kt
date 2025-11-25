@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.language_server.FileResolver
 import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.MarkupContent
+import io.github.arashiyama11.dncl_ide.language_server.logging
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 
 class HoverService(
@@ -21,6 +22,10 @@ class HoverService(
         val tokens = Lexer(code, astInfo.filePath)
             .toList()
             .mapNotNull { it.getOrNull() }
+
+        if (isCommentLine(code, offset - 1)) {
+            return null
+        }
 
         val originalFilePath = astInfo.filePath ?: tokens.firstOrNull()?.filePath
 
@@ -171,4 +176,26 @@ $funcImpl
 $snippet
 ```""".trimIndent()
     }
+}
+
+
+fun isCommentLine(code: String, offset: Int): Boolean {
+    if (offset < 0 || offset > code.length) return false
+
+    // 行の開始位置を探す（直前の改行の次）
+    val lineStart = code.lastIndexOf('\n', startIndex = offset - 1).let {
+        if (it == -1) 0 else it + 1
+    }
+
+    // 行の終わり位置（次の改行 or 末尾）
+    val lineEnd = code.indexOf('\n', startIndex = offset).let {
+        if (it == -1) code.length else it
+    }
+
+    val line = code.substring(lineStart, lineEnd)
+    logging("isCommentLine $line")
+
+
+    // 行頭の空白無視して '#' で始まるか判定
+    return line.trimStart().startsWith("#")
 }

@@ -26,10 +26,11 @@ data class JobState(
 data class DocumentJobRequest(
     val uri: String,
     val version: Int,
+    val text: String,
     val kind: JobKind = JobKind.ParseAndDiagnose,
     val priority: JobPriority = JobPriority.UserAction,
     val requestId: Long? = null,
-    val task: suspend () -> DocumentAnalysis?
+    val task: suspend (DiagnosticResult) -> DocumentAnalysis?
 )
 
 interface DocumentJobHandle {
@@ -72,7 +73,8 @@ private class DocumentJobHandleImpl(
 }
 
 class DefaultDocumentScheduler(
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val analyzer: DocumentAnalyzer
 ) : DocumentScheduler {
 
     private val mutex = Mutex()
@@ -80,7 +82,7 @@ class DefaultDocumentScheduler(
     private val latestVersionByUri = mutableMapOf<String, Int>()
     private val activeByUri = mutableMapOf<String, DocumentJobHandleImpl>()
     private val activeByRequestId = mutableMapOf<Long, DocumentJobHandleImpl>()
-    private val pendingStates = mutableListOf<JobState>()
+    private val pendingStates = LinkedHashMap<String, JobState>()
 
     override fun submit(request: DocumentJobRequest): DocumentJobHandle {
         val handle = DocumentJobHandleImpl(CompletableDeferred(), request.requestId)
@@ -97,22 +99,29 @@ class DefaultDocumentScheduler(
                 activeByUri[request.uri]?.cancel("Superseded by new request")
                 activeByUri[request.uri] = handle
                 request.requestId?.let { activeByRequestId[it] = handle }
-                pendingStates.add(
-                    JobState(
-                        uri = request.uri,
-                        version = request.version,
-                        kind = request.kind,
-                        status = JobStatus.Queued,
-                        requestId = request.requestId
-                    )
+                val key = stateKey(request.uri, request.version)
+                pendingStates.remove(key)
+                pendingStates[key] = JobState(
+                    uri = request.uri,
+                    version = request.version,
+                    kind = request.kind,
+                    status = JobStatus.Queued,
+                    requestId = request.requestId
                 )
+                while (pendingStates.size > stateHistoryLimit) {
+                    val firstKey = pendingStates.entries.firstOrNull()?.key ?: break
+                    pendingStates.remove(firstKey)
+                }
                 true
             }
-            if (!shouldRun) return@launch
+
+
+            if (!shouldRun) return@launch logging("${request.requestId} shouldRun false")
 
             try {
                 updateState(request, JobStatus.Running)
-                val result = request.task()
+                val parsed = analyzer.analyze(request.uri, request.text)
+                val result = request.task(parsed)
                 updateState(request, JobStatus.Succeeded)
                 handle.complete(result)
             } catch (e: CancellationException) {
@@ -166,27 +175,34 @@ class DefaultDocumentScheduler(
                     requestId = handle.requestId
                 )
             }
-            (pendingStates + active).toList()
+            val snapshot = LinkedHashMap<String, JobState>()
+            pendingStates.forEach { (k, v) -> snapshot[k] = v }
+            active.forEach {
+                val key = stateKey(it.uri, it.version)
+                snapshot[key] = it
+            }
+            snapshot.values.toList()
         }
     }
 
     private suspend fun updateState(request: DocumentJobRequest, status: JobStatus) {
         mutex.withLock {
-            pendingStates.add(
-                JobState(
-                    uri = request.uri,
-                    version = request.version,
-                    kind = request.kind,
-                    status = status,
-                    requestId = request.requestId
-                )
+            val key = stateKey(request.uri, request.version)
+            val state = JobState(
+                uri = request.uri,
+                version = request.version,
+                kind = request.kind,
+                status = status,
+                requestId = request.requestId
             )
-            // 履歴が肥大化しないように上限を設ける
-            if (pendingStates.size > stateHistoryLimit) {
-                repeat(pendingStates.size - stateHistoryLimit) {
-                    pendingStates.removeAt(0)
-                }
+            pendingStates.remove(key)
+            pendingStates[key] = state
+            while (pendingStates.size > stateHistoryLimit) {
+                val firstKey = pendingStates.entries.firstOrNull()?.key ?: break
+                pendingStates.remove(firstKey)
             }
         }
     }
+
+    private fun stateKey(uri: String, version: Int): String = "$uri#$version"
 }

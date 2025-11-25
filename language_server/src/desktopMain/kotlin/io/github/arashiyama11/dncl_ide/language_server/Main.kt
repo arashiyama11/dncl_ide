@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import io.github.arashiyama11.dncl_ide.language_server.service.CodeActionService
 import io.github.arashiyama11.dncl_ide.language_server.service.CompletionService
 import io.github.arashiyama11.dncl_ide.language_server.service.DefinitionService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.FormattingService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
@@ -33,9 +32,10 @@ suspend fun main() {
             val json = Json { ignoreUnknownKeys = true }
             val fileResolver = StdlibOnlyFileResolver()
             val astInfoService = AstInfoService(fileResolver)
+            val documentAnalyzerService = DocumentAnalyzerImpl(fileResolver)
+            val analyzer = DocumentAnalyzerImpl()
             val server = DNCLLanguageServer(
                 DocumentManager(),
-                DiagnosticService(fileResolver),
                 CompletionService(fileResolver),
                 HoverService(astInfoService),
                 DefinitionService(astInfoService),
@@ -45,8 +45,10 @@ suspend fun main() {
                 CodeActionService(),
                 SemanticTokensService(astInfoService, fileResolver),
                 astInfoService,
-                scheduler = DefaultDocumentScheduler(limitedScope),
-                debounceMillis = 100
+                scheduler = DefaultDocumentScheduler(limitedScope, analyzer),
+                config = LanguageServerConfig(
+                    debounceMillis = 100
+                )
             )
 
             // 出力ループを起動

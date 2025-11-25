@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import io.github.arashiyama11.dncl_ide.language_server.service.CodeActionService
 import io.github.arashiyama11.dncl_ide.language_server.service.CompletionService
 import io.github.arashiyama11.dncl_ide.language_server.service.DefinitionService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.FormattingService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
@@ -18,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,14 +27,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.coroutines.coroutineContext
-import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -47,15 +44,16 @@ internal suspend inline fun <T> logTimed(
     name: String,
     docUri: String?,
     requestId: String?,
+    timeoutMillis: Long,
     crossinline block: suspend () -> T
 ): T {
     val mark = TimeSource.Monotonic.markNow()
     try {
-        return withTimeout(3000) { block() }
+        return withTimeout(timeoutMillis) { block() }
     } finally {
         val elapsed: Duration = mark.elapsedNow()
         logging(
-            "op=$name uri=$docUri reqId=$requestId durationMs=${elapsed.inWholeNanoseconds / 1_000_000f}ms"
+            "op=$name uri=$docUri reqId=$requestId took ${elapsed.inWholeNanoseconds / 1_000_000f}ms"
         )
     }
 }
@@ -72,11 +70,6 @@ internal inline fun <T> traced(name: String, block: () -> T): T {
     }
 }
 
-// 使う側
-fun doSomething() = traced("doSomething") {
-    // 本体
-}
-
 
 internal data class LsState(
     val initialized: Boolean = false,
@@ -84,10 +77,16 @@ internal data class LsState(
     val capabilities: ClientCapabilities? = null
 )
 
+data class LanguageServerConfig(
+    val requestTimeoutMillis: Long = 3_000,
+    val analysisTimeoutMillis: Long = 2_500,
+    val debounceMillis: Long? = null,
+    val outputChannelCapacity: Int = 1024
+)
+
 
 class DNCLLanguageServer(
     private var documentManager: DocumentManager,
-    private val diagnosticService: DiagnosticService,
     private val completionService: CompletionService,
     private val hoverService: HoverService,
     private val definitionService: DefinitionService,
@@ -97,8 +96,8 @@ class DNCLLanguageServer(
     private val codeActionService: CodeActionService,
     private val semanticTokensService: SemanticTokensService,
     private val astInfoService: AstInfoService,
-    private val scheduler: DocumentScheduler = DefaultDocumentScheduler(),
-    private val debounceMillis: Long? = null
+    private val scheduler: DocumentScheduler,
+    private val config: LanguageServerConfig = LanguageServerConfig()
 ) {
     private val debug = false
     private val state = MutableStateFlow(LsState())
@@ -113,11 +112,11 @@ class DNCLLanguageServer(
         encodeDefaults = true
         explicitNulls = false
     }
-    private val outputChannel = Channel<String>(1024)
+    private val outputChannel = Channel<String>(config.outputChannelCapacity)
     val output: ReceiveChannel<String> = outputChannel
 
     suspend fun handleMessage(jsonRpcRequest: JsonRpcRequest) {
-        val currentJob = coroutineContext[Job]
+        val currentJob = currentCoroutineContext()[Job]
         try {
             val alreadyCancelled = registerRequest(jsonRpcRequest.id, currentJob)
             if (alreadyCancelled) {
@@ -128,7 +127,8 @@ class DNCLLanguageServer(
             logTimed(
                 jsonRpcRequest.method,
                 jsonRpcRequest.params?.jsonObject["textDocument"]?.jsonObject["uri"]?.jsonPrimitive.toString(),
-                jsonRpcRequest.id.toString()
+                jsonRpcRequest.id.toString(),
+                config.requestTimeoutMillis
             ) {
                 when (jsonRpcRequest.method) {
                     "initialize" -> handleInitialize(jsonRpcRequest)
@@ -158,6 +158,8 @@ class DNCLLanguageServer(
             }
         } catch (e: Exception) {
             if (debug) throw e
+            logging(e.toString())
+            logging(e.stackTraceToString())
             outputChannel.send(
                 json.encodeToString(
                     JsonRpcErrorResponse(
@@ -212,7 +214,7 @@ class DNCLLanguageServer(
             textDocumentSync = 1, // Full text document synchronization
             completionProvider = CompletionOptions(
                 resolveProvider = false,
-                triggerCharacters = listOf(":", "=", "(", "[", " ")
+                triggerCharacters = listOf("\n", "=", "(", "[", " ")
             ),
             hoverProvider = true,
             definitionProvider = true,
@@ -230,7 +232,8 @@ class DNCLLanguageServer(
                         "string",
                         "comment",
                         "operator",
-                        "parameter"
+                        "parameter",
+                        "macro"
                     ),
                     tokenModifiers = listOf("definition", "readonly")
                 ),
@@ -277,7 +280,7 @@ class DNCLLanguageServer(
         text: String,
         version: Int?,
         requestId: Long?,
-        debounce: Long? = debounceMillis,
+        debounce: Long? = config.debounceMillis,
         publishDiagnostics: Boolean = true
     ) {
         if (debounce != null && debounce > 0) {
@@ -288,27 +291,27 @@ class DNCLLanguageServer(
             DocumentJobRequest(
                 uri = uri,
                 version = targetVersion,
+                text = text,
                 kind = JobKind.ParseAndDiagnose,
                 priority = JobPriority.UserAction,
                 requestId = requestId
-            ) {
-                val diagnosticResult = diagnosticService.analyze(uri, text)
-                val astInfo = diagnosticResult.program?.let {
+            ) { parsed ->
+                val astInfo = parsed.program?.let {
                     astInfoService.buildAstInfo(
                         it,
                         uri,
-                        diagnosticResult.builtInSignatures
+                        parsed.builtInSignatures
                     )
                 }
                 DocumentAnalysis(
-                    diagnostics = diagnosticResult.diagnostics,
+                    diagnostics = parsed.diagnostics,
                     astInfo = astInfo
                 )
             }
         )
 
         val analysis = try {
-            withTimeoutOrNull(2500) {
+            withTimeoutOrNull(config.analysisTimeoutMillis) {
                 handle.await()
             } ?: run {
                 logging(
@@ -446,9 +449,7 @@ class DNCLLanguageServer(
 
             val snapshot = ensureSnapshotWithAnalysis(textDocument.uri, request.id) ?: return
             val offset = calculateOffset(snapshot.text, position.line, position.character)
-            val result = handler(snapshot, offset, it)
-
-            when (result) {
+            when (val result = handler(snapshot, offset, it)) {
                 is CompletionList -> sendResponse(
                     request.id,
                     json.encodeToJsonElement(CompletionList.serializer(), result)
@@ -494,7 +495,7 @@ class DNCLLanguageServer(
             val completionItems = completionService.getCompletionItems(
                 code = snapshot.text,
                 offset = offset,
-                filePath = params?.textDocument?.uri,
+                filePath = params.textDocument.uri,
                 astInfo = snapshot.astInfo
             )
             CompletionList(isIncomplete = false, items = completionItems)

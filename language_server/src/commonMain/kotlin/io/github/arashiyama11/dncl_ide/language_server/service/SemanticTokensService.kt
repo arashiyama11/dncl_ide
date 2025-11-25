@@ -3,16 +3,12 @@ package io.github.arashiyama11.dncl_ide.language_server.service
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
-import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
 import io.github.arashiyama11.dncl_ide.language_server.FileResolver
-import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
-import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
 import io.github.arashiyama11.dncl_ide.language_server.traced
-import kotlinx.coroutines.flow.toList
 
 class SemanticTokensService(
     private val astInfoService: AstInfoService,
@@ -21,9 +17,7 @@ class SemanticTokensService(
     suspend fun getSemanticTokens(code: String, cachedAstInfo: AstInfo? = null): SemanticTokens {
         val tokens =
             traced("Semantic Token lex") {
-                Lexer(code, cachedAstInfo?.filePath)//,
-                    ///resolveLib = { path -> resolveLibText(fileResolver, path) }
-
+                Lexer(code, cachedAstInfo?.filePath)
                     .toList()
                     .mapNotNull { it.getOrNull() }
             }
@@ -77,7 +71,7 @@ class SemanticTokensService(
         val basicType = when (token) {
             is Token.If, is Token.Function, is Token.Wo, is Token.Kara, is Token.Made,
             is Token.While, is Token.UpTo, is Token.DownTo, is Token.Define, is Token.Then,
-            is Token.Else, is Token.Elif, is Token.And, is Token.Or, is Token.AtMark,
+            is Token.Else, is Token.Elif, is Token.And, is Token.Or,
                 -> 0 // keyword
             is Token.Int, is Token.Float -> 3 // number
             is Token.String -> 4 // string
@@ -86,6 +80,7 @@ class SemanticTokensService(
             is Token.Modulo, is Token.Assign, is Token.Equal, is Token.NotEqual,
             is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual,
             is Token.LessThanOrEqual, is Token.Bang -> 6 // operator
+            is Token.AtMark -> 8 // macro
             else -> -1 // 未判定
         }
 
@@ -94,6 +89,10 @@ class SemanticTokensService(
 
         // 識別子の場合、ASTとシンボルテーブルを使用してより詳細な解析を行う
         if (token is Token.Identifier || token is Token.Japanese) {
+            if (token.literal == "組み込み関数") {
+                return 0
+            }
+
             astInfo?.let { info ->
                 // シンボルテーブルから情報を取得
                 val symbol = info.symbolTable.resolve(token.literal, offset)
@@ -133,6 +132,7 @@ class SemanticTokensService(
 
         // 識別子の場合のみ修飾子を計算
         if (token is Token.Identifier || token is Token.Japanese) {
+            if (token.literal == "組み込み関数") return 1
             astInfo?.let { info ->
                 val symbol =
                     info.symbolTable.resolve(token.literal, offset)

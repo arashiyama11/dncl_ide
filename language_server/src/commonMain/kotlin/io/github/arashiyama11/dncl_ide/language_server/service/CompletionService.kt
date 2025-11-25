@@ -11,8 +11,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 import io.github.arashiyama11.dncl_ide.language_server.FileResolver
-import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
-import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
 import kotlinx.coroutines.flow.toList
 import kotlin.math.abs
 import kotlin.math.max
@@ -27,6 +25,9 @@ class CompletionService(
         filePath: String? = null,
         astInfo: AstInfo? = null
     ): List<CompletionItem> {
+        if (isCommentLine(code, offset)) {
+            return emptyList()
+        }
         val suggestionUseCase = SuggestionUseCase(fileResolver, filePath)
         val suggestions = suggestionUseCase.suggestWithAstOrFallback(code, offset, astInfo)
         return suggestions.map { def ->
