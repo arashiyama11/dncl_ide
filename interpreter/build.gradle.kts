@@ -251,3 +251,7 @@ val generateTextMap by tasks.registering {
 tasks.filterIsInstance<KotlinCompile>().forEach {
     it.dependsOn(generateTextMap)
 }
+
+tasks.named { it.startsWith("compileKotlinIos") }.forEach {
+    it.dependsOn(generateTextMap)
+}
