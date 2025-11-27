@@ -252,6 +252,6 @@ tasks.filterIsInstance<KotlinCompile>().forEach {
     it.dependsOn(generateTextMap)
 }
 
-tasks.named { it.startsWith("compileKotlinIos") }.forEach {
+tasks.named { it.startsWith("compileKotlin") }.forEach {
     it.dependsOn(generateTextMap)
 }
