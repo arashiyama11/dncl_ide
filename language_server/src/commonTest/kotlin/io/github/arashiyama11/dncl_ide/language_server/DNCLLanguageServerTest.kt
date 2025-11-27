@@ -1,15 +1,5 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
-import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
-import io.github.arashiyama11.dncl_ide.language_server.service.CodeActionService
-import io.github.arashiyama11.dncl_ide.language_server.service.CompletionService
-import io.github.arashiyama11.dncl_ide.language_server.service.DefinitionService
-import io.github.arashiyama11.dncl_ide.language_server.service.FormattingService
-import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
-import io.github.arashiyama11.dncl_ide.language_server.service.ReferenceService
-import io.github.arashiyama11.dncl_ide.language_server.service.RenameService
-import io.github.arashiyama11.dncl_ide.language_server.service.SemanticTokensService
-import io.github.arashiyama11.dncl_ide.language_server.service.DefaultDocumentAnalyzer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -25,29 +15,11 @@ class DNCLLanguageServerTest {
     private val json = Json { ignoreUnknownKeys = true }
 
 
-    private fun createServer(astInfoService: AstInfoService = AstInfoService()): DNCLLanguageServer {
-        val documentAnalyzerService = DocumentAnalyzerImpl()
-        val analyzer = DefaultDocumentAnalyzer(documentAnalyzerService)
-        return DNCLLanguageServer(
-            DocumentManager(),
-            documentAnalyzerService,
-            CompletionService(),
-            HoverService(astInfoService),
-            DefinitionService(astInfoService),
-            ReferenceService(astInfoService),
-            RenameService(astInfoService),
-            FormattingService(),
-            CodeActionService(),
-            SemanticTokensService(astInfoService),
-            astInfoService,
-            scheduler = DefaultDocumentScheduler(analyzer = analyzer)
-        )
-    }
+    private fun createServer(): DNCLLanguageServer = createLanguageServer()
 
     @Test
     fun `handleMessage processes initialize request and sends capabilities`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         val initializeRequest = JsonRpcRequest(
             id = 1,
             method = "initialize",
@@ -76,7 +48,7 @@ class DNCLLanguageServerTest {
         assertNotNull(initializeResult.capabilities.completionProvider)
         assertEquals(false, initializeResult.capabilities.completionProvider.resolveProvider)
         assertEquals(
-            listOf(":", "=", "(", "[", " "),
+            listOf("\n", "=", "(", "[", " "),
             initializeResult.capabilities.completionProvider.triggerCharacters
         )
         assertEquals(true, initializeResult.capabilities.hoverProvider)
@@ -115,8 +87,7 @@ class DNCLLanguageServerTest {
 
     @Test
     fun `handleMessage processes textDocument_formatting request`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -165,8 +136,7 @@ class DNCLLanguageServerTest {
 
     @Test
     fun `handleMessage processes textDocument_codeAction request`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         // First, open the document with an error
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -222,8 +192,7 @@ class DNCLLanguageServerTest {
 
     @Test
     fun `handleMessage processes textDocument_semanticTokens_full request`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -267,8 +236,7 @@ class DNCLLanguageServerTest {
 
     @Test
     fun `handleMessage processes textDocument_hover request`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         // First, open the document
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",
@@ -314,8 +282,7 @@ class DNCLLanguageServerTest {
     @Test
     fun `handleMessage processes textDocument_hover request for user-defined variable`() =
         runBlocking {
-            val astInfoService = AstInfoService()
-            val server = createServer(astInfoService)
+            val server = createServer()
             // First, open the document
             val didOpenNotification = JsonRpcRequest(
                 method = "textDocument/didOpen",
@@ -415,8 +382,7 @@ class DNCLLanguageServerTest {
     //@Test
     fun `handleMessage processes textDocument_didChange request and publishes diagnostics`() =
         runBlocking {
-            val astInfoService = AstInfoService()
-            val server = createServer(astInfoService)
+            val server = createServer()
             // First, open the document
             val didOpenNotification = JsonRpcRequest(
                 method = "textDocument/didOpen",
@@ -470,8 +436,7 @@ class DNCLLanguageServerTest {
 
     @Test
     fun `handleMessage processes textDocument_definition request`() = runBlocking {
-        val astInfoService = AstInfoService()
-        val server = createServer(astInfoService)
+        val server = createServer()
         // First, open the document with a definition and its usage
         val didOpenNotification = JsonRpcRequest(
             method = "textDocument/didOpen",

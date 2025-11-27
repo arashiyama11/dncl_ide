@@ -4,7 +4,9 @@ import io.github.arashiyama11.dncl_ide.domain.model.CursorPosition
 import io.github.arashiyama11.dncl_ide.domain.model.Entry
 import io.github.arashiyama11.dncl_ide.domain.model.EntryPath
 import io.github.arashiyama11.dncl_ide.domain.model.FileContent
+import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.Folder
+import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import kotlinx.coroutines.Job
@@ -38,4 +40,22 @@ interface FileRepository {
     suspend fun selectFile(entryPath: EntryPath)
     suspend fun getFileContent(programFile: ProgramFile): FileContent
     suspend fun getCursorPosition(programFile: ProgramFile): CursorPosition
+}
+
+suspend fun FileRepository.resolveLib(path: String): String {
+    val normalized = path.removePrefix("./")
+    val entryPath = if (normalized.startsWith("/")) {
+        EntryPath.fromString(normalized)
+    } else {
+        val parts = normalized.split('/')
+        val folderParts = parts.dropLast(1).filter { it.isNotBlank() }.map { FolderName(it) }
+        val fileName = FileName(parts.last())
+        this.rootPath + EntryPath(folderParts + fileName)
+    }
+
+    val entry = this.getEntryByPath(entryPath)
+        ?: error("ファイル:$path が見つかりません")
+
+    require(entry is ProgramFile) { "ファイル:$path はプログラムファイルではありません" }
+    return this.getFileContent(entry).value
 }

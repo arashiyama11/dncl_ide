@@ -103,13 +103,6 @@ suspend fun executeSourceCode(sourceCode: String) = coroutineScope {
 
     val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
         stdout = StdoutImpl,
-        onImport = { path ->
-            stderrPrintln("REPLモードではimportはサポートされていません: $path")
-            DnclObject.RuntimeError(
-                "REPLモードではimportはサポートされていません: $path",
-                AstNode.Program(emptyList())
-            )
-        }
     )
 
     // 入力行を別コルーチンで読み取ってチャネルに流す（プラットフォーム依存実装）
@@ -139,13 +132,6 @@ suspend fun runRepl(): Nothing = coroutineScope {
 
     val env = EvaluatorFactory.createBuiltInFunctionEnvironment(
         stdout = StdoutImpl,
-        onImport = { path ->
-            stderrPrintln("REPLモードではimportはサポートされていません: $path")
-            DnclObject.RuntimeError(
-                "REPLモードではimportはサポートされていません: $path",
-                AstNode.Program(emptyList())
-            )
-        }
     )
 
     // バックグラウンドで stdin を読み、inputChannel に流す（プラットフォーム実装）

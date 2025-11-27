@@ -335,25 +335,8 @@ class NotebookViewModel(
             environment = Environment(
                 EvaluatorFactory.createBuiltInFunctionEnvironment(
                     stdout = DynamicStdout(),
-                    onImport = { importPath ->
-                        println("Importing from: $importPath")
-                        _state.value.notebookFile?.let { file ->
-                            with(notebookFileUseCase) {
-                                importAndExecute(
-                                    file,
-                                    importPath,
-                                    environment
-                                )
-                            }.also { println("Import completed") }
-                        } ?: run {
-                            errorChannel.send("ノートブックファイルが読み込まれていません。インポートできません。")
-                            DnclObject.RuntimeError(
-                                "ノートブックファイルが読み込まれていません。インポートできません。",
-                                AstNode.Identifier("", 0..0, "error")
-                            )
-                        }
-                    }
-                ))
+                )
+            )
         }
     }
 

@@ -56,19 +56,17 @@ object EvaluatorFactory {
 
     suspend fun createBuiltInFunctionEnvironment(
         stdout: Stdout,
-        onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
     ): Environment {
         val virtualFileSystem = VirtualFileSystem().apply {
             register(stdout.asVirtualFile(StandardVirtualFile.Stdout.path))
             openOrCreate(StandardVirtualFile.Stderr.path)
             openOrCreate(StandardVirtualFile.Stdin.path)
         }
-        return createBuiltInFunctionEnvironment(virtualFileSystem, onImport)
+        return createBuiltInFunctionEnvironment(virtualFileSystem)
     }
 
     suspend fun createBuiltInFunctionEnvironment(
         virtualFileSystem: VirtualFileSystem,
-        onImport: suspend CallBuiltInFunctionScope.(String) -> DnclObject,
     ): Environment =
         Environment().apply {
             val stdoutHandle =
@@ -282,19 +280,6 @@ object EvaluatorFactory {
                         l@{
                             checkArgSize(1)?.let { return@l it }
                             DnclObject.String(args[0].toString(), astNode)
-                        }
-                    }
-
-                    AllBuiltInFunction.IMPORT -> {
-                        l@{
-                            checkArgSize(1)?.let { return@l it }
-                            when (args[0]) {
-                                is DnclObject.String -> {
-                                    onImport((args[0] as DnclObject.String).value)
-                                }
-
-                                else -> return@l DnclObject.TypeError("", astNode)
-                            }
                         }
                     }
 

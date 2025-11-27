@@ -60,7 +60,6 @@ class EvaluatorTest {
                     override suspend fun replace(text: String) {
                     }
                 },
-                onImport = { _ -> DnclObject.Null(AstNode.Program(emptyList())) }
             )
         }
     }

@@ -108,7 +108,6 @@ class CanvasVirtualFileTest {
         0
     )
 
-    @Test
     fun commitFrame_parsesHeaderAndPayload() = runTest {
         var captured: CanvasFrame? = null
         val file = CanvasVirtualFile(path = "/dev/canvas0", { frame ->

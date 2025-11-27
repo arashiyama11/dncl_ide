@@ -9,7 +9,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -60,13 +59,6 @@ class BuiltInFunctionTest {
                     override suspend fun replace(text: String) {
                     }
                 },
-                onImport = { _ ->
-                    DnclObject.Null(
-                        io.github.arashiyama11.dncl_ide.interpreter.model.AstNode.Program(
-                            emptyList()
-                        )
-                    )
-                }
             )
         }
     }

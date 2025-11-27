@@ -74,7 +74,7 @@ class ErrorExplainTest {
         val program = "表示する result"
         // Error at 'result', range 9..14
         val errorToken = dummyToken("result", 5..10)
-        val error = ParserError.UnExpectedToken(errorToken)
+        val error = ParserError.UnexpectedToken(errorToken)
         val expected = """1行6文字目でエラーが発生しました
 予期しないトークン: result
 ===============
@@ -89,7 +89,7 @@ class ErrorExplainTest {
         val program = "もし　あああ　ならば"
         // Error at 'あああ', range 3..5
         val errorToken = dummyToken("あああ", 3..5)
-        val error = ParserError.UnExpectedToken(errorToken)
+        val error = ParserError.UnexpectedToken(errorToken)
         val expected = """1行4文字目でエラーが発生しました
 予期しないトークン: あああ
 ===============

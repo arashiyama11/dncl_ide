@@ -1,7 +1,6 @@
 package io.github.arashiyama11.dncl_ide.domain.usecase
 
 import arrow.core.getOrElse
-import io.arashiyama11.dncl_ide.generated.DnclLibs
 import io.github.arashiyama11.dncl_ide.domain.model.DebugRunningMode
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
@@ -11,7 +10,6 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileName
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository
-import io.github.arashiyama11.dncl_ide.interpreter.evaluator.CallBuiltInFunctionScope
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.Evaluator
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
@@ -24,7 +22,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
@@ -33,6 +30,7 @@ import kotlin.coroutines.resume
 import io.github.arashiyama11.dncl_ide.interpreter.evaluator.InputLifecycleCallback
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
 import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasVirtualFile
+import io.github.arashiyama11.dncl_ide.domain.repository.resolveLib
 import io.github.arashiyama11.dncl_ide.interpreter.api.InMemoryVirtualFile
 import io.github.arashiyama11.dncl_ide.interpreter.api.Stdout
 import io.github.arashiyama11.dncl_ide.interpreter.api.StandardVirtualFile
@@ -97,7 +95,7 @@ class ExecuteUseCase(
     ): Flow<DnclOutput> {
 
         return channelFlow {
-            val tokens = preProcess(Lexer(program, filePath), ::resolveLib).toList()
+            val tokens = preProcess(Lexer(program, filePath), fileRepository::resolveLib).toList()
             val parser = Parser(tokens).getOrElse { err ->
                 send(DnclOutput.SyntaxError(err))
                 close()
@@ -217,7 +215,6 @@ class ExecuteUseCase(
                 val globalEnv = Environment(
                     EvaluatorFactory.createBuiltInFunctionEnvironment(
                         virtualFileSystem = virtualFileSystem,
-                        onImport = { onImport(it) }
                     )
                 )
 
@@ -247,81 +244,6 @@ class ExecuteUseCase(
             }
         }
         return 0
-    }
-
-    private suspend fun CallBuiltInFunctionScope.onImport(it: String): DnclObject {
-        val content = if (DnclLibs.texts.containsKey(it)) {
-            DnclLibs.texts[it]!!
-        } else {
-            val str = it.split("/")
-            val file = withTimeoutOrNull(100) {
-                fileRepository.getEntryByPath(
-                    EntryPath(
-                        str.dropLast(1).map { FolderName(it) } + FileName(
-                            str.last()
-                        )
-                    )).apply { if (this != null) return@withTimeoutOrNull this }
-
-                fileRepository.getEntryByPath(
-                    fileRepository.rootPath + EntryPath(
-                        str.dropLast(1).map { FolderName(it) } + FileName(
-                            str.last()
-                        )
-                    )
-                )
-            }
-
-            if (file is ProgramFile) {
-                fileRepository.getFileContent(file).value
-            } else {
-                return DnclObject.RuntimeError(
-                    "ファイル:$str が見つかりません",
-                    args[0].astNode
-                )
-            }
-        }
-
-        val tokens = preProcess(Lexer(content), ::resolveLib).toList()
-        val parser =
-            Parser(tokens).getOrElse { err ->
-                return DnclObject.RuntimeError(
-                    err.explain(content),
-                    args[0].astNode
-                )
-            }
-
-        val prog = parser.parseProgram().getOrElse { err ->
-            return DnclObject.RuntimeError(
-                err.explain(content),
-                args[0].astNode
-            )
-        }
-        return evaluator.evalProgram(prog, env).fold(ifLeft = {
-            DnclObject.RuntimeError(
-                it.message.orEmpty(),
-                args[0].astNode
-            )
-        }, ifRight = {
-            DnclObject.Null(args[0].astNode)
-        })
-    }
-
-    private suspend fun resolveLib(path: String): String {
-        val normalized = path.removePrefix("./")
-        val entryPath = if (normalized.startsWith("/")) {
-            EntryPath.fromString(normalized)
-        } else {
-            val parts = normalized.split('/')
-            val folderParts = parts.dropLast(1).filter { it.isNotBlank() }.map { FolderName(it) }
-            val fileName = FileName(parts.last())
-            fileRepository.rootPath + EntryPath(folderParts + fileName)
-        }
-
-        val entry = fileRepository.getEntryByPath(entryPath)
-            ?: error("ファイル:$path が見つかりません")
-
-        require(entry is ProgramFile) { "ファイル:$path はプログラムファイルではありません" }
-        return fileRepository.getFileContent(entry).value
     }
 
     private fun getEvaluator(

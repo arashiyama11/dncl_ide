@@ -1,6 +1,6 @@
 package io.github.arashiyama11.dncl_ide.interpreter
 
-import arrow.core.getOrNull
+import arrow.core.firstOrNone
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignature
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 
 class PreProcessorTest {
 
@@ -38,8 +39,9 @@ class PreProcessorTest {
 
         val literals = tokens.mapNotNull { it.getOrNull()?.literal }
         assertTrue(literals.none { it == "組み込み関数" })
-        assertEquals(1, collected.size)
-        assertEquals("長さ", collected.first().name)
-        assertEquals(listOf("x", "y"), collected.first().params)
+        //assertEquals(1, collected.size)
+        val target = collected.firstOrNull { it.name == "長さ" }
+        assertNotNull(target)
+        assertEquals(listOf("x", "y"), target.params)
     }
 }

@@ -22,8 +22,10 @@ import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
 import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
+import io.github.arashiyama11.dncl_ide.domain.repository.resolveLib
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.editor.compose.toEditorContentUpdate
@@ -32,6 +34,7 @@ import io.github.arashiyama11.dncl_ide.editor.core.EditorDocument
 import io.github.arashiyama11.dncl_ide.editor.core.EditorIntent
 import io.github.arashiyama11.dncl_ide.editor.core.EditorState
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.interpreter.cli.resolveLib
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
@@ -119,7 +122,8 @@ class IdeViewModel(
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>,
-    private val languageFeatureProvider: LanguageFeatureProvider
+    private val languageFeatureProvider: LanguageFeatureProvider,
+    private val fileRepository: FileRepository
 ) : ViewModel() {
     private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
     private val editorStateFlow = editorSession.state
@@ -388,7 +392,8 @@ class IdeViewModel(
                 }
             }
 
-            val tokens = Lexer(indentedText.text).toList()
+            val tokens =
+                preProcess(Lexer(indentedText.text), resolveLib = { "" }).toList()
 
             val lexicalTokens = tokens.mapNotNull { it.getOrNull() }
             customImeController.onEditorContextChanged(indentedText, lexicalTokens)
@@ -398,7 +403,12 @@ class IdeViewModel(
 
             if (tokens.all { it.isRight() }) {
                 val parser =
-                    Parser(preProcess(Lexer(indentedText.text), resolveLib = { "" }).toList()).getOrNull()
+                    Parser(
+                        preProcess(
+                            Lexer(indentedText.text),
+                            resolveLib = fileRepository::resolveLib
+                        ).toList()
+                    ).getOrNull()
 
                 if (parser != null) {
                     parsedProgram = parser.parseProgram()
@@ -420,7 +430,7 @@ class IdeViewModel(
             val finalError = error ?: highlightError
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
-            val nextPane = when {
+                    val nextPane = when {
                         finalError != null -> OutputPane.ERROR
                         it.outputPane == OutputPane.ERROR -> OutputPane.STDOUT
                         else -> it.outputPane
@@ -529,26 +539,11 @@ class IdeViewModel(
                     is DnclOutput.RuntimeError -> {
                         viewModelScope.launch(Dispatchers.Main) {
 
-
                             val isSameFile: Boolean
 
-                            val content =
-                                if (DnclLibs.texts.containsKey(output.value.filePath)) {
-                                    isSameFile = false
-                                    DnclLibs.texts[output.value.filePath]!!
-                                } else {
-                                    val p =
-                                        EntryPath.fromString(
-                                            output.value.filePath!!
-                                        ).let {
-                                            if (it.isAbsolute) it else appState.rootFolder!!.path + it
-                                        }
-                                    val entry = fileUseCase.getEntryByPath(p)!! as ProgramFile
-                                    isSameFile = appState.selectedEntryPath == p
-                                    fileUseCase.getFileContent(
-                                        entry
-                                    ).value
-                                }
+                            val content = output.value.filePath?.let {
+                                fileRepository.resolveLib(it)
+                            } ?: uiState.value.codeTextFieldValue.text
 
 
                             _localState.update {
@@ -557,7 +552,7 @@ class IdeViewModel(
                                 it.copy(
                                     errorOutput = runtimeErrorText,
                                     isError = true,
-                                    errorRange = if (isSameFile) output.value.astNode.range else it.errorRange,
+                                    errorRange = it.errorRange,
                                     dnclError = output.value,
                                     outputPane = OutputPane.ERROR,
                                     textFieldType = TextFieldType.OUTPUT
@@ -862,7 +857,8 @@ class IdeViewModel(
             selectOutputPane(OutputPane.STDOUT)
             return
         }
-        val nextPane = if (uiState.value.outputPane == OutputPane.DEBUG) OutputPane.STDOUT else OutputPane.DEBUG
+        val nextPane =
+            if (uiState.value.outputPane == OutputPane.DEBUG) OutputPane.STDOUT else OutputPane.DEBUG
         selectOutputPane(nextPane)
     }
 

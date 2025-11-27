@@ -112,7 +112,7 @@ sealed interface AstNode {
         override val filePath: String? = loopCounter.filePath ?: block.filePath
     ) : Statement {
         override val literal: String
-            get() = "for ${loopCounter.literal} in $start..$end $stepType by $step ${block.literal}"
+            get() = "for ${loopCounter.literal} in ${start.literal}..${end.literal} $stepType by $step ${block.literal}"
 
         override val range: IntRange
             get() = loopCounter.range.first..block.range.last

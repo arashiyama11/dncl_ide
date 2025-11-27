@@ -235,7 +235,7 @@ private fun CanvasPanel(
                 Image(
                     bitmap = bitmap,
                     contentDescription = currentSurface.path,
-                    modifier = Modifier.fillMaxSize().padding(8.dp).border(3.dp, Color.Red),
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
                     contentScale = ContentScale.FillWidth,
                     filterQuality = FilterQuality.None
                 )

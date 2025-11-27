@@ -4,7 +4,6 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.toList

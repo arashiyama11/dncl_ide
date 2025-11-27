@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 
 class DnclObjectTest {
 
-    private val dummyAstNode = AstNode.Identifier("dummy", IntRange(0, 0))
+    private val dummyAstNode = AstNode.Identifier("dummy", IntRange(0, 0), null)
     private val dummyEnv = Environment()
 
     @Test

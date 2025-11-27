@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 
 class EnvironmentTest {
 
-    private val dummyAstNode = AstNode.Identifier("dummy", IntRange(0, 0))
+    private val dummyAstNode = AstNode.Identifier("dummy", IntRange(0, 0), null)
 
     @Test
     fun testGetSet() = runBlocking {
@@ -76,7 +76,7 @@ class EnvironmentTest {
         outerForOriginal.set("outer_c", outerValueForOriginal)
         // Simulate originalEnv having an outer environment for copy testing
         val envWithOuter = Environment(outerForOriginal)
-        envWithOuter.set("c", value1) 
+        envWithOuter.set("c", value1)
 
         val copiedEnv = envWithOuter.copy()
 
@@ -113,7 +113,7 @@ class EnvironmentTest {
         assertEquals(expectedKeys, env.allKeys())
 
         val envNoOuter = Environment()
-        envNoOuter.set("key_lonely", DnclObject.Int(5,dummyAstNode))
+        envNoOuter.set("key_lonely", DnclObject.Int(5, dummyAstNode))
         assertEquals(setOf("key_lonely"), envNoOuter.allKeys())
 
         assertEquals(emptySet(), Environment().allKeys())

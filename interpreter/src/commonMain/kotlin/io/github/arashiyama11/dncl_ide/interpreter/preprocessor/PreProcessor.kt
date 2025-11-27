@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.interpreter.preprocessor
 
 import arrow.core.Either
+import arrow.core.getOrElse
 import io.arashiyama11.dncl_ide.generated.DnclLibs
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignature
@@ -20,8 +21,7 @@ fun preProcess(
 ): Flow<Either<LexerError, Token>> {
     return flow {
         // builtin.dncl を暗黙的に読み込み、シグネチャだけ収集する
-        if (tokens.first().getOrNull()?.filePath?.endsWith("builtin.dncl") == false)
-            processBuiltinSignatures(onBuiltInSignature)
+        processBuiltinSignatures(onBuiltInSignature)
 
         val iterator = tokens.iterator()
         while (iterator.hasNext()) {
@@ -90,7 +90,13 @@ private fun consumeBuiltInSignature(
     iterator: Iterator<Either<LexerError, Token>>,
     onBuiltInSignature: ((BuiltInFunctionSignature) -> Unit)?
 ): Flow<Either<LexerError, Token>> {
-    if (onBuiltInSignature == null) return flowOf()
+    if (onBuiltInSignature == null) {
+        while (iterator.hasNext()) {
+            val tok = iterator.next().getOrElse { return flowOf() }
+            if (tok is Token.EOF || tok is Token.NewLine) return flowOf()
+        }
+        return flowOf()
+    }
 
     var name: String? = null
     val params = mutableListOf<String>()
