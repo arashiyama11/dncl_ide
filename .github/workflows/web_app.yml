@@ -23,7 +23,7 @@ jobs:
       built-path: ${{ steps.set-path.outputs.dist_path }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup JDK & Gradle
         uses: ./.github/actions/setup-java
