@@ -1,18 +1,18 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.HoverService
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class HoverServiceIntegrationTest {
 
     @Test
-    fun test_hover_integration_user_variable() {
+    fun test_hover_integration_user_variable() = runTest {
         // 統合テスト: ユーザー定義変数のホバー情報
-        val diagnosticService = DiagnosticService()
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val hoverService = HoverService(astInfoService)
 
@@ -21,9 +21,10 @@ class HoverServiceIntegrationTest {
             表示する(x)
         """.trimIndent()
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         // 2行目の変数xの�����置でホバーテスト
         val xPosition = code.indexOf("x", code.indexOf("表示する"))
-        val hover = hoverService.getHover(code, xPosition)
+        val hover = hoverService.getHover(code, xPosition, astInfo)
 
         assertNotNull(hover, "変数xのホバー情報が取得できるはずです")
         assertTrue(
@@ -33,9 +34,9 @@ class HoverServiceIntegrationTest {
     }
 
     @Test
-    fun test_hover_integration_user_function() {
+    fun test_hover_integration_user_function() = runTest {
         // 統合テスト: ユーザー定義関数のホバー情報
-        val diagnosticService = DiagnosticService()
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val hoverService = HoverService(astInfoService)
 
@@ -47,9 +48,10 @@ class HoverServiceIntegrationTest {
             res = add(1, 2)
         """.trimIndent()
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         // 関数呼び出し部分のaddの位置でホバーテスト
         val addPosition = code.indexOf("add", code.indexOf("res"))
-        val hover = hoverService.getHover(code, addPosition)
+        val hover = hoverService.getHover(code, addPosition, astInfo)
         println("hover: $hover")
 
         assertNotNull(hover, "関数addのホバー情報が取得できるはずです")
@@ -68,17 +70,18 @@ class HoverServiceIntegrationTest {
     }
 
     @Test
-    fun test_hover_integration_builtin_function() {
+    fun test_hover_integration_builtin_function() = runTest {
         // 統合テスト: 組み込み関数のホバー情報（既存機能の確認）
-        val diagnosticService = DiagnosticService()
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val hoverService = HoverService(astInfoService)
 
         val code = "表示する(\"Hello World\")"
 
+        val astInfo = astInfoService.parseAndAnalyze(code, "file:///test.dncl")
         // 表示関数の位置でホバーテスト
         val displayPosition = code.indexOf("表示する") + 1
-        val hover = hoverService.getHover(code, displayPosition)
+        val hover = hoverService.getHover(code, displayPosition, astInfo)
 
         assertNotNull(hover, "組み込み関数「表示する」のホバー情報が取得できるはずです")
         assertTrue(

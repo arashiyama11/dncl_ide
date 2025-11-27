@@ -2,6 +2,7 @@
 
 import org.gradle.kotlin.dsl.buildConfig
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -92,6 +93,8 @@ kotlin {
 // See: https://kotlinlang.org/docs/multiplatform-hierarchy.html
     sourceSets {
         commonMain {
+            kotlin.srcDir("build/generated/sources/dnclLibs/main")
+
             dependencies {
                 implementation(libs.kotlin.stdlib)
                 implementation(libs.arrow.core)
@@ -103,6 +106,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
 
@@ -184,4 +188,70 @@ tasks.register<Jar>("fatJar") {
     manifest {
         attributes["Main-Class"] = "io.github.arashiyama11.dncl_ide.interpreter.MainKt"
     }
+}
+
+
+val generateTextMap by tasks.registering {
+    val inputDir = rootDir.resolve("dncl")
+    val generatedTextDir = layout.buildDirectory.dir("generated/sources/dnclLibs/main")
+
+    inputs.dir(inputDir)
+    outputs.dir(generatedTextDir)
+
+    doLast {
+        val pkg = "io.arashiyama11.dncl_ide.generated"
+        val outDir = generatedTextDir.get()
+            .dir(pkg.replace('.', '/'))
+            .asFile
+
+        outDir.mkdirs()
+
+        val outFile = File(outDir, "DnclLib.kt")
+
+        val baseDirFile = inputDir
+
+        val files = baseDirFile
+            .walkTopDown()
+            .filter { it.isFile }
+            .toList()
+
+        outFile.writeText(buildString {
+            appendLine("package $pkg")
+            appendLine()
+            appendLine("object DnclLibs {")
+            appendLine("    val texts: Map<String, String> = mapOf(")
+
+            files.forEachIndexed { index, file ->
+                val relPath = baseDirFile.toPath()
+                    .relativize(file.toPath())
+                    .toString()
+                    .replace(File.separatorChar, '/')
+
+                val raw = file.readText(Charsets.UTF_8)
+
+                val escaped = raw
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\r", "\\r")
+                    .replace("\n", "\\n")
+
+                append("        \"$relPath\" to \"$escaped\"")
+                if (index != files.lastIndex) appendLine(",") else appendLine()
+            }
+
+            appendLine("    )")
+            appendLine()
+            appendLine("    fun load(name: String): String? =")
+            appendLine("        texts[name]")
+            appendLine("}")
+        })
+    }
+}
+
+tasks.filterIsInstance<KotlinCompile>().forEach {
+    it.dependsOn(generateTextMap)
+}
+
+tasks.named { it.startsWith("compileKotlin") }.forEach {
+    it.dependsOn(generateTextMap)
 }

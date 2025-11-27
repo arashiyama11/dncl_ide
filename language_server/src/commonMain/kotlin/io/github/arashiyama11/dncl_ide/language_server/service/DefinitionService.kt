@@ -8,17 +8,17 @@ import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 class DefinitionService(
     private val astInfoService: AstInfoService
 ) {
-    fun getDefinitionLocation(
+    suspend fun getDefinitionLocation(
         uri: String,
         code: String,
         offset: Int,
         cachedAstInfo: AstInfo? = null
     ): Location? {
-        // Parse and analyze the code
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return null
+        // 解析済みASTがない場合は何もしない（パースはスケジューラ経由に統一）
+        val astInfo = cachedAstInfo ?: return null
 
         // カーソル位置のシンボルを取得
-        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset)
+        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset, uri)
             ?: return null
 
         // シンボルの定義位置を取得

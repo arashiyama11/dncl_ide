@@ -6,6 +6,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import arrow.core.Either
+import dncl_ide.composeapp.generated.resources.Res
+import io.arashiyama11.dncl_ide.generated.DnclLibs
 import io.github.arashiyama11.dncl_ide.common.Action
 import io.github.arashiyama11.dncl_ide.common.AppStateStore
 import io.github.arashiyama11.dncl_ide.common.AppStateStore.Companion.dispatch
@@ -19,8 +21,11 @@ import io.github.arashiyama11.dncl_ide.domain.model.FileContent
 import io.github.arashiyama11.dncl_ide.domain.model.NotebookFile
 import io.github.arashiyama11.dncl_ide.domain.model.ProgramFile
 import io.github.arashiyama11.dncl_ide.domain.model.SuggestionPanelStyle
+import io.github.arashiyama11.dncl_ide.domain.model.FolderName
+import io.github.arashiyama11.dncl_ide.domain.repository.FileRepository
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_DEBUG_RUNNING_MODE
 import io.github.arashiyama11.dncl_ide.domain.repository.SettingsRepository.Companion.DEFAULT_FONT_SIZE
+import io.github.arashiyama11.dncl_ide.domain.repository.resolveLib
 import io.github.arashiyama11.dncl_ide.domain.usecase.ExecuteUseCase
 import io.github.arashiyama11.dncl_ide.domain.usecase.FileUseCase
 import io.github.arashiyama11.dncl_ide.editor.compose.toEditorContentUpdate
@@ -29,6 +34,7 @@ import io.github.arashiyama11.dncl_ide.editor.core.EditorDocument
 import io.github.arashiyama11.dncl_ide.editor.core.EditorIntent
 import io.github.arashiyama11.dncl_ide.editor.core.EditorState
 import io.github.arashiyama11.dncl_ide.editor.lsp.LanguageFeatureProvider
+import io.github.arashiyama11.dncl_ide.interpreter.cli.resolveLib
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
@@ -37,10 +43,9 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.util.OutputHandler
-import io.github.arashiyama11.dncl_ide.util.Platform
 import io.github.arashiyama11.dncl_ide.util.SyntaxHighLighter
-import io.github.arashiyama11.dncl_ide.util.currentPlatform
 import io.github.arashiyama11.dncl_ide.util.toFileUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -53,6 +58,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -62,6 +68,7 @@ import kotlin.math.min
 data class IdeUiState(
     val codeTextFieldValue: TextFieldValue = TextFieldValue(""),
     val dnclError: DnclError? = null,
+    val errorOutput: String = "",
     val annotatedString: AnnotatedString? = null,
     val highlightRevision: Long = 0L,
     val output: String = "",
@@ -78,6 +85,7 @@ data class IdeUiState(
     val debugMode: Boolean = false,
     val debugRunningMode: DebugRunningMode = DEFAULT_DEBUG_RUNNING_MODE,
     val isDarkTheme: Boolean = false,
+    val isReadOnly: Boolean = false,
     val textSuggestions: List<Definition> = emptyList(),
     val isFocused: Boolean = false,
     val showInlineSuggestions: Boolean = false,
@@ -89,11 +97,24 @@ data class IdeUiState(
     val customImeSnippets: List<CustomImeSnippet> = emptyList(),
     val customImeQuickKeys: List<String> = emptyList(),
     val customImeKeywords: List<CustomImeKeyword> = emptyList(),
-    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS
+    val customImePanelMode: CustomImePanelMode = CustomImePanelMode.QUICK_KEYS,
+    val canvasSurfaces: List<CanvasSurfaceState> = emptyList(),
+    val selectedCanvasPath: String? = null,
+    val outputPane: OutputPane = OutputPane.STDOUT,
+    val hoverHintText: String = "",
+    val showHoverHintInOutput: Boolean = false
 )
 
 enum class TextFieldType {
     OUTPUT, DEBUG_OUTPUT
+}
+
+enum class OutputPane {
+    STDOUT,
+    DEBUG,
+    HOVER,
+    CANVAS,
+    ERROR
 }
 
 class IdeViewModel(
@@ -101,23 +122,20 @@ class IdeViewModel(
     private val executeUseCase: ExecuteUseCase,
     private val fileUseCase: FileUseCase,
     private val appStateStore: AppStateStore<StatePermission.Write>,
-    private val languageFeatureProvider: LanguageFeatureProvider
+    private val languageFeatureProvider: LanguageFeatureProvider,
+    private val fileRepository: FileRepository
 ) : ViewModel() {
     private val editorSession = DefaultEditorSession(viewModelScope, languageFeatureProvider)
     private val editorStateFlow = editorSession.state
     private val appState by appStateStore
 
-    private val defaultTextInputMode: TextInputMode =
-        if (currentPlatform == Platform.Desktop || currentPlatform == Platform.Web) {
-            TextInputMode.CUSTOM
-        } else {
-            TextInputMode.STANDARD
-        }
+    private val defaultTextInputMode: TextInputMode = TextInputMode.STANDARD
 
     private val _localState = MutableStateFlow(
         LocalIdeState(
             codeTextFieldValue = TextFieldValue(""),
             dnclError = null,
+            errorOutput = "",
             annotatedString = null,
             highlightRevision = 0L,
             output = "",
@@ -139,7 +157,12 @@ class IdeViewModel(
             customImeSnippets = emptyList(),
             customImeQuickKeys = emptyList(),
             customImeKeywords = emptyList(),
-            customImePanelMode = CustomImePanelMode.QUICK_KEYS
+            customImePanelMode = CustomImePanelMode.QUICK_KEYS,
+            canvasSurfaces = emptyList(),
+            selectedCanvasPath = null,
+            outputPane = OutputPane.STDOUT,
+            hoverHintText = "",
+            showHoverHintInOutput = false
         )
     )
 
@@ -211,6 +234,7 @@ class IdeViewModel(
         IdeUiState(
             codeTextFieldValue = localState.codeTextFieldValue,
             dnclError = localState.dnclError,
+            errorOutput = localState.errorOutput,
             annotatedString = localState.annotatedString,
             highlightRevision = localState.highlightRevision,
             output = localState.output,
@@ -227,6 +251,7 @@ class IdeViewModel(
             debugMode = appState.dnclConfig.debugModeEnabled,
             debugRunningMode = appState.dnclConfig.debugRunningMode,
             isDarkTheme = localState.isDarkTheme,
+            isReadOnly = isStdlibPath(appState.selectedEntryPath, appState.rootFolder?.path),
             textSuggestions = localState.textSuggestions,
             isFocused = localState.isFocused,
             showInlineSuggestions = localState.showInlineSuggestions,
@@ -238,7 +263,12 @@ class IdeViewModel(
             customImeSnippets = localState.customImeSnippets,
             customImeQuickKeys = localState.customImeQuickKeys,
             customImeKeywords = localState.customImeKeywords,
-            customImePanelMode = localState.customImePanelMode
+            customImePanelMode = localState.customImePanelMode,
+            canvasSurfaces = localState.canvasSurfaces,
+            selectedCanvasPath = localState.selectedCanvasPath,
+            outputPane = localState.outputPane,
+            hoverHintText = localState.hoverHintText,
+            showHoverHintInOutput = localState.showHoverHintInOutput
         )
     }.stateIn(viewModelScope, SharingStarted.Lazily, IdeUiState())
 
@@ -248,6 +278,7 @@ class IdeViewModel(
     private var executeScope: CoroutineScope = CoroutineScope(Dispatchers.Default + Job())
     private lateinit var outputHandler: OutputHandler
     private var completionTriggerJob: Job? = null
+    private var hoverTriggerJob: Job? = null
 
     fun onPause() {
         viewModelScope.launch {
@@ -277,6 +308,14 @@ class IdeViewModel(
         viewModelScope.launch {
             var prePath: EntryPath? = null
             appStateStore.state.collect { appState ->
+                if (!appState.dnclConfig.debugModeEnabled && _localState.value.outputPane == OutputPane.DEBUG) {
+                    _localState.update { state ->
+                        state.copy(
+                            outputPane = OutputPane.STDOUT,
+                            textFieldType = TextFieldType.OUTPUT
+                        )
+                    }
+                }
                 val entryPath = appState.selectedEntryPath
                 if (entryPath != null && entryPath != prePath) {
                     val programFile = fileUseCase.getEntryByPath(entryPath)
@@ -353,7 +392,8 @@ class IdeViewModel(
                 }
             }
 
-            val tokens = Lexer(indentedText.text).toList()
+            val tokens =
+                preProcess(Lexer(indentedText.text), resolveLib = { "" }).toList()
 
             val lexicalTokens = tokens.mapNotNull { it.getOrNull() }
             customImeController.onEditorContextChanged(indentedText, lexicalTokens)
@@ -362,7 +402,13 @@ class IdeViewModel(
             var parsedProgram: Either<DnclError, AstNode.Program>? = null
 
             if (tokens.all { it.isRight() }) {
-                val parser = Parser(Lexer(indentedText.text)).getOrNull()
+                val parser =
+                    Parser(
+                        preProcess(
+                            Lexer(indentedText.text),
+                            resolveLib = fileRepository::resolveLib
+                        ).toList()
+                    ).getOrNull()
 
                 if (parser != null) {
                     parsedProgram = parser.parseProgram()
@@ -384,12 +430,19 @@ class IdeViewModel(
             val finalError = error ?: highlightError
             viewModelScope.launch(Dispatchers.Main) {
                 _localState.update {
+                    val nextPane = when {
+                        finalError != null -> OutputPane.ERROR
+                        it.outputPane == OutputPane.ERROR -> OutputPane.STDOUT
+                        else -> it.outputPane
+                    }
+                    val nextErrorOutput = finalError?.explain(uiState.value.codeTextFieldValue.text)
                     it.copy(
-                        dnclError = finalError,
-                        output = finalError?.explain(uiState.value.codeTextFieldValue.text)
-                            ?: if (it.dnclError == null) it.output else "",
-                        errorRange = finalError?.errorRange
-                            ?: if (it.dnclError == null) it.errorRange else null,
+                        //dnclError = finalError,
+                        //errorOutput = nextErrorOutput ?: "",
+                        //errorRange = finalError?.errorRange
+                        //   ?: if (it.dnclError == null) it.errorRange else null,
+                        outputPane = nextPane,
+                        textFieldType = nextPane.toTextFieldType()
                     )
                 }
             }
@@ -411,6 +464,9 @@ class IdeViewModel(
                 val position: Position =
                     calculatePosition(indentedText.text, indentedText.selection.end)
                 triggerCompletionDebounced(position)
+                if (_localState.value.showHoverHintInOutput) {
+                    triggerHoverHint(position)
+                }
             }
         }
     }
@@ -420,6 +476,21 @@ class IdeViewModel(
         completionTriggerJob = viewModelScope.launch {
             delay(COMPLETION_DEBOUNCE_MS)
             editorSession.dispatch(EditorIntent.TriggerCompletion(position))
+        }
+    }
+
+    private fun triggerHoverHint(position: Position) {
+        hoverTriggerJob?.cancel()
+        hoverTriggerJob = viewModelScope.launch {
+            delay(HOVER_DEBOUNCE_MS)
+            val documentUri = editorStateFlow.value.document?.uri ?: return@launch
+            val hover = runCatching {
+                languageFeatureProvider.requestHover(documentUri, position)
+            }.getOrNull()
+            val content = hover?.contents?.value ?: ""
+            _localState.update { state ->
+                if (!state.showHoverHintInOutput) state else state.copy(hoverHintText = content)
+            }
         }
     }
 
@@ -433,6 +504,7 @@ class IdeViewModel(
         viewModelScope.launch {
             outputHandler.stdout.clear()
         }
+        resetCanvasSurfaces()
 
         executeJob?.cancel()
         // Cancel previous execution scope and recreate
@@ -451,36 +523,76 @@ class IdeViewModel(
                     errorRange = null,
                     currentEvaluatingLine = null,
                     dnclError = null,
-                    isWaitingForInput = false
+                    errorOutput = "",
+                    isWaitingForInput = false,
                 )
             }
             onTextChanged(uiState.value.codeTextFieldValue, userTriggeredTyping = false)
 
             executeUseCase(
                 uiState.value.codeTextFieldValue.text,
+                appState.selectedEntryPath?.toString(),
                 inputChannel!!,
                 appState.dnclConfig.arrayOriginIndex,
             ).collect { output ->
                 when (output) {
                     is DnclOutput.RuntimeError -> {
                         viewModelScope.launch(Dispatchers.Main) {
+
+                            val isSameFile: Boolean
+
+                            val content = output.value.filePath?.let {
+                                fileRepository.resolveLib(it)
+                            } ?: uiState.value.codeTextFieldValue.text
+
+
                             _localState.update {
+                                val runtimeErrorText =
+                                    output.value.explain(content)
                                 it.copy(
-                                    // output = it.output + "\n" + output.value.explain(uiState.value.codeTextFieldValue.text), // Output is handled by watchStdoutChannel
+                                    errorOutput = runtimeErrorText,
                                     isError = true,
-                                    errorRange = output.value.astNode.range
+                                    errorRange = it.errorRange,
+                                    dnclError = output.value,
+                                    outputPane = OutputPane.ERROR,
+                                    textFieldType = TextFieldType.OUTPUT
                                 )
                             }
                         }
-                        appStateStore.dispatch(Action.SetRunning(false)) // Removed cast
+                        appStateStore.dispatch(Action.SetRunning(false))
                     }
 
-                    is DnclOutput.Error -> {
+                    is DnclOutput.SyntaxError -> {
                         viewModelScope.launch(Dispatchers.Main) {
+                            val isSameFile: Boolean
+
+                            val content =
+                                if (DnclLibs.texts.containsKey(output.value.filePath)) {
+                                    isSameFile = false
+                                    DnclLibs.texts[output.value.filePath]!!
+                                } else {
+                                    val p =
+                                        EntryPath.fromString(
+                                            output.value.filePath!!
+                                        ).let {
+                                            if (it.isAbsolute) it else appState.rootFolder!!.path + it
+                                        }
+                                    val entry = fileUseCase.getEntryByPath(p)!! as ProgramFile
+                                    isSameFile = appState.selectedEntryPath == p
+                                    fileUseCase.getFileContent(
+                                        entry
+                                    ).value
+                                }
+
                             _localState.update {
                                 it.copy(
                                     // output = "${it.output}\n${output.value}", // Output is handled by watchStdoutChannel
-                                    isError = true
+                                    dnclError = output.value,
+                                    errorOutput = output.value.explain(content),
+                                    isError = true,
+                                    outputPane = OutputPane.ERROR,
+                                    textFieldType = TextFieldType.OUTPUT,
+                                    errorRange = if (isSameFile) output.value.errorRange else it.errorRange,
                                 )
                             }
                         }
@@ -534,6 +646,23 @@ class IdeViewModel(
                             }
                         }
                     }
+
+                    is DnclOutput.CanvasFrameOutput -> {
+                        val surfaceState = output.frame.toSurfaceState()
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _localState.update { state ->
+                                val nextMap =
+                                    state.canvasSurfaces.associateBy { it.path }.toMutableMap()
+                                nextMap[surfaceState.path] = surfaceState
+                                val sorted = nextMap.values.sortedBy { it.path }
+                                val selectedPath = state.selectedCanvasPath ?: surfaceState.path
+                                state.copy(
+                                    canvasSurfaces = sorted,
+                                    selectedCanvasPath = selectedPath
+                                )
+                            }
+                        }
+                    }
                 }
             }
             outputHandler.stdout.flush()
@@ -553,6 +682,50 @@ class IdeViewModel(
         }
         _localState.update { it.copy(currentEvaluatingLine = null) }
         appStateStore.dispatch(Action.SetRunning(false))
+    }
+
+    fun selectOutputPane(pane: OutputPane) {
+        val resolvedPane = when (pane) {
+            OutputPane.DEBUG -> if (uiState.value.debugMode) OutputPane.DEBUG else OutputPane.STDOUT
+            OutputPane.CANVAS -> if (_localState.value.canvasSurfaces.isNotEmpty()) OutputPane.CANVAS else OutputPane.STDOUT
+            OutputPane.HOVER -> if (_localState.value.showHoverHintInOutput) OutputPane.HOVER else OutputPane.STDOUT
+            OutputPane.ERROR -> if (_localState.value.dnclError != null) OutputPane.ERROR else OutputPane.STDOUT
+            else -> pane
+        }
+        _localState.update { state ->
+            state.copy(
+                outputPane = resolvedPane,
+                textFieldType = resolvedPane.toTextFieldType()
+            )
+        }
+    }
+
+    fun selectCanvasSurface(path: String) {
+        _localState.update { state ->
+            if (state.selectedCanvasPath == path) {
+                state
+            } else {
+                state.copy(selectedCanvasPath = path)
+            }
+        }
+    }
+
+    private fun resetCanvasSurfaces() {
+        viewModelScope.launch(Dispatchers.Main) {
+            _localState.update {
+                Res
+                it.copy(
+                    canvasSurfaces = emptyList(),
+                    selectedCanvasPath = null,
+                    outputPane = if (it.outputPane == OutputPane.CANVAS) {
+                        OutputPane.STDOUT
+                    } else {
+                        it.outputPane
+                    },
+                    textFieldType = if (it.outputPane == OutputPane.CANVAS) TextFieldType.OUTPUT else it.textFieldType
+                )
+            }
+        }
     }
 
     fun onStepButtonClicked() {
@@ -680,13 +853,46 @@ class IdeViewModel(
     }
 
     fun onChangeIOButtonClicked() {
-        val next = when (uiState.value.textFieldType) {
-            TextFieldType.OUTPUT -> if (uiState.value.debugMode) TextFieldType.DEBUG_OUTPUT else TextFieldType.OUTPUT
-            TextFieldType.DEBUG_OUTPUT -> TextFieldType.OUTPUT
+        if (!uiState.value.debugMode) {
+            selectOutputPane(OutputPane.STDOUT)
+            return
         }
-        _localState.update {
-            it.copy(textFieldType = next)
+        val nextPane =
+            if (uiState.value.outputPane == OutputPane.DEBUG) OutputPane.STDOUT else OutputPane.DEBUG
+        selectOutputPane(nextPane)
+    }
+
+    fun toggleHoverHintMode() {
+        val next = !_localState.value.showHoverHintInOutput
+        _localState.update { state ->
+            state.copy(
+                showHoverHintInOutput = next,
+                hoverHintText = if (next) state.hoverHintText else state.hoverHintText,
+                outputPane = when {
+                    next -> OutputPane.HOVER
+                    state.outputPane == OutputPane.HOVER -> OutputPane.STDOUT
+                    else -> state.outputPane
+                },
+                textFieldType = when {
+                    next -> TextFieldType.OUTPUT
+                    state.outputPane == OutputPane.HOVER -> TextFieldType.OUTPUT
+                    else -> state.textFieldType
+                }
+            )
         }
+        if (next) {
+            refreshHoverHint()
+        }
+    }
+
+    fun refreshHoverHint() {
+        val document = editorStateFlow.value.document ?: run {
+            _localState.update { it.copy(hoverHintText = "Hover情報を取得できません") }
+            return
+        }
+        val textValue = uiState.value.codeTextFieldValue
+        val position = calculatePosition(textValue.text, textValue.selection.end)
+        triggerHoverHint(position)
     }
 
     fun onCurrentInputChanged(text: String) {
@@ -800,11 +1006,13 @@ class IdeViewModel(
 
     companion object {
         private const val COMPLETION_DEBOUNCE_MS = 100L
+        private const val HOVER_DEBOUNCE_MS = 80L
     }
 
     private data class LocalIdeState(
         val codeTextFieldValue: TextFieldValue,
         val dnclError: DnclError?,
+        val errorOutput: String,
         val annotatedString: AnnotatedString?,
         val highlightRevision: Long,
         val output: String,
@@ -826,6 +1034,21 @@ class IdeViewModel(
         val customImeSnippets: List<CustomImeSnippet>,
         val customImeQuickKeys: List<String>,
         val customImeKeywords: List<CustomImeKeyword>,
-        val customImePanelMode: CustomImePanelMode
+        val customImePanelMode: CustomImePanelMode,
+        val canvasSurfaces: List<CanvasSurfaceState>,
+        val selectedCanvasPath: String?,
+        val outputPane: OutputPane,
+        val hoverHintText: String,
+        val showHoverHintInOutput: Boolean
     )
+
+    private fun isStdlibPath(path: EntryPath?, rootPath: EntryPath?): Boolean {
+        if (path == null || rootPath == null) return false
+        val stdlibPrefix = rootPath.value + FolderName("stdlib")
+        if (path.value.size < stdlibPrefix.size) return false
+        return path.value.take(stdlibPrefix.size) == stdlibPrefix
+    }
+
+    private fun OutputPane.toTextFieldType(): TextFieldType =
+        if (this == OutputPane.DEBUG) TextFieldType.DEBUG_OUTPUT else TextFieldType.OUTPUT
 }

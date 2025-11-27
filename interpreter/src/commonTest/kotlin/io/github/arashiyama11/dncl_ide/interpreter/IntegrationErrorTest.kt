@@ -4,16 +4,17 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
-import io.github.arashiyama11.dncl_ide.interpreter.model.explain
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class IntegrationErrorTest {
-    private fun runTest(program: String, expectedOutput: String) {
+    private suspend fun runEvalTest(program: String, expectedOutput: String) {
         // Try to create Parser instance using the companion object invoke operator
         val output = run {
-            val lexer = Lexer(program)
+            val lexer = preProcess(Lexer(program), resolveLib = { "" }).toList()
 
             val parser = Parser(lexer).fold(ifLeft = { return@run it.explain(program) }) { it }
             val ast =
@@ -21,9 +22,7 @@ class IntegrationErrorTest {
 
             val evaluator =
                 EvaluatorFactory.create(Channel<String>(capacity = 1).apply { trySend("") }, 0)
-            runBlocking {
-                evaluator.evalProgram(ast)
-            }.fold(ifLeft = { return@run it.explain(program) }) {
+            evaluator.evalProgram(ast).fold(ifLeft = { return@run it.explain(program) }) {
                 if (it is DnclObject.Error) {
                     return@run it.explain(program)
                 }
@@ -35,8 +34,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testInvalidCharacterError() {
-        runTest(
+    fun testInvalidCharacterError() = runTest {
+        runEvalTest(
             """a;b""",
             """1行2文字目でエラーが発生しました
 「;」は無効な文字です
@@ -47,8 +46,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testUnclosedStringError() {
-        runTest(
+    fun testUnclosedStringError() = runTest {
+        runEvalTest(
             """
 1+1
 "これは閉じない文字列
@@ -63,9 +62,9 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testMultipleExpressionsInOneLineError() {
+    fun testMultipleExpressionsInOneLineError() = runTest {
         //runTest("""""", """""")
-        runTest(
+        runEvalTest(
             """let a = 1""", """1行1文字目でエラーが発生しました
 一行に複数の式を書けません
 ===============
@@ -75,8 +74,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testUnclosedParenthesisError() {
-        runTest(
+    fun testUnclosedParenthesisError() = runTest {
+        runEvalTest(
             """
 
 1 + ( 2 + 3 """, """3行5文字目でエラーが発生しました
@@ -90,8 +89,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testUnexpectedEndOfExpressionInArrayError() {
-        runTest(
+    fun testUnexpectedEndOfExpressionInArrayError() = runTest {
+        runEvalTest(
             """[1,2,""", """1行6文字目でエラーが発生しました
 期待せず式が終了しました
 ===============
@@ -101,8 +100,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testUnexpectedTokenInIfConditionError() {
-        runTest(
+    fun testUnexpectedTokenInIfConditionError() = runTest {
+        runEvalTest(
             """もし x が 1""", """1行6文字目でエラーが発生しました
 予期しないトークン: が
 期待されるトークン: ならば
@@ -113,8 +112,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testArrayIndexOutOfBoundsError() {
-        runTest(
+    fun testArrayIndexOutOfBoundsError() = runTest {
+        runEvalTest(
             """[1,2,3][123]""", """1行9文字目でエラーが発生しました
 配列の範囲外アクセスがされました。
 配列の長さ:3 
@@ -126,8 +125,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testUndefinedVariableError() {
-        runTest(
+    fun testUndefinedVariableError() = runTest {
+        runEvalTest(
             "\n\na", """3行1文字目でエラーが発生しました
 変数「a」は定義されていません
 ===============
@@ -139,8 +138,8 @@ class IntegrationErrorTest {
     }
 
     @Test
-    fun testTypeError() {
-        runTest(
+    fun testTypeError() = runTest {
+        runEvalTest(
             """1 + [] """, """1行1文字目でエラーが発生しました
 演算子「+」は整数、小数、文字列、配列の同じ型同士の演算のみ可能です。
 Int + Array が実行されようとしました
@@ -151,8 +150,8 @@ Int + Array が実行されようとしました
     }
 
     @Test
-    fun testIndentError() {
-        runTest(
+    fun testIndentError() = runTest {
+        runEvalTest(
             """
 1 + 1
   2 + 3
@@ -167,7 +166,7 @@ Int + Array が実行されようとしました
    ^^"""
         )
 
-        runTest(
+        runEvalTest(
             """
 もし 1 ならば:
 こんにちは
@@ -182,7 +181,7 @@ Int + Array が実行されようとしました
    ^^"""
         )
 
-        runTest(
+        runEvalTest(
             """
 もし 1 ならば:
   こんにちは

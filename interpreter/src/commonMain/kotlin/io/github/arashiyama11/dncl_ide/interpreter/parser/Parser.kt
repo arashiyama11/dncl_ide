@@ -17,8 +17,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.Precedence
 import io.github.arashiyama11.dncl_ide.interpreter.model.PrefixExpressionToken
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.model.tokenToLiteral
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 
-class Parser private constructor(private val lexer: ILexer) : IParser {
+class Parser private constructor(private val lexer: Iterator<Either<LexerError, Token>>) : IParser {
     private val indentStack: MutableList<Int> = mutableListOf(0)
     private lateinit var currentToken: Token
     private lateinit var nextToken: Token
@@ -50,7 +53,10 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
         }
         AstNode.Program(statements)
-    }.mapLeft { InternalError(it.message ?: "") }
+    }.mapLeft {
+        it.printStackTrace()
+        InternalError(it.message ?: "")
+    }
 
 
     @EnsuredEndOfLine
@@ -98,8 +104,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             val expression = parseExpression(Precedence.LOWEST).bind()
             requireEndOfLine {
                 ParserError.ParseError(
-                    "一行に複数の式を書けません",
                     currentToken,
+                    "一行に複数の式を書けません",
                 )
             }.bind()
             if (expression is AstNode.WhileExpression) {
@@ -110,12 +116,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     private fun nextToken(): Either<LexerError, Token> = either {
         currentToken = nextToken
         nextToken = aheadToken
-        aheadToken = run {
-            var tok = lexer.nextToken().bind()
-            while (tok is Token.Comment) {
-                tok = lexer.nextToken().bind()
-            }
-            tok
+        if (lexer.hasNext()) {
+            aheadToken = lexer.next().bind()
         }
         return currentToken.right()
     }
@@ -124,7 +126,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         if (currentToken is Token.EOF) return@either
         if (currentToken is Token.NewLine && nextToken is Token.Indent) return@either
         raise(
-            ParserError.UnExpectedToken(
+            ParserError.UnexpectedToken(
                 currentToken,
                 "改行とインデントが必要です"
             )
@@ -143,7 +145,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         nextToken()
         if (currentToken !is T) {
             raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken,
                     expectedToken = tokenToLiteral<T>()
                 )
@@ -159,6 +161,15 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
         }
 
+    private fun parseIntLiteral(literal: String): Int? {
+        return when {
+            literal.startsWith("0x", ignoreCase = true) -> literal.drop(2).toIntOrNull(16)
+            literal.startsWith("0b", ignoreCase = true) -> literal.drop(2).toIntOrNull(2)
+            literal.startsWith("0o", ignoreCase = true) -> literal.drop(2).toIntOrNull(8)
+            else -> literal.toIntOrNull()
+        }
+    }
+
 
     @EnsuredEndOfLine
     private fun parseBlockStatement(): Either<DnclError, AstNode.BlockStatement> = either {
@@ -166,7 +177,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         expectNextToken<Token.NewLine>().bind()
         val startDepth = if (nextToken is Token.Indent) {
             (nextToken as Token.Indent).depth
-        } else raise(ParserError.UnExpectedToken(nextToken))
+        } else raise(ParserError.UnexpectedToken(nextToken))
         if ((indentStack.lastOrNull() ?: raise(
                 ParserError.IndentError(
                     nextToken,
@@ -182,7 +193,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         indentStack.add(startDepth)
         while (currentToken !is Token.EOF) {
             if (currentToken !is Token.NewLine) raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken
                 )
             )
@@ -193,7 +204,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             val depth = (nextToken as? Token.Indent)?.depth ?: raise(
-                ParserError.UnExpectedToken(currentToken)
+                ParserError.UnexpectedToken(currentToken)
             )
 
 
@@ -253,9 +264,9 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
     @EnsuredEndOfLine
     private fun parseForStatement(): Either<DnclError, AstNode.ForStatement> = either {
         val counter = when (val token = currentToken) {
-            is Token.Identifier -> AstNode.Identifier(token.literal, token.range)
-            is Token.Japanese -> AstNode.Identifier(token.literal, token.range)
-            else -> return ParserError.UnExpectedToken(currentToken).left()
+            is Token.Identifier -> AstNode.Identifier(token.literal, token.range, token.filePath)
+            is Token.Japanese -> AstNode.Identifier(token.literal, token.range, token.filePath)
+            else -> return ParserError.UnexpectedToken(currentToken).left()
         }
         expectNextToken<Token.Wo>().bind()
         nextToken().bind()
@@ -270,7 +281,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val type = when (currentToken) {
             is Token.UpTo -> AstNode.ForStatement.Companion.StepType.INCREMENT
             is Token.DownTo -> AstNode.ForStatement.Companion.StepType.DECREMENT
-            else -> raise(ParserError.UnExpectedToken(currentToken))
+            else -> raise(ParserError.UnexpectedToken(currentToken))
         }
         expectNextToken<Token.Colon>().bind()
         val block = parseBlockStatement().bind()
@@ -282,13 +293,13 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         val start = currentToken
         nextToken().bind()
         val nameToken = (currentToken as? Token.Identifier)
-            ?: currentToken as? Token.Japanese ?: raise(ParserError.UnExpectedToken(currentToken))
+            ?: currentToken as? Token.Japanese ?: raise(ParserError.UnexpectedToken(currentToken))
         expectNextToken<Token.ParenOpen>().bind()
         nextToken().bind()
         val paramsTokens = mutableListOf<Token>()
         val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
         params.any { it !is AstNode.Identifier }.let {
-            if (it) raise(ParserError.UnExpectedToken(currentToken))
+            if (it) raise(ParserError.UnexpectedToken(currentToken))
         }
         expectNextToken<Token.Wo>().bind()
         expectNextToken<Token.Colon>().bind()
@@ -318,7 +329,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         while (currentToken !is Token.NewLine && currentToken !is Token.EOF) {
             val identifierToken = currentToken
             if (identifierToken !is Token.Identifier && identifierToken !is Token.Japanese) raise(
-                ParserError.UnExpectedToken(
+                ParserError.UnexpectedToken(
                     currentToken,
                     expectedToken = "識別子"
                 )
@@ -327,12 +338,20 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 expectNextToken<Token.BracketOpen>()
                 nextToken().bind()
                 AstNode.IndexExpression(
-                    AstNode.Identifier(identifierToken.literal, identifierToken.range),
+                    AstNode.Identifier(
+                        identifierToken.literal,
+                        identifierToken.range,
+                        identifierToken.filePath
+                    ),
                     parseExpressionList<Token.BracketClose>().bind()
-                        .firstOrNull() ?: raise(ParserError.UnExpectedToken(currentToken)),
+                        .firstOrNull() ?: raise(ParserError.UnexpectedToken(currentToken)),
                 )
             } else {
-                AstNode.Identifier(identifierToken.literal, identifierToken.range)
+                AstNode.Identifier(
+                    identifierToken.literal,
+                    identifierToken.range,
+                    identifierToken.filePath
+                )
             }
 
             expectNextToken<Token.Assign>().bind()
@@ -353,42 +372,45 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
         when (token) {
             is Token.Boolean -> {
                 val boolToken = (currentToken as? Token.Boolean)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.BooleanLiteral(boolToken.value, boolToken.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.BooleanLiteral(boolToken.value, boolToken.range, boolToken.filePath)
             }
+
             is Token.Identifier -> {
                 val identifier = (currentToken as? Token.Identifier)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal, identifier.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.Identifier(identifier.literal, identifier.range, identifier.filePath)
             }
+
             is Token.Japanese -> {
                 val identifier = (currentToken as? Token.Japanese)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.Identifier(identifier.literal, identifier.range)
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                AstNode.Identifier(identifier.literal, identifier.range, identifier.filePath)
             }
 
             is Token.Int -> {
                 val int = (currentToken as? Token.Int)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
-                AstNode.IntLiteral(
-                    int.literal.toIntOrNull()
-                        ?: raise(ParserError.InvalidIntLiteral(int)), int.range
-                )
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
+                val value = parseIntLiteral(int.literal)
+                    ?: raise(ParserError.InvalidIntLiteral(int))
+                AstNode.IntLiteral(value, int.range, int.filePath)
             }
 
             is Token.Float -> {
                 val float = (currentToken as? Token.Float)
-                    ?: raise(ParserError.UnExpectedToken(currentToken))
+                    ?: raise(ParserError.UnexpectedToken(currentToken))
                 AstNode.FloatLiteral(
                     float.literal.toFloatOrNull()
-                        ?: raise(ParserError.InvalidFloatLiteral(float)), float.range
+                        ?: raise(ParserError.InvalidFloatLiteral(float)),
+                    float.range,
+                    float.filePath
                 )
             }
 
             is Token.String -> {
                 val string = (currentToken as? Token.String)
-                    ?: return ParserError.UnExpectedToken(currentToken).left()
-                AstNode.StringLiteral(string.literal, string.range)
+                    ?: return ParserError.UnexpectedToken(currentToken).left()
+                AstNode.StringLiteral(string.literal, string.range, string.filePath)
             }
 
             is PrefixExpressionToken -> {
@@ -402,7 +424,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 nextToken().bind()
                 val expression = parseExpression(Precedence.LOWEST).bind()
                 expectNextToken<Token.ParenClose> {
-                    ParserError.ParseError("カッコが閉じていません", token)
+                    ParserError.ParseError(token, "カッコが閉じていません")
                 }.bind()
                 expression
             }
@@ -417,12 +439,16 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             is Token.LenticularOpen -> {
                 expectNextToken<Token.Japanese>().bind()
                 val string = (currentToken as? Token.Japanese) ?: raise(
-                    ParserError.UnExpectedToken(
+                    ParserError.UnexpectedToken(
                         currentToken
                     )
                 )
                 expectNextToken<Token.LenticularClose>().bind()
-                AstNode.SystemLiteral(string.literal, token.range.first..currentToken.range.last)
+                AstNode.SystemLiteral(
+                    string.literal,
+                    token.range.first..currentToken.range.last,
+                    token.filePath
+                )
             }
 
             is Token.Function -> {
@@ -431,7 +457,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
                 val paramsTokens = mutableListOf<Token>()
                 val params = parseExpressionList<Token.ParenClose>(paramsTokens).bind()
                 params.any { it !is AstNode.Identifier }.let {
-                    if (it) raise(ParserError.UnExpectedToken(currentToken))
+                    if (it) raise(ParserError.UnexpectedToken(currentToken))
                 }
                 expectNextToken<Token.Wo>().bind()
                 expectNextToken<Token.Colon>().bind()
@@ -446,7 +472,8 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
             is Token.EOF -> raise(
                 ParserError.ParseError(
-                    "期待せず式が終了しました", token
+                    token,
+                    "期待せず式が終了しました"
                 )
             )
 
@@ -482,7 +509,7 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
             }
 
             expectNextToken<T> {
-                ParserError.ParseError("式が閉じていません", currentToken)
+                ParserError.ParseError(currentToken, "式が閉じていません")
             }.bind()
             return list.toList().right()
         }
@@ -524,28 +551,30 @@ class Parser private constructor(private val lexer: ILexer) : IParser {
 
 
     companion object {
-        operator fun invoke(lexer: ILexer): Either<LexerError, Parser> = either {
-            val parser = Parser(lexer)
-            parser.currentToken = skipComment(lexer).bind()
-            parser.nextToken = skipComment(lexer).bind()
-            parser.aheadToken = skipComment(lexer).bind()
-            return parser.right()
-        }
+        operator fun invoke(
+            tokens: List<Either<LexerError, Token>>,
+        ): Either<LexerError, Parser> = either {
+            val itr = tokens.iterator()
+            val parser = Parser(itr)
+            parser.currentToken = itr.next().bind()
+            parser.nextToken =
+                if (!itr.hasNext()) parser.currentToken else itr.next().bind()
+            parser.aheadToken =
+                if (!itr.hasNext()) parser.nextToken else itr.next().bind()
 
-        private fun skipComment(lexer: ILexer): Either<LexerError, Token> = either {
-            var tok = lexer.nextToken().bind()
-            while (tok is Token.Comment) {
-                tok = lexer.nextToken().bind()
-            }
-            return tok.right()
+            return parser.right()
         }
 
         fun Token.precedence() = when (this) {
             is Token.Plus, is Token.Minus -> Precedence.SUM
             is Token.Times, is Token.Divide, is Token.DivideInt, is Token.Modulo -> Precedence.PRODUCT
+            is Token.ShiftLeft, is Token.ShiftRight -> Precedence.SHIFT
+            is Token.BitAnd -> Precedence.BITAND
+            is Token.BitXor -> Precedence.BITXOR
+            is Token.BitOr -> Precedence.BITOR
             is Token.GreaterThan, is Token.LessThan, is Token.GreaterThanOrEqual, is Token.LessThanOrEqual -> Precedence.LESSGREATER
             is Token.Equal, is Token.NotEqual -> Precedence.EQUALS
-            is Token.Bang, is Token.LenticularOpen -> Precedence.PREFIX
+            is Token.Bang, is Token.LenticularOpen, is Token.BitNot -> Precedence.PREFIX
             is Token.BracketOpen -> Precedence.INDEX
             is Token.ParenOpen -> Precedence.CALL
             is Token.While -> Precedence.WHILE

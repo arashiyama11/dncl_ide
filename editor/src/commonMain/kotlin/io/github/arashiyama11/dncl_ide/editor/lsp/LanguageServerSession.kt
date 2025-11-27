@@ -8,6 +8,8 @@ import io.github.arashiyama11.dncl_ide.language_server.DidChangeTextDocumentPara
 import io.github.arashiyama11.dncl_ide.language_server.DidCloseTextDocumentParams
 import io.github.arashiyama11.dncl_ide.language_server.DidOpenTextDocumentParams
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.Hover
+import io.github.arashiyama11.dncl_ide.language_server.HoverParams
 import io.github.arashiyama11.dncl_ide.language_server.InitializeParams
 import io.github.arashiyama11.dncl_ide.language_server.InitializeResult
 import io.github.arashiyama11.dncl_ide.language_server.JsonRpcErrorResponse
@@ -23,6 +25,8 @@ import io.github.arashiyama11.dncl_ide.language_server.TextDocumentIdentifier
 import io.github.arashiyama11.dncl_ide.language_server.TextDocumentItem
 import io.github.arashiyama11.dncl_ide.language_server.VersionedTextDocumentIdentifier
 import io.github.arashiyama11.dncl_ide.language_server.createLanguageServer
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -47,14 +51,17 @@ import kotlinx.serialization.json.jsonObject
  */
 class LanguageServerSession(
     private val scope: CoroutineScope,
-    private val serverFactory: () -> DNCLLanguageServer = ::createLanguageServer,
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver(),
+    private val serverFactory: (FileResolver) -> DNCLLanguageServer = { resolver ->
+        createLanguageServer(resolver)
+    },
     private val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
         encodeDefaults = true
     }
 ) : LanguageServerClient {
-    private val server: DNCLLanguageServer = serverFactory()
+    private val server: DNCLLanguageServer = serverFactory(fileResolver)
 
     private val requestId = atomic(0L)
     private val pendingMutex = Mutex()
@@ -166,6 +173,18 @@ class LanguageServerSession(
         val tokens = json.decodeFromJsonElement(SemanticTokens.serializer(), response)
         semanticTokensState.update { current -> current + (uri to tokens) }
         return tokens
+    }
+
+    override suspend fun requestHover(uri: String, position: Position): Hover? {
+        val params = HoverParams(
+            textDocument = TextDocumentIdentifier(uri),
+            position = position
+        )
+        val response = sendRequest(
+            method = "textDocument/hover",
+            params = json.encodeToJsonElement(HoverParams.serializer(), params)
+        ) ?: return null
+        return json.decodeFromJsonElement(Hover.serializer(), response)
     }
 
     override fun capabilities(): Flow<ServerCapabilities?> = capabilitiesState

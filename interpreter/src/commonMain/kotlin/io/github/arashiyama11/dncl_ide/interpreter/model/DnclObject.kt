@@ -81,37 +81,48 @@ sealed interface DnclObject {
 
     }
 
-    sealed class Error(open val message: kotlin.String, override val astNode: AstNode) :
-        DnclObject {
-        override fun toString() = message
+    sealed class Error(
+        final override val message: kotlin.String,
+        node: AstNode,
+    ) : DnclObject, DnclError {
 
+        final override val astNode: AstNode = node
+        final override val errorRange: IntRange = node.range
+        final override val filePath: kotlin.String? = node.filePath
+
+        override fun toString() = message
         override fun hash() = message.hashCode()
+
+        final override fun explain(program: kotlin.String): kotlin.String {
+            return explainError(program, message, errorRange, filePath)
+        }
     }
 
-    data class RuntimeError(override val message: kotlin.String, override val astNode: AstNode) :
+
+    class RuntimeError(message: kotlin.String, astNode: AstNode) :
         Error(message, astNode)
 
-    data class ArgumentSizeError(
-        override val message: kotlin.String,
-        override val astNode: AstNode
+    class ArgumentSizeError(
+        message: kotlin.String,
+        astNode: AstNode
     ) :
         Error(message, astNode)
 
-    data class TypeError(override val message: kotlin.String, override val astNode: AstNode) :
+    class TypeError(message: kotlin.String, astNode: AstNode) :
         Error(message, astNode)
 
-    data class UndefinedError(override val message: kotlin.String, override val astNode: AstNode) :
+    class UndefinedError(message: kotlin.String, astNode: AstNode) :
         Error(message, astNode)
 
-    data class CannotAssignNothingError(
-        override val message: kotlin.String,
-        override val astNode: AstNode
+    class CannotAssignNothingError(
+        message: kotlin.String,
+        astNode: AstNode
     ) : Error(message, astNode)
 
-    data class IndexOutOfRangeError(
-        val index: kotlin.Int,
-        val length: kotlin.Int,
-        override val astNode: AstNode
+    class IndexOutOfRangeError(
+        index: kotlin.Int,
+        length: kotlin.Int,
+        astNode: AstNode
     ) : Error(
         "配列の範囲外アクセスがされました。\n配列の長さ:${length} \nインデックス:$index",
         astNode

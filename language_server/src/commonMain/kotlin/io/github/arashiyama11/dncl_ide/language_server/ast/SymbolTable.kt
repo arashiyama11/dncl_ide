@@ -7,6 +7,7 @@ data class Symbol(
     val kind: SymbolKind,
     val range: IntRange,
     val scopeRange: IntRange,
+    val filePath: String? = null,
     val type: String? = null, // 型情報 (例: "Int", "String", "Function")
     val definitionNode: AstNode? = null // 定義元のASTノード
 )
@@ -28,7 +29,10 @@ class SymbolTable(val outer: SymbolTable? = null) {
 
     fun resolve(name: String, offset: Int): Symbol? {
         val applicableSymbols = store.values
-            .filter { it.name == name && offset in it.scopeRange }
+            .filter {
+                it.name == name &&
+                        offset in it.scopeRange
+            }
             .sortedByDescending { it.scopeRange.last - it.scopeRange.first } // より小さいスコープを優先
         return applicableSymbols.firstOrNull() ?: outer?.resolve(name, offset)
     }

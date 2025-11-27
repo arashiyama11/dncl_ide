@@ -35,6 +35,11 @@ data class JsonRpcError(
 )
 
 @Serializable
+data class CancelParams(
+    val id: Long
+)
+
+@Serializable
 data class InitializeParams(
     val processId: Long?,
     val rootUri: String?,

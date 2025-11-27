@@ -1,5 +1,7 @@
 package io.github.arashiyama11.dncl_ide.domain.model
 
+import io.github.arashiyama11.dncl_ide.domain.canvas.CanvasFrame
+import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
 import kotlin.jvm.JvmInline
@@ -7,7 +9,7 @@ import kotlin.jvm.JvmInline
 
 sealed interface DnclOutput {
     @JvmInline
-    value class Error(val value: String) : DnclOutput
+    value class SyntaxError(val value: DnclError) : DnclOutput
 
     @JvmInline
     value class RuntimeError(val value: DnclObject.Error) : DnclOutput
@@ -26,7 +28,9 @@ sealed interface DnclOutput {
     data object StdoutFlush : DnclOutput
     data object StdoutClear : DnclOutput
     data object StdoutCommitFrame : DnclOutput
-    
+
     @JvmInline
     value class StdoutReplace(val value: String) : DnclOutput
+
+    data class CanvasFrameOutput(val frame: CanvasFrame) : DnclOutput
 }

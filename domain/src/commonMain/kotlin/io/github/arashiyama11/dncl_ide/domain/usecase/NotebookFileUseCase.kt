@@ -23,8 +23,8 @@ import io.github.arashiyama11.dncl_ide.interpreter.evaluator.EvaluatorFactory
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclObject
 import io.github.arashiyama11.dncl_ide.interpreter.model.Environment
-import io.github.arashiyama11.dncl_ide.interpreter.model.explain
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -32,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -43,9 +44,11 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
         ignoreUnknownKeys = true
     }
 
-    fun FileContent.toNotebook(): Notebook = json.decodeFromString<SerializableNotebook>(value).toDomain()
+    fun FileContent.toNotebook(): Notebook =
+        json.decodeFromString<SerializableNotebook>(value).toDomain()
 
-    fun Notebook.toFileContent(): FileContent = FileContent(json.encodeToString(this.toSerializable()))
+    fun Notebook.toFileContent(): FileContent =
+        FileContent(json.encodeToString(this.toSerializable()))
 
     open suspend fun executeCell(notebook: Notebook, cellId: String, env: Environment): Output =
         withContext(
@@ -62,10 +65,11 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
 
             val output = run {
 
+                val tokens = preProcess(Lexer(code), ::resolveLib).toList()
                 val program =
-                    Parser(Lexer(code)).getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                    Parser(tokens).getOrElse { return@run DnclOutput.SyntaxError(it) }
                         .parseProgram()
-                        .getOrElse { return@run DnclOutput.Error(it.explain(code)) }
+                        .getOrElse { return@run DnclOutput.SyntaxError(it) }
                 var i = 0
                 val evaluator = EvaluatorFactory.create(
                     Channel(), 0, null, { _, _ ->
@@ -77,7 +81,7 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 )
                 evaluator.evalProgram(program, env).fold(
                     ifLeft = {
-                        DnclOutput.Error(it.explain(code))
+                        DnclOutput.SyntaxError(it)
                     }
                 ) {
                     when (it) {
@@ -105,11 +109,12 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
                     )
                 }
 
-                is DnclOutput.Error -> {
+                is DnclOutput.SyntaxError -> {
+                    val e = output.value.explain(code)
                     Output(
                         outputType = "error",
-                        text = persistentListOf(output.value),
-                        evalue = output.value,
+                        text = persistentListOf(e),
+                        evalue = e,
                         ename = output::class.simpleName,
                     )
                 }
@@ -130,6 +135,12 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
                 )
             }
         }
+
+    private suspend fun resolveLib(path: String): String {
+        val entry = fileRepository.getEntryByPath(EntryPath.fromString(path))
+        require(entry is ProgramFile)
+        return fileRepository.getFileContent(entry).value
+    }
 
     fun createNotebookFile(
         parentPath: EntryPath,
@@ -365,17 +376,19 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
             ?: throw IllegalArgumentException("Cell with id $cellId not found in the notebook.")
         val prevOutputs = oldCell.outputs ?: persistentListOf()
 
-        val mergedOutputs = if (prevOutputs.isNotEmpty() && prevOutputs.last().outputType == newOutput.outputType) {
-            val last = prevOutputs.last()
-            val mergedText = (last.text ?: persistentListOf()) + (newOutput.text ?: persistentListOf())
-            val mergedOutput = last.copy(text = mergedText.toImmutableList())
+        val mergedOutputs =
+            if (prevOutputs.isNotEmpty() && prevOutputs.last().outputType == newOutput.outputType) {
+                val last = prevOutputs.last()
+                val mergedText =
+                    (last.text ?: persistentListOf()) + (newOutput.text ?: persistentListOf())
+                val mergedOutput = last.copy(text = mergedText.toImmutableList())
 
-            val mutableOutputs = prevOutputs.toMutableList()
-            mutableOutputs[mutableOutputs.lastIndex] = mergedOutput
-            mutableOutputs.toImmutableList()
-        } else {
-            prevOutputs.toMutableList().apply { add(newOutput) }.toImmutableList()
-        }
+                val mutableOutputs = prevOutputs.toMutableList()
+                mutableOutputs[mutableOutputs.lastIndex] = mergedOutput
+                mutableOutputs.toImmutableList()
+            } else {
+                prevOutputs.toMutableList().apply { add(newOutput) }.toImmutableList()
+            }
 
         val updatedCell = oldCell.copy(
             outputs = mergedOutputs,
@@ -412,7 +425,8 @@ open class NotebookFileUseCase(private val fileRepository: FileRepository) {
         }
         return@withContext if (entry is ProgramFile) {
             val content = fileRepository.getFileContent(entry).value
-            val parser = Parser(Lexer(content)).getOrElse { err ->
+            val tokens = preProcess(Lexer(content), ::resolveLib).toList()
+            val parser = Parser(tokens).getOrElse { err ->
                 return@withContext DnclObject.RuntimeError(
                     err.explain(content),
                     astNode

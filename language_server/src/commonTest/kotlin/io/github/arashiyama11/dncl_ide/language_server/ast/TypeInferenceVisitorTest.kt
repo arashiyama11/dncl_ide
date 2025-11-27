@@ -4,13 +4,14 @@ import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlinx.coroutines.test.runTest
 
 class TypeInferenceVisitorTest {
 
     private val astInfoService = AstInfoService()
 
     @Test
-    fun `test integer literal type inference`() {
+    fun `test integer literal type inference`() = runTest {
         val code = "a = 123"
 
         val astInfo = astInfoService.parseAndAnalyze(code)

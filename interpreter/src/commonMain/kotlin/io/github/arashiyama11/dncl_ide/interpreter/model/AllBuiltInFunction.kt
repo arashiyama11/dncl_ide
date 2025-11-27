@@ -4,7 +4,7 @@ enum class AllBuiltInFunction(val identifier: String) {
     PRINT("表示する"), LENGTH("要素数"), DIFF("差分"), RETURN("戻り値"),
     CONCAT("連結"), PUSH("末尾追加"), SHIFT("先頭削除"), UNSHIFT("先頭追加"),
     POP("末尾削除"), INT("整数変換"), FLOAT("浮動小数点変換"), STRING("文字列変換"),
-    IMPORT("インポート"), CHAR_CODE("文字コード"), FROM_CHAR_CODE("コードから文字"),
+    CHAR_CODE("文字コード"), FROM_CHAR_CODE("コードから文字"),
 
     // 配列操作関数
     SLICE("部分配列"), JOIN("配列結合"), SORT("並べ替え"), REVERSE("逆順"), FIND("検索"),
@@ -28,7 +28,11 @@ enum class AllBuiltInFunction(val identifier: String) {
     GET_STDOUT("標準出力ハンドル"), GET_STDERR("標準エラーハンドル"), GET_STDIN("標準入力ハンドル"),
     FILE_OPEN("ファイルを開く"), FILE_WRITE("ファイルへ書く"), FILE_READ("ファイルを読む"),
     FILE_CLEAR("ファイルをクリア"), FILE_FLUSH("ファイルをフラッシュ"), FILE_COMMIT("ファイルをコミット"),
-    FILE_CLOSE("ファイルを閉じる");
+    FILE_CLOSE("ファイルを閉じる"),
+
+    GET_CANVAS("get_canvas"), CANVAS_WRITE("write_canvas"), CANVAS_READ("read_canvas"),
+    CANVAS_CLEAR("clear_canvas"), CANVAS_COMMIT("commit_canvas")
+    ;
 
     companion object {
         fun from(identifier: String): AllBuiltInFunction? =

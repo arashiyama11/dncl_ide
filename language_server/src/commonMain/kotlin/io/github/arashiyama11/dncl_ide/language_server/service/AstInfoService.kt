@@ -1,78 +1,113 @@
 package io.github.arashiyama11.dncl_ide.language_server.service
 
 import arrow.core.Either
+import arrow.core.getOrElse
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignature
 import io.github.arashiyama11.dncl_ide.language_server.ast.Symbol
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolTable
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.ast.AstVisitor
 import io.github.arashiyama11.dncl_ide.language_server.ast.SymbolKind
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.StdlibOnlyFileResolver
+import io.github.arashiyama11.dncl_ide.language_server.service.resolveLibText
+import kotlinx.coroutines.flow.toList
 
 data class AstInfo(
     val ast: AstNode.Program,
-    val symbolTable: SymbolTable
+    val symbolTable: SymbolTable,
+    val filePath: String?,
+    val builtInSignatures: List<BuiltInFunctionSignature> = emptyList()
 )
 
-class AstInfoService {
-    fun parseAndAnalyze(code: String): AstInfo? {
+class AstInfoService(
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver()
+) {
+    suspend fun parseAndAnalyze(code: String, filePath: String? = null): AstInfo? {
         return try {
-            val lexer = Lexer(code)
-            val parserResult = Parser(lexer)
-            val parser = when (parserResult) {
-                is Either.Left -> return null
-                is Either.Right -> parserResult.value
-            }
+            val builtIns = mutableListOf<BuiltInFunctionSignature>()
+            val lexer = preProcess(
+                Lexer(code, filePath),
+                resolveLib = { path -> resolveLibText(fileResolver, path) },
+                onBuiltInSignature = { builtIns += it }
+            ).toList()
+            val parser = Parser(lexer).getOrElse { return null }
 
-            val programResult = parser.parseProgram()
-            val program = when (programResult) {
+            val program = when (val programResult = parser.parseProgram()) {
                 is Either.Left -> return null
                 is Either.Right -> programResult.value
             }
 
-            buildAstInfo(program)
+            buildAstInfo(program, filePath, builtIns)
         } catch (e: Exception) {
             null
         }
     }
 
-    fun buildAstInfo(program: AstNode.Program): AstInfo {
+    fun buildAstInfo(
+        program: AstNode.Program,
+        filePath: String? = null,
+        builtInSignatures: List<BuiltInFunctionSignature> = emptyList()
+    ): AstInfo {
         val visitor = AstVisitor()
         val symbolTable = visitor.visit(program)
-        return AstInfo(program, symbolTable)
+        return AstInfo(program, symbolTable, filePath, builtInSignatures)
     }
 
-    fun findNodeAtOffset(astInfo: AstInfo, offset: Int): AstNode? {
-        return findNodeRecursive(astInfo.ast, offset)
+    fun findNodeAtOffset(
+        astInfo: AstInfo,
+        offset: Int,
+        targetFilePath: String? = astInfo.filePath
+    ): AstNode? {
+        return findNodeRecursive(astInfo.ast, offset, targetFilePath)
     }
 
-    fun findSymbolAtOffset(astInfo: AstInfo, offset: Int): Symbol? {
+    fun findSymbolAtOffset(
+        astInfo: AstInfo,
+        offset: Int,
+        filePath: String? = astInfo.filePath
+    ): Symbol? {
         // First, find the node at the offset to understand the context
-        val node = findNodeAtOffset(astInfo, offset)
+        val node = findNodeAtOffset(astInfo, offset, filePath)
 
         // If it's an identifier, try to resolve it from the appropriate scope
         if (node is AstNode.Identifier) {
             // Find the appropriate scope for this offset
-            val scopeSymbolTable = findScopeForOffset(astInfo.ast, offset, astInfo.symbolTable)
-            return scopeSymbolTable.resolve(node.value, offset)
+            val scopeSymbolTable =
+                findScopeForOffset(astInfo.ast, offset, astInfo.symbolTable, filePath)
+
+            return scopeSymbolTable.resolve(
+                node.value,
+                offset,
+            )
         }
 
         // Also check if we're in a function name or parameter position
-        return findSymbolInAst(astInfo.ast, offset, astInfo.symbolTable)
+        return findSymbolInAst(
+            astInfo.ast,
+            offset,
+            astInfo.symbolTable,
+            astInfo.copy(filePath = filePath ?: astInfo.filePath)
+        )
     }
 
     private fun findScopeForOffset(
         node: AstNode,
         offset: Int,
-        globalScope: SymbolTable
+        globalScope: SymbolTable,
+        targetFilePath: String?
     ): SymbolTable {
         if (offset !in node.range) return globalScope
+        //if (targetFilePath != null && node.filePath != null && node.filePath != targetFilePath) return globalScope
 
         return when (node) {
             is AstNode.Program -> {
                 // Check if we're inside any function
                 node.statements.forEach { statement ->
-                    val scope = findScopeForOffset(statement, offset, globalScope)
+                    val scope = findScopeForOffset(statement, offset, globalScope, targetFilePath)
                     if (scope != globalScope) return scope
                 }
                 globalScope
@@ -89,7 +124,7 @@ class AstInfoService {
 
             is AstNode.BlockStatement -> {
                 node.statements.forEach { statement ->
-                    val scope = findScopeForOffset(statement, offset, globalScope)
+                    val scope = findScopeForOffset(statement, offset, globalScope, targetFilePath)
                     if (scope != globalScope) return scope
                 }
                 globalScope
@@ -99,14 +134,23 @@ class AstInfoService {
                 findScopeForOffset(
                     node.condition,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 findScopeForOffset(
                     node.consequence,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
-                node.alternative?.let { findScopeForOffset(it, offset, globalScope) }
+                node.alternative?.let {
+                    findScopeForOffset(
+                        it,
+                        offset,
+                        globalScope,
+                        targetFilePath
+                    )
+                }
                     ?.let { if (it != globalScope) return it }
                 globalScope
             }
@@ -124,12 +168,14 @@ class AstInfoService {
                 findScopeForOffset(
                     node.condition,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 findScopeForOffset(
                     node.block,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 globalScope
             }
@@ -139,50 +185,56 @@ class AstInfoService {
                     findScopeForOffset(
                         assignable,
                         offset,
-                        globalScope
+                        globalScope,
+                        targetFilePath
                     ).let { if (it != globalScope) return it }
                     findScopeForOffset(
                         expression,
                         offset,
-                        globalScope
+                        globalScope,
+                        targetFilePath
                     ).let { if (it != globalScope) return it }
                 }
                 globalScope
             }
 
             is AstNode.ExpressionStatement -> {
-                findScopeForOffset(node.expression, offset, globalScope)
+                findScopeForOffset(node.expression, offset, globalScope, targetFilePath)
             }
 
             is AstNode.InfixExpression -> {
                 findScopeForOffset(
                     node.left,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 findScopeForOffset(
                     node.right,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 globalScope
             }
 
             is AstNode.PrefixExpression -> {
-                findScopeForOffset(node.right, offset, globalScope)
+                findScopeForOffset(node.right, offset, globalScope, targetFilePath)
             }
 
             is AstNode.CallExpression -> {
                 findScopeForOffset(
                     node.function,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 node.arguments.forEach { arg ->
                     findScopeForOffset(
                         arg,
                         offset,
-                        globalScope
+                        globalScope,
+                        targetFilePath
                     ).let { if (it != globalScope) return it }
                 }
                 globalScope
@@ -192,12 +244,14 @@ class AstInfoService {
                 findScopeForOffset(
                     node.left,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 findScopeForOffset(
                     node.right,
                     offset,
-                    globalScope
+                    globalScope,
+                    targetFilePath
                 ).let { if (it != globalScope) return it }
                 globalScope
             }
@@ -207,7 +261,8 @@ class AstInfoService {
                     findScopeForOffset(
                         element,
                         offset,
-                        globalScope
+                        globalScope,
+                        targetFilePath
                     ).let { if (it != globalScope) return it }
                 }
                 globalScope
@@ -332,44 +387,50 @@ class AstInfoService {
         }
     }
 
-    private fun findNodeRecursive(node: AstNode, offset: Int): AstNode? {
+    private fun findNodeRecursive(node: AstNode, offset: Int, targetFilePath: String?): AstNode? {
         if (offset !in node.range) {
+            return null
+        }
+
+        if (targetFilePath != null && node.filePath != null && node.filePath != targetFilePath) {
             return null
         }
 
         // 複合ノードの場合、子ノードを再帰的に探索
         return when (node) {
             is AstNode.Program -> node.statements.firstNotNullOfOrNull {
-                findNodeRecursive(it, offset)
+                findNodeRecursive(it, offset, targetFilePath)
             } ?: node
 
             is AstNode.FunctionStatement -> {
                 // 関数名がオフセットに含まれるかチェック
                 if (offset in node.name.range) return AstNode.Identifier(
                     node.name.literal,
-                    node.name.range
+                    node.name.range,
+                    node.filePath
                 )
 
                 // パラメータがオフセットに含まれるかチェック
                 node.parameters.firstNotNullOfOrNull { paramToken ->
                     if (offset in paramToken.range) return AstNode.Identifier(
                         paramToken.literal,
-                        paramToken.range
+                        paramToken.range,
+                        paramToken.filePath
                     )
                     null
-                } ?: findNodeRecursive(node.block, offset) ?: node
+                } ?: findNodeRecursive(node.block, offset, targetFilePath) ?: node
             }
 
             is AstNode.IfStatement -> {
-                findNodeRecursive(node.condition, offset)
-                    ?: findNodeRecursive(node.consequence, offset)
-                    ?: node.alternative?.let { findNodeRecursive(it, offset) }
+                findNodeRecursive(node.condition, offset, targetFilePath)
+                    ?: findNodeRecursive(node.consequence, offset, targetFilePath)
+                    ?: node.alternative?.let { findNodeRecursive(it, offset, targetFilePath) }
                     ?: node
             }
 
             is AstNode.WhileStatement -> {
-                findNodeRecursive(node.condition, offset)
-                    ?: findNodeRecursive(node.block, offset)
+                findNodeRecursive(node.condition, offset, targetFilePath)
+                    ?: findNodeRecursive(node.block, offset, targetFilePath)
                     ?: node
             }
 
@@ -377,55 +438,69 @@ class AstInfoService {
                 // ループカウンタがオフセットに含まれるかチェック
                 if (offset in node.loopCounter.range) return AstNode.Identifier(
                     node.loopCounter.literal,
-                    node.loopCounter.range
+                    node.loopCounter.range,
+                    node.filePath
                 )
 
-                findNodeRecursive(node.start, offset)
-                    ?: findNodeRecursive(node.end, offset)
-                    ?: findNodeRecursive(node.step, offset)
-                    ?: findNodeRecursive(node.block, offset)
+                findNodeRecursive(node.start, offset, targetFilePath)
+                    ?: findNodeRecursive(node.end, offset, targetFilePath)
+                    ?: findNodeRecursive(node.step, offset, targetFilePath)
+                    ?: findNodeRecursive(node.block, offset, targetFilePath)
                     ?: node
             }
 
             is AstNode.AssignStatement -> {
                 node.assignments.firstNotNullOfOrNull { (assignable, expression) ->
-                    findNodeRecursive(assignable, offset)
-                        ?: findNodeRecursive(expression, offset)
+                    findNodeRecursive(assignable, offset, targetFilePath)
+                        ?: findNodeRecursive(expression, offset, targetFilePath)
                 } ?: node
             }
 
             is AstNode.ExpressionStatement -> {
-                findNodeRecursive(node.expression, offset) ?: node
+                findNodeRecursive(node.expression, offset, targetFilePath) ?: node
             }
 
             is AstNode.BlockStatement -> {
-                node.statements.firstNotNullOfOrNull { findNodeRecursive(it, offset) } ?: node
+                node.statements.firstNotNullOfOrNull {
+                    findNodeRecursive(
+                        it,
+                        offset,
+                        targetFilePath
+                    )
+                } ?: node
             }
 
             is AstNode.InfixExpression -> {
-                findNodeRecursive(node.left, offset)
-                    ?: findNodeRecursive(node.right, offset)
+                findNodeRecursive(node.left, offset, targetFilePath)
+                    ?: findNodeRecursive(node.right, offset, targetFilePath)
                     ?: node
             }
 
             is AstNode.PrefixExpression -> {
-                findNodeRecursive(node.right, offset) ?: node
+                findNodeRecursive(node.right, offset, targetFilePath) ?: node
             }
 
             is AstNode.CallExpression -> {
-                findNodeRecursive(node.function, offset)
-                    ?: node.arguments.firstNotNullOfOrNull { findNodeRecursive(it, offset) }
+                findNodeRecursive(node.function, offset, targetFilePath)
+                    ?: node.arguments.firstNotNullOfOrNull {
+                        findNodeRecursive(
+                            it,
+                            offset,
+                            targetFilePath
+                        )
+                    }
                     ?: node
             }
 
             is AstNode.IndexExpression -> {
-                findNodeRecursive(node.left, offset)
-                    ?: findNodeRecursive(node.right, offset)
+                findNodeRecursive(node.left, offset, targetFilePath)
+                    ?: findNodeRecursive(node.right, offset, targetFilePath)
                     ?: node
             }
 
             is AstNode.ArrayLiteral -> {
-                node.elements.firstNotNullOfOrNull { findNodeRecursive(it, offset) } ?: node
+                node.elements.firstNotNullOfOrNull { findNodeRecursive(it, offset, targetFilePath) }
+                    ?: node
             }
 
             // リーフノード
@@ -439,41 +514,54 @@ class AstInfoService {
         }
     }
 
-    private fun findSymbolInAst(node: AstNode, offset: Int, symbolTable: SymbolTable): Symbol? {
+    private fun findSymbolInAst(
+        node: AstNode,
+        offset: Int,
+        symbolTable: SymbolTable,
+        astInfo: AstInfo
+    ): Symbol? {
         if (offset !in node.range) return null
+        val targetFilePath = astInfo.filePath
+        if (targetFilePath != null && node.filePath != null && node.filePath != targetFilePath) return null
 
         return when (node) {
             is AstNode.Program -> {
                 node.statements.firstNotNullOfOrNull {
-                    findSymbolInAst(it, offset, symbolTable)
+                    findSymbolInAst(it, offset, symbolTable, astInfo)
                 }
             }
 
             is AstNode.FunctionStatement -> {
                 // Check if offset is in function name
                 if (offset in node.name.range) {
-                    return symbolTable.resolve(node.name.literal, offset)
+                    return symbolTable.resolve(
+                        node.name.literal,
+                        offset,
+                    )
                 }
 
                 // Check if offset is in parameters
                 node.parameters.forEach { param ->
                     if (offset in param.range) {
-                        return symbolTable.resolve(param.literal, offset)
+                        return symbolTable.resolve(
+                            param.literal,
+                            offset,
+                        )
                     }
                 }
 
                 // Check function body
-                findSymbolInAst(node.block, offset, symbolTable)
+                findSymbolInAst(node.block, offset, symbolTable, astInfo)
             }
 
             is AstNode.CallExpression -> {
                 // Check if we're calling a function
-                val funcResult = findSymbolInAst(node.function, offset, symbolTable)
+                val funcResult = findSymbolInAst(node.function, offset, symbolTable, astInfo)
                 if (funcResult != null) return funcResult
 
                 // Check arguments
                 node.arguments.firstNotNullOfOrNull {
-                    findSymbolInAst(it, offset, symbolTable)
+                    findSymbolInAst(it, offset, symbolTable, astInfo)
                 }
             }
 
@@ -485,61 +573,64 @@ class AstInfoService {
 
             is AstNode.AssignStatement -> {
                 node.assignments.firstNotNullOfOrNull { (assignable, expression) ->
-                    findSymbolInAst(assignable, offset, symbolTable)
-                        ?: findSymbolInAst(expression, offset, symbolTable)
+                    findSymbolInAst(assignable, offset, symbolTable, astInfo)
+                        ?: findSymbolInAst(expression, offset, symbolTable, astInfo)
                 }
             }
 
             is AstNode.BlockStatement -> {
                 node.statements.firstNotNullOfOrNull {
-                    findSymbolInAst(it, offset, symbolTable)
+                    findSymbolInAst(it, offset, symbolTable, astInfo)
                 }
             }
 
             is AstNode.ExpressionStatement -> {
-                findSymbolInAst(node.expression, offset, symbolTable)
+                findSymbolInAst(node.expression, offset, symbolTable, astInfo)
             }
 
             is AstNode.IfStatement -> {
-                findSymbolInAst(node.condition, offset, symbolTable)
-                    ?: findSymbolInAst(node.consequence, offset, symbolTable)
-                    ?: node.alternative?.let { findSymbolInAst(it, offset, symbolTable) }
+                findSymbolInAst(node.condition, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.consequence, offset, symbolTable, astInfo)
+                    ?: node.alternative?.let { findSymbolInAst(it, offset, symbolTable, astInfo) }
             }
 
             is AstNode.ForStatement -> {
                 // Check loop counter
                 if (offset in node.loopCounter.range) {
-                    return symbolTable.resolve(node.loopCounter.literal, offset)
+                    return symbolTable.resolve(
+                        node.loopCounter.literal,
+                        offset,
+                    )
                 }
 
-                findSymbolInAst(node.start, offset, symbolTable)
-                    ?: findSymbolInAst(node.end, offset, symbolTable)
-                    ?: findSymbolInAst(node.step, offset, symbolTable)
-                    ?: findSymbolInAst(node.block, offset, symbolTable)
+                findSymbolInAst(node.start, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.end, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.step, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.block, offset, symbolTable, astInfo)
             }
 
             is AstNode.WhileStatement -> {
-                findSymbolInAst(node.condition, offset, symbolTable)
-                    ?: findSymbolInAst(node.block, offset, symbolTable)
+                findSymbolInAst(node.condition, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.block, offset, symbolTable, astInfo)
             }
 
             is AstNode.InfixExpression -> {
-                findSymbolInAst(node.left, offset, symbolTable)
-                    ?: findSymbolInAst(node.right, offset, symbolTable)
+                findSymbolInAst(node.left, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.right, offset, symbolTable, astInfo)
             }
 
             is AstNode.PrefixExpression -> {
-                findSymbolInAst(node.right, offset, symbolTable)
+                findSymbolInAst(node.right, offset, symbolTable, astInfo)
             }
 
             is AstNode.IndexExpression -> {
-                findSymbolInAst(node.left, offset, symbolTable)
-                    ?: findSymbolInAst(node.right, offset, symbolTable)
+                findSymbolInAst(node.left, offset, symbolTable, astInfo)
+                    ?: findSymbolInAst(node.right, offset, symbolTable, astInfo)
             }
 
             is AstNode.ArrayLiteral -> {
                 node.elements.firstNotNullOfOrNull {
-                    findSymbolInAst(it, offset, symbolTable)
+                    findSymbolInAst(it, offset, symbolTable, astInfo)
                 }
             }
 

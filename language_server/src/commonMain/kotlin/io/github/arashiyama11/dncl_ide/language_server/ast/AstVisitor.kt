@@ -13,6 +13,7 @@ class AstVisitor {
                     kind = SymbolKind.BUILT_IN_FUNCTION,
                     range = IntRange(0, 0), // 組み込み関数は範囲を持たない
                     scopeRange = IntRange(0, Int.MAX_VALUE),
+                    filePath = null,
                     definitionNode = null
                 )
             )
@@ -80,14 +81,15 @@ class AstVisitor {
             when (assignable) {
                 is AstNode.Identifier -> {
                     currentScope().define(
-                        Symbol(
-                            name = assignable.value,
-                            kind = SymbolKind.VARIABLE,
-                            range = assignable.range,
-                            scopeRange = currentScopeRange(),
-                            definitionNode = assignable
-                        )
-                    )
+                Symbol(
+                    name = assignable.value,
+                    kind = SymbolKind.VARIABLE,
+                    range = assignable.range,
+                    scopeRange = currentScopeRange(),
+                    filePath = assignable.filePath,
+                    definitionNode = assignable
+                )
+            )
                     visit(expression)
                 }
 
@@ -101,14 +103,15 @@ class AstVisitor {
 
     private fun visitFunctionStatement(functionStmt: AstNode.FunctionStatement) {
         currentScope().define(
-            Symbol(
-                name = functionStmt.name.literal,
-                kind = SymbolKind.FUNCTION,
-                range = functionStmt.name.range,
-                scopeRange = currentScopeRange(),
-                definitionNode = functionStmt
+                Symbol(
+                    name = functionStmt.name.literal,
+                    kind = SymbolKind.FUNCTION,
+                    range = functionStmt.name.range,
+                    scopeRange = currentScopeRange(),
+                    filePath = functionStmt.name.filePath,
+                    definitionNode = functionStmt
+                )
             )
-        )
         enterScope(functionStmt.range)
         functionStmt.parameters.forEach { paramToken ->
             currentScope().define(
@@ -117,6 +120,7 @@ class AstVisitor {
                     kind = SymbolKind.PARAMETER,
                     range = paramToken.range,
                     scopeRange = functionStmt.range,
+                    filePath = paramToken.filePath,
                     definitionNode = null
                 )
             )
@@ -144,14 +148,15 @@ class AstVisitor {
     private fun visitForStatement(forStmt: AstNode.ForStatement) {
         enterScope(forStmt.block.range)
         currentScope().define(
-            Symbol(
-                name = forStmt.loopCounter.literal,
-                kind = SymbolKind.VARIABLE,
-                range = forStmt.loopCounter.range,
-                scopeRange = forStmt.block.range,
-                definitionNode = forStmt.loopCounter
+                Symbol(
+                    name = forStmt.loopCounter.literal,
+                    kind = SymbolKind.VARIABLE,
+                    range = forStmt.loopCounter.range,
+                    scopeRange = forStmt.block.range,
+                    filePath = forStmt.loopCounter.filePath,
+                    definitionNode = forStmt.loopCounter
+                )
             )
-        )
         visit(forStmt.start)
         visit(forStmt.end)
         visit(forStmt.step)
@@ -201,6 +206,7 @@ class AstVisitor {
                     kind = SymbolKind.PARAMETER,
                     range = paramToken.range,
                     scopeRange = functionLiteral.range,
+                    filePath = paramToken.filePath,
                     definitionNode = null
                 )
             )

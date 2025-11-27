@@ -48,7 +48,8 @@ class ReferenceFinder(private val targetSymbol: Symbol) {
                 checkReference(
                     AstNode.Identifier(
                         statement.loopCounter.literal,
-                        statement.loopCounter.range
+                        statement.loopCounter.range,
+                        statement.filePath
                     )
                 )
                 visitExpression(statement.start)

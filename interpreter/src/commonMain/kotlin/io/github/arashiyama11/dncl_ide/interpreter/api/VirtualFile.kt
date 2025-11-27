@@ -16,9 +16,20 @@ interface VirtualFile {
     suspend fun write(text: String)
 
     /**
+     * バイト列を書き込む。未対応の場合は例外を投げる。
+     */
+    suspend fun write(bytes: ByteArray) {
+        throw UnsupportedOperationException("write(bytes) is not supported for $path")
+    }
+
+    /**
      * ファイル内容を文字列として取得する。対応しない場合は例外を投げる。
      */
-    suspend fun read(): String = throw UnsupportedOperationException("read is not supported for $path")
+    suspend fun read(): String =
+        throw UnsupportedOperationException("read is not supported for $path")
+
+    suspend fun readBytes(): ByteArray = read().encodeToByteArray()
+
 
     /**
      * バッファをフラッシュする。未対応の場合は何もしない。
@@ -28,7 +39,8 @@ interface VirtualFile {
     /**
      * 内容を消去する。未対応の場合は例外を投げる。
      */
-    suspend fun clear(): Unit = throw UnsupportedOperationException("clear is not supported for $path")
+    suspend fun clear(): Unit =
+        throw UnsupportedOperationException("clear is not supported for $path")
 
     /**
      * フレーム単位でのコミット。標準出力向けの特殊操作。未対応の場合は何もしない。
@@ -60,7 +72,9 @@ class VirtualFileHandle internal constructor(
     val path: String get() = file.path
 
     suspend fun write(text: String) = file.write(text)
+    suspend fun write(bytes: ByteArray) = file.write(bytes)
     suspend fun read(): String = file.read()
+    suspend fun readBytes(): ByteArray = file.readBytes()
     suspend fun flush() = file.flush()
     suspend fun clear() = file.clear()
     suspend fun commitFrame() = file.commitFrame()
@@ -82,17 +96,23 @@ class InMemoryVirtualFile(
     override val path: String,
     initialContent: String = ""
 ) : VirtualFile {
-    private val buffer = StringBuilder(initialContent)
+    private val buffer = mutableListOf<Byte>().apply {
+        addAll(initialContent.encodeToByteArray().toList())
+    }
     private val mutex = Mutex()
 
     override suspend fun write(text: String) {
+        write(text.encodeToByteArray())
+    }
+
+    override suspend fun write(bytes: ByteArray) {
         mutex.withLock {
-            buffer.append(text)
+            bytes.forEach(buffer::add)
         }
     }
 
     override suspend fun read(): String =
-        mutex.withLock { buffer.toString() }
+        mutex.withLock { buffer.toByteArray().decodeToString() }
 
     override suspend fun clear() {
         mutex.withLock { buffer.clear() }
@@ -101,8 +121,14 @@ class InMemoryVirtualFile(
     override suspend fun replace(text: String) {
         mutex.withLock {
             buffer.clear()
-            buffer.append(text)
+            buffer.addAll(text.encodeToByteArray().toList())
         }
+    }
+
+    private fun MutableList<Byte>.toByteArray(): ByteArray {
+        val result = ByteArray(size)
+        indices.forEach { result[it] = this[it] }
+        return result
     }
 }
 
@@ -124,7 +150,7 @@ fun Stdout.asVirtualFile(path: String = StandardVirtualFile.Stdout.path): Virtua
  * 仮想ファイルを収容・管理するファイルシステム。必要に応じて新規ファイルを生成する。
  */
 class VirtualFileSystem(
-    private val defaultFileFactory: (String) -> VirtualFile = { path -> InMemoryVirtualFile(path) }
+    private val defaultFileFactory: (String) -> VirtualFile = { path -> InMemoryVirtualFile(path) },
 ) {
     private val files = mutableMapOf<String, VirtualFile>()
     private var handleCounter = 0
@@ -139,7 +165,7 @@ class VirtualFileSystem(
 
     fun open(path: String, createIfMissing: Boolean = false): VirtualFileHandle? {
         val file = files[path] ?: if (createIfMissing) {
-            defaultFileFactory(path).also { files[path] = it }
+            createFile(path).also { files[path] = it }
         } else {
             null
         }
@@ -155,9 +181,15 @@ class VirtualFileSystem(
 
     fun listFiles(): Set<String> = files.keys.toSet()
 
+    private fun createFile(path: String): VirtualFile = defaultFileFactory(path)
+
     private fun nextHandleId(): Int {
         handleCounter += 1
         return handleCounter
+    }
+
+    companion object {
+        const val CANVAS_PREFIX = "/dev/canvas"
     }
 }
 

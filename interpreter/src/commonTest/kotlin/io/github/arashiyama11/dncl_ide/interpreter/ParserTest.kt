@@ -2,6 +2,9 @@ package io.github.arashiyama11.dncl_ide.interpreter
 
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
@@ -9,16 +12,19 @@ import kotlin.test.fail
 
 class ParserTest {
     @Test
-    fun test() {
+    fun test() = runTest {
         val input = """
 もし Akibi[buin] < Akibi[tantou] ならば:
     tantou = buin
 表示する("次の工芸品の担当は部員", tantou, "です")"""
-        println(Parser(Lexer(input)).getOrNull()!!.parseProgram())
+        println(
+            Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
+                .parseProgram()
+        )
     }
 
     @Test
-    fun testExpression() {
+    fun testExpression() = runTest {
         val input = """
 -a+b
 !-a
@@ -39,7 +45,7 @@ a + b * c + d / e - f
 5 < 4 != 3 > 4
 3 + 4 * 5 == 3 * 1 + 4 * 5
 """
-        val parser = Parser(Lexer(input)).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         println(prog.getOrNull()!!.literal)
@@ -66,16 +72,16 @@ a + b * c + d / e - f
     }
 
     @Test
-    fun testFunction() {
+    fun testFunction() = runTest {
         val input = TestCase.MaisuFunction
-        val parser = Parser(Lexer(input)).getOrNull()!!
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.explain(input))
         assertEquals(
             """function 枚数(kingaku) {
 Kouka = [1, 5, 10, 50, 100]
 maisu = 0, nokori = kingaku
-for i in IntLiteral(value=4, range=81..81)..IntLiteral(value=0, range=86..86) DECREMENT by IntLiteral(value=1, range=91..91) {
+for i in 4..0 DECREMENT by IntLiteral(value=1, range=91..91, filePath=null) {
 maisu = (maisu + (nokori // Kouka[i]))
 nokori = (nokori % Kouka[i])
 }
@@ -90,7 +96,7 @@ nokori = (nokori % Kouka[i])
             TestCase.exam2025_0, """Akibi = [5, 3, 4]
 buinsu = 3
 tantou = 1
-for buin in IntLiteral(value=2, range=47..47)..Identifier(value=buinsu, range=52..57) INCREMENT by IntLiteral(value=1, range=62..62) {
+for buin in 2..buinsu INCREMENT by IntLiteral(value=1, range=62..62, filePath=null) {
 if (Akibi[buin] < Akibi[tantou]) {
 tantou = buin
 }
@@ -106,9 +112,9 @@ tantou = buin
 kougeihinsu = 9
 Akibi = [1, 1, 1]
 buinsu = 3
-for kougeihin in IntLiteral(value=1, range=93..93)..Identifier(value=kougeihinsu, range=98..108) INCREMENT by IntLiteral(value=1, range=113..113) {
+for kougeihin in 1..kougeihinsu INCREMENT by IntLiteral(value=1, range=113..113, filePath=null) {
 tantou = 1
-for buin in IntLiteral(value=2, range=151..151)..Identifier(value=buinsu, range=156..161) INCREMENT by IntLiteral(value=1, range=166..166) {
+for buin in 2..buinsu INCREMENT by IntLiteral(value=1, range=166..166, filePath=null) {
 if (Akibi[buin] < Akibi[tantou]) {
 tantou = buin
 }
@@ -125,7 +131,7 @@ Akibi[tantou] = (Akibi[tantou] + Nissu[kougeihin])
             TestCase.Sisaku2022,
             """Angoubun = ["p", "y", "e", "b", " ", "c", "m", "y", "b", "o", " ", "k", "x", "n", " ", "c", "o", "f", "o", "x", " ", "i", "o", "k", "b", "c", " ", "k", "q", "y", " "]
 Hindo = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-for i in IntLiteral(value=0, range=242..242)..InfixExpression(left=CallExpression(function=Identifier(value=要素数, range=247..249), arguments=[Identifier(value=Angoubun, range=251..258)]), operator=Minus(range=260..260, literal=-), right=IntLiteral(value=1, range=261..261)) INCREMENT by IntLiteral(value=1, range=266..266) {
+for i in 0..(要素数(Angoubun) - 1) INCREMENT by IntLiteral(value=1, range=266..266, filePath=null) {
 bangou = 差分(Angoubun[i])
 if (bangou ≠ (-1)) {
 Hindo[bangou] = (Hindo[bangou] + 1)
@@ -141,7 +147,7 @@ Hindo[bangou] = (Hindo[bangou] + 1)
             TestCase.Sisaku2022_0, """Kouka = [1, 5, 10, 50, 100]
 kingaku = 46
 maisu = 0, nokori = kingaku
-for i in IntLiteral(value=4, range=69..69)..IntLiteral(value=0, range=74..74) DECREMENT by IntLiteral(value=1, range=79..79) {
+for i in 4..0 DECREMENT by IntLiteral(value=1, range=79..79, filePath=null) {
 maisu = (maisu + (nokori // Kouka[i]))
 nokori = (nokori % Kouka[i])
 }
@@ -154,7 +160,7 @@ nokori = (nokori % Kouka[i])
         testParser(
             TestCase.Sisaku2022_1, """kakaku = 46
 min_maisu = 100
-for tsuri in IntLiteral(value=0, range=36..36)..IntLiteral(value=99, range=41..42) INCREMENT by IntLiteral(value=1, range=47..47) {
+for tsuri in 0..99 INCREMENT by IntLiteral(value=1, range=47..47, filePath=null) {
 shiharai = (kakaku + tsuri)
 maisu = (枚数(shiharai) + 枚数(tsuri))
 if (maisu < min_maisu) {
@@ -191,15 +197,15 @@ if (owari == 0) {
 表示する(atai, "は見つかりませんでした")
 }
 表示する("添字", " ", "要素")
-for i in IntLiteral(value=0, range=463..463)..InfixExpression(left=Identifier(value=kazu, range=468..471), operator=Minus(range=473..473, literal=-), right=IntLiteral(value=1, range=475..475)) INCREMENT by IntLiteral(value=1, range=480..480) {
+for i in 0..(kazu - 1) INCREMENT by IntLiteral(value=1, range=480..480, filePath=null) {
 表示する(i, " ", Data[i])
 }"""
         )
     }
 
 
-    private fun testParser(input: String, expected: String) {
-        val parser = Parser(Lexer(input)).getOrNull()!!
+    private fun testParser(input: String, expected: String) = runTest {
+        val parser = Parser(preProcess(Lexer(input), resolveLib = { "" }).toList()).getOrNull()!!
         val prog = parser.parseProgram()
         if (prog.isLeft()) fail(prog.leftOrNull()?.message)
         assertEquals(expected, prog.getOrNull()!!.literal)

@@ -8,6 +8,7 @@ import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
 import io.github.arashiyama11.dncl_ide.language_server.Diagnostic
+import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.ServerCapabilities
@@ -109,6 +110,8 @@ class DefaultLanguageFeatureProviderTest {
         override suspend fun requestSemanticTokens(uri: String): SemanticTokens {
             return SemanticTokens(data = emptyList())
         }
+
+        override suspend fun requestHover(uri: String, position: Position): Hover? = null
 
         override fun capabilities() = MutableStateFlow<ServerCapabilities?>(null)
 

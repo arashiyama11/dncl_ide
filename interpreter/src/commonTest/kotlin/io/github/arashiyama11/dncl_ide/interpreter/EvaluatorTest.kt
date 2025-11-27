@@ -12,8 +12,11 @@ import io.github.arashiyama11.dncl_ide.interpreter.model.LexerError
 import io.github.arashiyama11.dncl_ide.interpreter.model.ParserError
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,7 +40,7 @@ class EvaluatorTest {
             inputChannel = inputChannel,
             arrayOrigin = 0
         )
-        
+
         builtInEnv = runBlocking {
             EvaluatorFactory.createBuiltInFunctionEnvironment(
                 stdout = object : Stdout {
@@ -57,13 +60,14 @@ class EvaluatorTest {
                     override suspend fun replace(text: String) {
                     }
                 },
-                onImport = { _ -> DnclObject.Null(AstNode.Program(emptyList())) }
             )
         }
     }
 
-    private fun String.toProgram(): AstNode.Program {
-        val lexer = Lexer(this)
+    private fun resolveLib(path: String) = ""
+
+    private suspend fun String.toProgram(): AstNode.Program {
+        val lexer = preProcess(Lexer(this), ::resolveLib).toList()
         val parserResult = Parser(lexer)
         if (parserResult.isLeft()) {
             fail("Failed to create parser for: $this, error: ${parserResult.leftOrNull()}")
@@ -95,6 +99,33 @@ class EvaluatorTest {
     @Test
     fun `basic arithmetic operations`() {
         testEval("表示する(1 + 2 * 3 - 2)", "5\n")
+    }
+
+    @Test
+    fun `binary octal hex literals`() {
+        testEval(
+            """
+表示する(0b1010)
+表示する(0o17)
+表示する(0x1F)
+""".trimIndent(),
+            "10\n15\n31\n"
+        )
+    }
+
+    @Test
+    fun `bitwise operations`() {
+        testEval(
+            """
+表示する(5 & 3)
+表示する(5 | 2)
+表示する(5 ^ 1)
+表示する(~1)
+表示する(4 << 1)
+表示する(8 >> 2)
+""".trimIndent(),
+            "1\n7\n4\n-2\n8\n2\n"
+        )
     }
 
     @Test
@@ -169,13 +200,12 @@ class EvaluatorTest {
     }
 
     @Test
-    fun `array out of bounds access`() {
-        val result = runBlocking {
+    fun `array out of bounds access`() = runTest {
+        val result =
             evaluator.evalProgram(
                 "arr = [1, 2, 3]\n表示する(arr[3])".toProgram(),
                 builtInEnv
             )
-        }
         // Check if the result is an error or if it succeeds (depending on implementation)
         if (result.isLeft()) {
             val error = result.leftOrNull()!!
@@ -212,7 +242,7 @@ class EvaluatorTest {
     }
 
     @Test
-    fun `array origin 1`() {
+    fun `array origin 1`() = runTest {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("")
         val evaluatorWithOrigin1 = EvaluatorFactory.create(
@@ -220,17 +250,17 @@ class EvaluatorTest {
             arrayOrigin = 1
         )
 
-        runBlocking {
-            evaluatorWithOrigin1.evalProgram(
-                "arr = [10, 20, 30]\n表示する(arr[1])".toProgram(),
-                builtInEnv
-            ).leftOrNull()?.let { fail(it.toString()) }
-        }
+
+        evaluatorWithOrigin1.evalProgram(
+            "arr = [10, 20, 30]\n表示する(arr[1])".toProgram(),
+            builtInEnv
+        ).leftOrNull()?.let { fail(it.toString()) }
+
         assertEquals("10\n", stdout)
     }
 
     @Test
-    fun `array origin 1 out of bounds`() {
+    fun `array origin 1 out of bounds`() = runTest {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("")
         val evaluatorWithOrigin1 = EvaluatorFactory.create(
@@ -238,12 +268,11 @@ class EvaluatorTest {
             arrayOrigin = 1
         )
 
-        val result = runBlocking {
+        val result =
             evaluatorWithOrigin1.evalProgram(
                 "arr = [1, 2, 3]\n表示する(arr[0])".toProgram(),
                 builtInEnv
             )
-        }
         // Check if the result is an error or if it succeeds (depending on implementation)
         if (result.isLeft()) {
             val error = result.leftOrNull()!!
@@ -255,7 +284,7 @@ class EvaluatorTest {
     }
 
     @Test
-    fun `input function`() {
+    fun `input function`() = runTest {
         val inputChannel = Channel<String>(capacity = 1)
         inputChannel.trySend("42")
         val evaluatorWithInput = EvaluatorFactory.create(
@@ -263,12 +292,10 @@ class EvaluatorTest {
             arrayOrigin = 0
         )
 
-        runBlocking {
-            evaluatorWithInput.evalProgram(
-                "x = 【外部からの入力】\n表示する(x)".toProgram(),
-                builtInEnv
-            ).leftOrNull()?.let { fail(it.toString()) }
-        }
+        evaluatorWithInput.evalProgram(
+            "x = 【外部からの入力】\n表示する(x)".toProgram(),
+            builtInEnv
+        ).leftOrNull()?.let { fail(it.toString()) }
         assertEquals("42\n", stdout)
     }
 
@@ -310,7 +337,7 @@ class EvaluatorTest {
     }
 
     @Test
-    fun `error handling - syntax error`() {
+    fun `error handling - syntax error`() = runTest {
         try {
             "もし 1 == 1 ならば 表示する(\"True\")".toProgram()
             fail("Expected parsing to fail")
@@ -321,7 +348,7 @@ class EvaluatorTest {
     }
 
     @Test
-    fun `error handling - lexer error`() {
+    fun `error handling - lexer error`() = runTest {
         try {
             "x = $".toProgram()
             fail("Expected parsing to fail")

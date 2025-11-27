@@ -1,25 +1,25 @@
 package io.github.arashiyama11.dncl_ide.language_server
 
 import io.github.arashiyama11.dncl_ide.language_server.service.AstInfoService
-import io.github.arashiyama11.dncl_ide.language_server.service.DiagnosticService
 import io.github.arashiyama11.dncl_ide.language_server.service.RenameService
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class RenameServiceTest {
 
-    private fun createServices(): Triple<RenameService, DiagnosticService, AstInfoService> {
-        val diagnosticService = DiagnosticService()
+    private fun createServices(): Triple<RenameService, DocumentAnalyzerImpl, AstInfoService> {
+        val documentAnalyzerService = DocumentAnalyzerImpl()
         val astInfoService = AstInfoService()
         val renameService = RenameService(astInfoService)
-        return Triple(renameService, diagnosticService, astInfoService)
+        return Triple(renameService, documentAnalyzerService, astInfoService)
     }
 
     @Test
-    fun test_rename_variable() {
+    fun test_rename_variable() = runTest {
         // Red: 変数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -29,7 +29,8 @@ class RenameServiceTest {
         """.trimIndent()
 
         val uri = "file:///test.dncl"
-        val workspaceEdit = renameService.rename(uri, code, code.indexOf("x"), "newX")
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val workspaceEdit = renameService.rename(uri, code, code.indexOf("x"), "newX", astInfo)
 
         assertNotNull(workspaceEdit)
         assertNotNull(workspaceEdit.changes)
@@ -43,7 +44,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_function() {
+    fun test_rename_function() = runTest {
         // Red: 関数のリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -57,7 +58,8 @@ class RenameServiceTest {
         // 関数定義のaddをcalculateにリネーム
         val uri = "file:///test.dncl"
         val addPosition = code.indexOf("add")
-        val workspaceEdit = renameService.rename(uri, code, addPosition, "calculate")
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val workspaceEdit = renameService.rename(uri, code, addPosition, "calculate", astInfo)
 
         assertNotNull(workspaceEdit)
         assertNotNull(workspaceEdit.changes)
@@ -68,7 +70,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_scoped_variables_correctly() {
+    fun test_rename_scoped_variables_correctly() = runTest {
         // Red: スコープを考慮した変数リネームのテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -83,7 +85,8 @@ class RenameServiceTest {
         // グローバルのxをglobalVarにリネーム
         val uri = "file:///test.dncl"
         val globalXPosition = code.indexOf("x")
-        val globalEdit = renameService.rename(uri, code, globalXPosition, "globalVar")
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val globalEdit = renameService.rename(uri, code, globalXPosition, "globalVar", astInfo)
 
         assertNotNull(globalEdit)
         assertNotNull(globalEdit.changes)
@@ -97,7 +100,7 @@ class RenameServiceTest {
 
         // 関数内のxをlocalVarにリネーム
         val localXPosition = code.indexOf("x = 20")
-        val localEdit = renameService.rename(uri, code, localXPosition, "localVar")
+        val localEdit = renameService.rename(uri, code, localXPosition, "localVar", astInfo)
 
         assertNotNull(localEdit)
         assertNotNull(localEdit.changes)
@@ -111,7 +114,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_parameter() {
+    fun test_rename_parameter() = runTest {
         // Red: 関数パラメータのリネーム機能をテスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -125,7 +128,8 @@ class RenameServiceTest {
         // パラメータnum1をfirstNumにリネーム
         val uri = "file:///test.dncl"
         val param1Position = code.indexOf("num1")
-        val workspaceEdit = renameService.rename(uri, code, param1Position, "firstNum")
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val workspaceEdit = renameService.rename(uri, code, param1Position, "firstNum", astInfo)
 
         assertNotNull(workspaceEdit)
         assertNotNull(workspaceEdit.changes)
@@ -139,7 +143,7 @@ class RenameServiceTest {
     }
 
     @Test
-    fun test_rename_invalid_position() {
+    fun test_rename_invalid_position() = runTest {
         // Green: 無効な位置でのリネーム試行テスト
         val (renameService, _, astInfoService) = createServices()
         val code = """
@@ -149,7 +153,8 @@ class RenameServiceTest {
         // 文字列リテラル内の位置でリネーム試行
         val uri = "file:///test.dncl"
         val invalidPosition = code.indexOf("hello")
-        val workspaceEdit = renameService.rename(uri, code, invalidPosition, "newName")
+        val astInfo = astInfoService.parseAndAnalyze(code, uri)
+        val workspaceEdit = renameService.rename(uri, code, invalidPosition, "newName", astInfo)
 
         assertNull(workspaceEdit, "文字列リテラル内ではリネームできないはずです")
     }

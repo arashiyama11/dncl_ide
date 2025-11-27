@@ -35,7 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextInputService
@@ -43,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeUiState
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
-import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.adapter.TextInputMode
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
 import io.github.arashiyama11.dncl_ide.editor.compose.BindCodeEditorState
@@ -54,7 +52,7 @@ import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorControll
 import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
 import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
+import io.github.arashiyama11.dncl_ide.ui.components.CanvasAwareOutputField
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
@@ -141,49 +139,22 @@ fun DnclIDEHorizontal(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
                     .fillMaxHeight()
             )
 
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            ) {
-                when (uiState.textFieldType) {
-                    TextFieldType.DEBUG_OUTPUT -> {
-                        uiState.currentEnvironment?.let { environment ->
-                            EnvironmentDebugView(
-                                environment = environment,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                            )
-                        } ?: run {
-                            val textFieldDesc = "デバッグ出力"
-                            OutlinedTextField(
-                                value = uiState.output,
-                                onValueChange = { },
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
-                                textStyle = MaterialTheme.typography.bodyLarge,
-                                label = { Text(textFieldDesc) },
-                                readOnly = true
-                            )
-                        }
-                    }
-
-                    TextFieldType.OUTPUT -> {
-                        val textFieldDesc = "出力"
-                        OutlinedTextField(
-                            value = uiState.output,
-                            onValueChange = { },
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            textStyle = LocalCodeTypography.current.bodyLarge,
-                            label = { Text(textFieldDesc) },
-                            readOnly = true,
-                        )
-                    }
-                }
-                with(viewModel) {
-                    IdeSideButtons(Modifier.fillMaxHeight())
-                }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+        ) {
+            CanvasAwareOutputField(
+                uiState = uiState,
+                onSelectPane = viewModel::selectOutputPane,
+                onSelectCanvas = viewModel::selectCanvasSurface,
+                onRefreshHoverHint = viewModel::refreshHoverHint,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
+            with(viewModel) {
+                IdeSideButtons(Modifier.fillMaxHeight())
             }
+        }
         }
     }
 }
@@ -300,7 +271,8 @@ fun Editor(
             fontSize = uiState.fontSize,
             textStyle = LocalCodeTypography.current.bodyMedium,
             verticalScrollEnabled = true,
-            keyboardOptions = codeEditorKeyboardOptions
+            keyboardOptions = codeEditorKeyboardOptions,
+            readOnly = (isMobilePlatform && isCustomMode) || uiState.isReadOnly
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle

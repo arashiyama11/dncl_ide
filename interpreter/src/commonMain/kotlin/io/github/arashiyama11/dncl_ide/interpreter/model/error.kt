@@ -5,6 +5,7 @@ import kotlin.math.max
 sealed interface DnclError {
     val message: String?
     val errorRange: IntRange?
+    val filePath: String?
     fun explain(program: String): String
 }
 
@@ -16,8 +17,9 @@ private fun isHalfWidth(char: Char): Boolean {
 
 sealed class LexerError(override val message: String, open val index: Int) :
     DnclError {
+    override val filePath: String? = null
     override fun explain(program: String): String {
-        return explainError(program, message, index until index)
+        return explainError(program, message, index until index, filePath)
     }
 
     data class UnExpectedCharacter(
@@ -33,54 +35,81 @@ sealed class LexerError(override val message: String, open val index: Int) :
 }
 
 sealed class ParserError(
-    override val message: String, open val failToken: Token,
-    override val errorRange: IntRange = failToken.range
+    final override val message: String,
+    val token: Token,
+    final override val errorRange: IntRange = token.range,
 ) : DnclError {
-    override fun explain(program: String): String {
-        return explainError(program, message, errorRange)
+
+    final override val filePath: String? = token.filePath
+    final override fun explain(program: String): String =
+        explainError(program, message, errorRange, filePath)
+
+    // 単純な「パース失敗」
+    class ParseError(
+        token: Token,
+        message: String = "一行に複数の式を書けません",
+        range: IntRange = token.range,
+    ) : ParserError(message, token, range)
+
+    // UnexpectedToken
+    class UnexpectedToken(
+        token: Token,
+        val expectedToken: String? = null,
+    ) : ParserError(
+        buildString {
+            append("予期しないトークン: ${token.literal}")
+            if (expectedToken != null) {
+                append("\n期待されるトークン: $expectedToken")
+            }
+        },
+        token
+    )
+
+    class InvalidIntLiteral(
+        intToken: Token.Int,
+    ) : ParserError("無効な整数リテラル: ${intToken.literal}", intToken)
+
+    class InvalidFloatLiteral(
+        floatToken: Token.Float,
+    ) : ParserError("無効な浮動小数点リテラル: ${floatToken.literal}", floatToken)
+
+    class UnknownPrefixOperator(
+        token: Token,
+    ) : ParserError("予期しないトークン（不明な前置演算子）: ${token.literal}", token)
+
+    class UnknownInfixOperator(
+        token: Token,
+    ) : ParserError("予期しないトークン（不明な中置演算子）: ${token.literal}", token)
+
+    class IndentError(
+        token: Token,
+        message: String,
+    ) : ParserError(message, token) {
+
+        constructor(token: Token, indentStack: List<Int>) : this(
+            token,
+            "インデントエラー\n" +
+                    "予期しないインデント: ${token.literal}\n" +
+                    "インデントは " + if (indentStack.size == 1) {
+                "${indentStack.single()} である必要があります"
+            } else {
+                "$indentStack のいずれかである必要があります"
+            }
+        )
+
+        constructor(token: Token, expected: Int) : this(
+            token,
+            "インデントエラー\n" +
+                    "予期しないインデント: ${token.literal}\n" +
+                    "インデントは $expected である必要があります"
+        )
     }
-
-    data class ParseError(
-        override val message: String,
-        override val failToken: Token,
-        override val errorRange: IntRange = failToken.range
-    ) : ParserError(message, failToken, errorRange)
-
-    data class UnExpectedToken(override val failToken: Token, val expectedToken: String? = null) :
-        ParserError(
-            "予期しないトークン: ${failToken.literal}${if (expectedToken != null) "\n期待されるトークン: $expectedToken" else ""}",
-            failToken
-        )
-
-    data class InvalidIntLiteral(override val failToken: Token.Int) :
-        ParserError("無効な整数リテラル: ${failToken.literal}", failToken)
-
-    data class InvalidFloatLiteral(override val failToken: Token.Float) :
-        ParserError("無効な浮動小数点リテラル: ${failToken.literal}", failToken)
-
-    data class UnknownPrefixOperator(override val failToken: Token) :
-        ParserError("予期しないトークン（不明な前置演算子）: ${failToken.literal}", failToken)
-
-    data class UnknownInfixOperator(override val failToken: Token) :
-        ParserError("予期しないトークン（不明な中置演算子）: ${failToken.literal}", failToken)
-
-    data class IndentError(override val failToken: Token, override val message: String) :
-        ParserError(message, failToken) {
-        constructor(failToken: Token, indentStack: List<Int>) : this(
-            failToken,
-            "インデントエラー\n予期しないインデント: ${failToken.literal}\nインデントは ${if (indentStack.size == 1) "${indentStack.single()} である必要があります" else "$indentStack のいずれかである必要があります"}"
-        )
-
-        constructor(failToken: Token, expected: Int) : this(
-            failToken,
-            "インデントエラー\n予期しないインデント: ${failToken.literal}\nインデントは $expected である必要があります"
-        )
-    }
-
 }
+
 
 data class InternalError(override val message: String, override val errorRange: IntRange? = null) :
     DnclError {
+    override val filePath: String? = null
     override fun explain(program: String): String {
         return message
     }
@@ -106,6 +135,11 @@ inline fun <reified T : Token> tokenToLiteral(): String? {
         Token.DivideInt::class -> "//"
         Token.Divide::class -> "/"
         Token.Modulo::class -> "%"
+        Token.BitAnd::class -> "&"
+        Token.BitOr::class -> "|"
+        Token.BitXor::class -> "^"
+        Token.ShiftLeft::class -> "<<"
+        Token.ShiftRight::class -> ">>"
         Token.Assign::class -> "="
         Token.Equal::class -> "=="
         Token.NotEqual::class -> "≠"
@@ -114,6 +148,7 @@ inline fun <reified T : Token> tokenToLiteral(): String? {
         Token.GreaterThanOrEqual::class -> "≧"
         Token.LessThanOrEqual::class -> "≦"
         Token.Bang::class -> "!"
+        Token.BitNot::class -> "~"
         Token.And::class -> "AND"
         Token.Or::class -> "OR"
         Token.If::class -> "もし"
@@ -132,10 +167,11 @@ inline fun <reified T : Token> tokenToLiteral(): String? {
     }
 }
 
-private fun explainError(
+internal fun explainError(
     program: String,
     message: String,
-    errorRange: IntRange
+    errorRange: IntRange,
+    filePath: String? = null
 ): String {
     val programLines = program.split("\n")
     val (column, line, spaces) = run {
@@ -156,7 +192,8 @@ private fun explainError(
     val hats = program.safeSubstring(errorRange.first, errorRange.last + 1)
         .fold(0) { acc, c -> acc + if (isHalfWidth(c)) 1 else 2 }
         .let { if (it <= 0) 1 else it }
-    return """${line}行${column}文字目でエラーが発生しました
+    val fileInfo = filePath?.let { "ファイル: $it\n" } ?: ""
+    return """${fileInfo}${line}行${column}文字目でエラーが発生しました
 $message
 ${"=".repeat(15)}
 ${
@@ -170,10 +207,6 @@ ${
 ${" ".repeat((line - 1).toString().length + 2 + spaces)}${"^".repeat(hats)}"""
 }
 
-
-fun DnclObject.Error.explain(program: String): String {
-    return explainError(program, message, astNode.range)
-}
 
 private fun String.safeSubstring(startIndex: Int, endIndex: Int): String {
     if (this.isEmpty()) return ""

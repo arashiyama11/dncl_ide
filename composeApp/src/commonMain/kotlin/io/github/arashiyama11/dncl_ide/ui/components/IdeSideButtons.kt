@@ -14,10 +14,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -120,11 +122,19 @@ fun IdeViewModel.IdeSideButtons(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    when (uiState.textFieldType) {
-                        TextFieldType.OUTPUT -> Icons.Outlined.FileUpload
-                        TextFieldType.DEBUG_OUTPUT -> Icons.Outlined.FileDownload
-                    },
+                    Icons.Outlined.BugReport,
                     contentDescription = "Change IO",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            IconButton(
+                onClick = { toggleHoverHintMode() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Hoverヒント切替",
                     tint = MaterialTheme.colorScheme.onBackground
                 )
             }

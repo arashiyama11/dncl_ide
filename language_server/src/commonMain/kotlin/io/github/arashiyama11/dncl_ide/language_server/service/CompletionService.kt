@@ -4,18 +4,32 @@ import arrow.core.Either
 import io.github.arashiyama11.dncl_ide.interpreter.lexer.Lexer
 import io.github.arashiyama11.dncl_ide.interpreter.model.AllBuiltInFunction
 import io.github.arashiyama11.dncl_ide.interpreter.model.AstNode
+import io.github.arashiyama11.dncl_ide.interpreter.model.BuiltInFunctionSignature
 import io.github.arashiyama11.dncl_ide.interpreter.model.DnclError
 import io.github.arashiyama11.dncl_ide.interpreter.model.Token
 import io.github.arashiyama11.dncl_ide.interpreter.parser.Parser
+import io.github.arashiyama11.dncl_ide.interpreter.preprocessor.preProcess
 import io.github.arashiyama11.dncl_ide.language_server.CompletionItem
+import io.github.arashiyama11.dncl_ide.language_server.FileResolver
+import kotlinx.coroutines.flow.toList
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-class CompletionService {
-    fun getCompletionItems(code: String, offset: Int): List<CompletionItem> {
-        val suggestionUseCase = SuggestionUseCase()
-        val suggestions = suggestionUseCase.suggestWhenFailingParse(code, offset)
+class CompletionService(
+    private val fileResolver: FileResolver = StdlibOnlyFileResolver()
+) {
+    suspend fun getCompletionItems(
+        code: String,
+        offset: Int,
+        filePath: String? = null,
+        astInfo: AstInfo? = null
+    ): List<CompletionItem> {
+        if (isCommentLine(code, offset)) {
+            return emptyList()
+        }
+        val suggestionUseCase = SuggestionUseCase(fileResolver, filePath)
+        val suggestions = suggestionUseCase.suggestWithAstOrFallback(code, offset, astInfo)
         return suggestions.map { def ->
             CompletionItem(
                 label = def.literal,
@@ -197,13 +211,32 @@ private val SNIPPET_SUGGESTIONS = listOf(
 
 private val BASE_SUGGESTIONS = KEYWORD_SUGGESTIONS + SNIPPET_SUGGESTIONS
 
-private val BUILTIN_FUNCTION_SUGGESTIONS = AllBuiltInFunction.allIdentifiers().map {
+private val DEFAULT_BUILTIN_DEFINITIONS = AllBuiltInFunction.allIdentifiers().map {
     Definition(
         literal = it,
         position = null,
         kind = SuggestionKind.BuiltinFunction
     )
 }
+
+private fun builtInDefinitions(signatures: List<BuiltInFunctionSignature>): List<Definition> {
+    if (signatures.isEmpty()) return DEFAULT_BUILTIN_DEFINITIONS
+    return signatures.map { sig ->
+        val params = sig.params.joinToString(", ")
+        Definition(
+            literal = sig.name,
+            position = null,
+            kind = SuggestionKind.BuiltinFunction,
+            detail = if (params.isBlank()) "${sig.name}()" else "${sig.name}($params)",
+            insertText = if (params.isBlank()) "${sig.name}()" else "${sig.name}($params)"
+        )
+    }
+}
+
+private data class ParseResult(
+    val program: AstNode.Program?,
+    val builtInSignatures: List<BuiltInFunctionSignature>
+)
 
 private val SUGGESTION_KIND_PRIORITY = mapOf(
     SuggestionKind.Keyword to 0,
@@ -216,16 +249,33 @@ private val SUGGESTION_KIND_PRIORITY = mapOf(
     SuggestionKind.Snippet to 4
 )
 
-private class SuggestionUseCase {
-    fun suggestWhenFailingParse(
+private class SuggestionUseCase(
+    private val fileResolver: FileResolver,
+    private val filePath: String?
+) {
+    suspend fun suggestWithAstOrFallback(
         code: String,
-        position: Int
+        position: Int,
+        astInfo: AstInfo?
     ): List<Definition> {
+        if (astInfo != null) {
+            val tokens = Lexer(code, filePath).toList()
+            return suggestWithParsedProgram(
+                code = code,
+                position = position,
+                tokens = tokens,
+                program = astInfo.ast,
+                builtInSignatures = astInfo.builtInSignatures
+            )
+        }
+
+        // AST が無い場合は従来のフォールバック（軽量パース付き）
         val fixedCode = code.substring(0 until position) + "u" + code.substring(position)
-        val lexer = Lexer(fixedCode)
-        val program = parseProgramOrNull(lexer)
+        val lexer = Lexer(fixedCode, filePath)
+        val parseResult = parseProgramWithBuiltIns(lexer, filePath)
+        val program = parseResult.program
             ?: run {
-                val fallback = BASE_SUGGESTIONS + BUILTIN_FUNCTION_SUGGESTIONS
+                val fallback = BASE_SUGGESTIONS + builtInDefinitions(parseResult.builtInSignatures)
                 val query = extractActiveQuery(code, position)
                 return sortCandidates(
                     candidates = fallback,
@@ -237,8 +287,9 @@ private class SuggestionUseCase {
         return suggestWithParsedProgram(
             code = code,
             position = position,
-            tokens = Lexer(code).toList(),
-            program = program
+            tokens = Lexer(code, filePath).toList(),
+            program = program,
+            builtInSignatures = parseResult.builtInSignatures
         )
 
     }
@@ -247,7 +298,8 @@ private class SuggestionUseCase {
         code: String,
         position: Int,
         tokens: List<Either<DnclError, Token>>,
-        program: AstNode.Program
+        program: AstNode.Program,
+        builtInSignatures: List<BuiltInFunctionSignature>
     ): List<Definition> {
         val positionTokenIndex =
             tokens.indexOfFirst { it.getOrNull()?.range?.contains(position) == true }
@@ -260,12 +312,13 @@ private class SuggestionUseCase {
             )
                 .firstOrNull { it.getOrNull() is Token.Identifier || it.getOrNull() is Token.Japanese }
                 ?: tokens.getOrNull(positionTokenIndex)
-        val globalDefinitions = collectGlobalDefinitions(program)
+        val globalDefinitions = collectGlobalDefinitions(program, builtInSignatures)
         val words =
             (collectDefinitions(
                 statements = program.statements,
-                Int.MAX_VALUE,
-                position
+                depth = Int.MAX_VALUE,
+                limitPosition = position,
+                targetFilePath = filePath
             ) + globalDefinitions + BASE_SUGGESTIONS).distinctBy { it.literal to it.kind }
 
         val activeTokenLiteral = currentToken?.getOrNull()?.let { token ->
@@ -276,24 +329,35 @@ private class SuggestionUseCase {
         }
 
         val query = activeTokenLiteral ?: extractActiveQuery(code, position)
-        println("query: $query")
         return sortCandidates(words, query, position, code.length)
     }
 
-    private fun collectGlobalDefinitions(program: AstNode.Program): List<Definition> {
-        return BUILTIN_FUNCTION_SUGGESTIONS +
-                collectDefinitions(program.statements, depth = 1, limitPosition = Int.MAX_VALUE)
+    private fun collectGlobalDefinitions(
+        program: AstNode.Program,
+        builtInSignatures: List<BuiltInFunctionSignature>
+    ): List<Definition> {
+        return builtInDefinitions(builtInSignatures) +
+                collectDefinitions(
+                    statements = program.statements,
+                    depth = 1,
+                    limitPosition = Int.MAX_VALUE,
+                    targetFilePath = filePath
+                )
     }
 
     private fun collectDefinitions(
         statements: List<AstNode.Statement>,
         depth: Int,
-        limitPosition: Int
+        limitPosition: Int,
+        targetFilePath: String? = null
     ): List<Definition> {
         if (depth == 0) return emptyList()
         if (statements.isEmpty()) return emptyList()
         val result = mutableListOf<Definition>()
         for (stmt in statements) {
+            if (targetFilePath != null && stmt.filePath != null && stmt.filePath != targetFilePath) {
+                continue
+            }
             if (stmt.range.first > limitPosition) return result
             when (stmt) {
                 is AstNode.AssignStatement -> {
@@ -311,7 +375,14 @@ private class SuggestionUseCase {
                 }
 
                 is AstNode.BlockStatement -> {
-                    result.addAll(collectDefinitions(stmt.statements, depth - 1, limitPosition))
+                    result.addAll(
+                        collectDefinitions(
+                            stmt.statements,
+                            depth - 1,
+                            limitPosition,
+                            targetFilePath
+                        )
+                    )
                 }
 
                 is AstNode.ExpressionStatement -> {}
@@ -327,7 +398,8 @@ private class SuggestionUseCase {
                         collectDefinitions(
                             stmt.block.statements,
                             depth - 1,
-                            limitPosition
+                            limitPosition,
+                            targetFilePath
                         )
                     )
                 }
@@ -352,7 +424,8 @@ private class SuggestionUseCase {
                             collectDefinitions(
                                 stmt.block.statements,
                                 depth - 1,
-                                limitPosition
+                                limitPosition,
+                                targetFilePath
                             )
                         )
                     }
@@ -363,14 +436,17 @@ private class SuggestionUseCase {
                         collectDefinitions(
                             stmt.consequence.statements,
                             depth - 1,
-                            limitPosition
+                            limitPosition,
+                            targetFilePath
                         )
                     )
                     stmt.alternative?.let {
                         result.addAll(
                             collectDefinitions(
                                 it.statements,
-                                depth - 1, limitPosition
+                                depth - 1,
+                                limitPosition,
+                                targetFilePath
                             )
                         )
                     }
@@ -381,7 +457,8 @@ private class SuggestionUseCase {
                         collectDefinitions(
                             stmt.block.statements,
                             depth - 1,
-                            limitPosition
+                            limitPosition,
+                            targetFilePath
                         )
                     )
                 }
@@ -453,8 +530,17 @@ private class SuggestionUseCase {
         return scored.sortedWith(comparator).map { it.definition }
     }
 
-    private fun parseProgramOrNull(lexer: Lexer): AstNode.Program? {
-        return Parser(lexer).fold(
+    private suspend fun parseProgramWithBuiltIns(
+        lexer: Lexer,
+        filePath: String? = null
+    ): ParseResult {
+        val builtIns = mutableListOf<BuiltInFunctionSignature>()
+        val tokens = preProcess(
+            lexer,
+            resolveLib = { path -> resolveLibText(fileResolver, path) },
+            onBuiltInSignature = { builtIns += it }
+        ).toList()
+        val program = Parser(tokens).fold(
             ifLeft = { null },
             ifRight = { parser ->
                 parser.parseProgram().fold(
@@ -463,6 +549,7 @@ private class SuggestionUseCase {
                 )
             }
         )
+        return ParseResult(program, builtIns)
     }
 
     private fun computeMatchRank(target: String, query: String): Int {

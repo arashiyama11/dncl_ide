@@ -9,17 +9,17 @@ import io.github.arashiyama11.dncl_ide.language_server.util.calculatePosition
 class ReferenceService(
     private val astInfoService: AstInfoService
 ) {
-    fun findReferences(
+    suspend fun findReferences(
         uri: String,
         code: String,
         offset: Int,
         includeDeclaration: Boolean = true,
         cachedAstInfo: AstInfo? = null
     ): List<Location> {
-        val astInfo = cachedAstInfo ?: astInfoService.parseAndAnalyze(code) ?: return emptyList()
+        val astInfo = cachedAstInfo ?: return emptyList()
 
         // カーソル位置のシンボルを取得
-        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset) ?: return emptyList()
+        val symbol = astInfoService.findSymbolAtOffset(astInfo, offset, uri) ?: return emptyList()
 
         val references = mutableListOf<Location>()
 

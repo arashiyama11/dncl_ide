@@ -1,6 +1,7 @@
 package io.github.arashiyama11.dncl_ide.editor.lsp
 
 import io.github.arashiyama11.dncl_ide.language_server.CompletionList
+import io.github.arashiyama11.dncl_ide.language_server.Hover
 import io.github.arashiyama11.dncl_ide.language_server.Position
 import io.github.arashiyama11.dncl_ide.language_server.SemanticTokens
 import io.github.arashiyama11.dncl_ide.language_server.ClientCapabilities
@@ -55,6 +56,11 @@ class DefaultLanguageFeatureProvider(
     override suspend fun requestSemanticTokens(uri: String): SemanticTokens {
         ensureInitialized()
         return client.requestSemanticTokens(uri)
+    }
+
+    override suspend fun requestHover(uri: String, position: Position): Hover? {
+        ensureInitialized()
+        return client.requestHover(uri, position)
     }
 
     override val capabilities = client.capabilities()

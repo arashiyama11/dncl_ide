@@ -80,9 +80,9 @@ class DocumentManager(private val state: DocumentState = DocumentState()) {
 
     fun getDiagnostics(uri: String): List<Diagnostic>? = findEntry(uri)?.diagnostics
 
-    fun setDocument(uri: String, text: String): DocumentManager {
+    fun setDocument(uri: String, text: String, version: Int? = null): DocumentManager {
         return updateEntry(uri) { previous ->
-            val nextVersion = (previous?.version ?: -1) + 1
+            val nextVersion = version ?: ((previous?.version ?: -1) + 1)
             DocumentEntry(
                 text = text,
                 version = nextVersion

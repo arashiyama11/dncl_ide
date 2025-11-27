@@ -1,0 +1,46 @@
+# 4バイトの整数を読み込む
+関数 read_int(array, offset) を:
+  戻り値((array[offset] << 24) + (array[offset+1] << 16) + (array[offset+2] << 8) + array[offset+3])
+と定義する
+
+# 4バイトの整数を読み込む
+関数 write_int(array, offset, data) を:
+  array[offset] = (data >> 24) & 0xff
+  array[offset+1] = (data >> 16) & 0xff
+  array[offset+2] = (data >> 8) & 0xff
+  array[offset+3] = data & 0xff
+と定義する
+
+関数 write_short(array, offset, data) を:
+  array[offset] = (data >> 8) & 0xff
+  array[offset+1] = data & 0xff
+と定義する
+
+
+関数 キャンバス作成(width, height,r,g,b,a) を:
+  ctx = get_canvas()
+  size = width * height * 4
+  data = [68,78,67,76,0,1,0,0,
+  (width >> 24) & 0xff, (width >> 16) & 0xff, (width >> 8) & 0xff, width & 0xff,
+   (height >> 24) & 0xff, (height >> 16) & 0xff, (height >> 8) & 0xff, height & 0xff,
+  r,g,b,a,
+  0,0,0,0,
+  0,0,0,0,
+  (size >> 24) & 0xff, (size >> 16) & 0xff, (size >> 8) & 0xff, size & 0xff]
+  i を 1 から size まで 1 ずつ増やしながら繰り返す:
+    末尾追加(data,0)
+  write_canvas(ctx,data)
+  戻り値(ctx)
+と定義する
+
+関数 キャンバス書き込み(ctx, data) を:
+  content = read_canvas(ctx)
+  i を 1 から 要素数(data) まで 1 ずつ増やしながら繰り返す:
+    j = i + 31
+    content[j] = data[i-1]
+
+  frame = read_int(content, 20)
+  write_int(content,20, frame + 1)
+  clear_canvas(ctx)
+  write_canvas(ctx,content)
+と定義する

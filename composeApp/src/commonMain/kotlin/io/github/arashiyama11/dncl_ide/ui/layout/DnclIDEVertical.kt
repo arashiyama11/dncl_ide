@@ -39,7 +39,6 @@ import androidx.compose.ui.platform.LocalTextInputService
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.arashiyama11.dncl_ide.adapter.IdeViewModel
-import io.github.arashiyama11.dncl_ide.adapter.TextFieldType
 import io.github.arashiyama11.dncl_ide.adapter.TextInputMode
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditor
 import io.github.arashiyama11.dncl_ide.editor.compose.CodeEditorController
@@ -50,7 +49,7 @@ import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorControll
 import io.github.arashiyama11.dncl_ide.editor.compose.rememberCodeEditorState
 import io.github.arashiyama11.dncl_ide.editor.core.EditorContent
 import io.github.arashiyama11.dncl_ide.ui.LocalCodeTypography
-import io.github.arashiyama11.dncl_ide.ui.components.EnvironmentDebugView
+import io.github.arashiyama11.dncl_ide.ui.components.CanvasAwareOutputField
 import io.github.arashiyama11.dncl_ide.ui.components.IdeSideButtons
 import io.github.arashiyama11.dncl_ide.ui.components.InlineSuggestionPopup
 import io.github.arashiyama11.dncl_ide.ui.components.SuggestionStripView
@@ -219,7 +218,7 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
             textStyle = LocalCodeTypography.current.bodyMedium,
             verticalScrollEnabled = true,
             keyboardOptions = codeEditorKeyboardOptions,
-            readOnly = shouldDisableSystemKeyboard
+            readOnly = shouldDisableSystemKeyboard || uiState.isReadOnly
         )
 
         val suggestionPanelStyle = uiState.suggestionPanelStyle
@@ -294,41 +293,13 @@ fun DnclIDEVertical(modifier: Modifier = Modifier, viewModel: IdeViewModel) {
                 .weight(1f, fill = true),
             horizontalArrangement = Arrangement.Start
         ) {
-            when (uiState.textFieldType) {
-                TextFieldType.DEBUG_OUTPUT -> {
-                    uiState.currentEnvironment?.let { environment ->
-                        EnvironmentDebugView(
-                            environment = environment,
-                            modifier = Modifier
-                                .fillMaxSize().weight(1f, fill = true)
-                        )
-                    } ?: run {
-                        // Fallback if environment is null
-                        val textFieldDesc = "デバッグ出力"
-                        OutlinedTextField(
-                            value = uiState.output, // Debug output shows general output when env is null
-                            onValueChange = { }, // ReadOnly
-                            modifier = Modifier.weight(1f, fill = true)
-                                .fillMaxHeight(),
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            label = { Text(textFieldDesc) },
-                            readOnly = true
-                        )
-                    }
-                }
-
-                TextFieldType.OUTPUT -> {
-                    val textFieldDesc = "出力"
-                    OutlinedTextField(
-                        value = uiState.output,
-                        onValueChange = { }, // ReadOnly
-                        modifier = Modifier.weight(1f, fill = true).fillMaxSize(),
-                        textStyle = LocalCodeTypography.current.bodyLarge,
-                        label = { Text(textFieldDesc) },
-                        readOnly = true,
-                    )
-                }
-            }
+            CanvasAwareOutputField(
+                uiState = uiState,
+                onSelectPane = viewModel::selectOutputPane,
+                onSelectCanvas = viewModel::selectCanvasSurface,
+                onRefreshHoverHint = viewModel::refreshHoverHint,
+                modifier = Modifier.weight(1f, fill = true)
+            )
             with(viewModel) {
                 IdeSideButtons(Modifier.fillMaxHeight())
             }

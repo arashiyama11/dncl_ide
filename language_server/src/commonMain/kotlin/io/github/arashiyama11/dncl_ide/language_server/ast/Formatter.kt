@@ -67,7 +67,8 @@ class Formatter {
                 visitIdentifier(
                     AstNode.Identifier(
                         statement.loopCounter.literal,
-                        statement.loopCounter.range
+                        statement.loopCounter.range,
+                        statement.filePath
                     )
                 )
                 builder.append(" を ")
