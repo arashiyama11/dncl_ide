@@ -1,10 +1,6 @@
-補完をIMEに
-
 # DNCL IDE
 
 DNCL IDEは共通テスト情報で用いられる擬似プログラミング言語「DNCL」の統合開発環境です
-https://www.canva.com/design/DAG0nhGRe7w/1v3MxG1X_RDAeI5vwcFiQQ/edit?utm_content=DAG0nhGRe7w&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
-
 ## Packages
 
 リリースのAssetsからIDE, CLI, Language Serverをダウンロードできます。
