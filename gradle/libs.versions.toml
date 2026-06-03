@@ -23,7 +23,7 @@ compose-hot-reload = "1.0.0"
 markdown-renderer = "0.38.1"
 atomicfu = "0.29.0"
 kotlinx-collections-immutable = "0.4.0"
-buildconfig = "6.0.5"
+buildconfig = "6.0.10"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
